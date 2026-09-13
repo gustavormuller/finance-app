@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/verify.sh >&2 || exit 2",
+            "timeout": 900,
+            "statusMessage": "Running scripts/verify.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>Finance.Api</RootNamespace>
+    <AssemblyName>Finance.Api</AssemblyName>
+    <UserSecretsId>finance-app-api</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Finance.Api.Tests" />
+  </ItemGroup>
+
+</Project>

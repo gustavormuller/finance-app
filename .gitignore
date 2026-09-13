@@ -1,0 +1,41 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+artifacts/
+TestResults/
+*.trx
+*.coverage
+*.coverlet.json
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+secrets.json
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Editors and OS
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code personal overrides
+.claude/settings.local.json

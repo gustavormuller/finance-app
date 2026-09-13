@@ -1,0 +1,17 @@
+# Normalize every text file to LF inside the repository.
+* text=auto eol=lf
+
+# Shell scripts must have LF in the working tree too. With core.autocrlf=true on
+# Windows, a CRLF checkout makes bash fail with "$'\r': command not found".
+*.sh text eol=lf
+
+# Windows-native scripts are the exception and need CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Never touch binaries.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
