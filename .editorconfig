@@ -36,3 +36,9 @@ trim_trailing_whitespace = false
 
 [*.sh]
 end_of_line = lf
+
+# EF Core scaffolds migrations with block-scoped namespaces and offers no generator
+# option to change that. Relaxed here rather than hand-editing generated code after
+# every `dotnet ef migrations add`.
+[api/Migrations/*.cs]
+dotnet_diagnostic.IDE0161.severity = none
