@@ -36,9 +36,19 @@ trap cleanup EXIT
 step "starting PostgreSQL"
 docker compose -f "$COMPOSE_FILE" up -d
 
+# Built and launched as a dll rather than with `dotnet run`, because `dotnet run`
+# spawns the application as a child process: killing the pid this script holds would
+# leave that child alive, still bound to the port, and the next run would silently
+# test against a stale build. The content root has to be pinned explicitly, because
+# it otherwise follows the working directory and the app would not find
+# appsettings.Development.json.
+step "building API"
+dotnet build "$ROOT_DIR/api" --nologo
+
 step "starting API at $API_URL"
 ASPNETCORE_ENVIRONMENT=Development \
-  dotnet run --project "$ROOT_DIR/api" --no-launch-profile --urls "$API_URL" &
+  dotnet "$ROOT_DIR/api/bin/Debug/net10.0/Finance.Api.dll" \
+  --contentRoot "$ROOT_DIR/api" --urls "$API_URL" &
 API_PID=$!
 
 step "waiting for $API_URL/health"
