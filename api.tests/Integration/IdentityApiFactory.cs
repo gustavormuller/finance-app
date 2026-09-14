@@ -45,6 +45,17 @@ internal sealed class TestGoogleHandler(
 {
     protected override Task<HandleRequestResult> HandleRemoteAuthenticateAsync()
     {
+        // Google reports a refused consent, or a flow that broke on its side, as a
+        // query parameter on the callback — before any code exchange. The real handler
+        // turns that into a failed result, and so does this one, so the production
+        // OnRemoteFailure runs against it.
+        var error = Request.Query["error"].ToString();
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            return Task.FromResult(HandleRequestResult.Fail($"Google returned {error}."));
+        }
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, account.Subject),

@@ -25,6 +25,12 @@ public static class AuthenticationSetup
     /// <summary>Where the browser lands when Google will not vouch for the address.</summary>
     public const string UnverifiedEmailPath = "/login?error=unverified";
 
+    /// <summary>Where the browser lands when the person refused the consent screen.</summary>
+    public const string SignInCancelledPath = "/login?error=cancelled";
+
+    /// <summary>Where the browser lands when the flow broke for any other reason.</summary>
+    public const string SignInFailedPath = "/login?error=auth_failed";
+
     /// <summary>
     /// Identity with no roles and no local passwords, a cookie session, Google as the
     /// only sign-in provider, and a key ring that survives a restart.
@@ -79,6 +85,40 @@ public static class AuthenticationSetup
                     context.Identity?.AddClaim(
                         new Claim("email_verified", verified.GetBoolean() ? "true" : "false"));
                 }
+
+                return Task.CompletedTask;
+            };
+
+            // Without this the handler throws, and refusing the consent screen — a
+            // button Google puts in front of everyone — answers 500.
+            options.Events.OnRemoteFailure = context =>
+            {
+                context.HandleResponse();
+
+                // Classified from the parameter Google actually sent rather than from
+                // the failure message, which is prose and version-dependent. A failure
+                // with no error parameter at all is a broken flow: a missing or
+                // tampered state, or a correlation cookie that never came back.
+                var refused = string.Equals(
+                    context.Request.Query["error"],
+                    "access_denied",
+                    StringComparison.Ordinal);
+
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("Finance.Api.Authentication.Google");
+
+                if (refused)
+                {
+                    // Somebody changing their mind is not an incident.
+                    logger.LogInformation("A Google sign-in was refused at the consent screen.");
+                }
+                else
+                {
+                    logger.LogWarning(context.Failure, "The Google sign-in flow failed.");
+                }
+
+                context.Response.Redirect(refused ? SignInCancelledPath : SignInFailedPath);
 
                 return Task.CompletedTask;
             };

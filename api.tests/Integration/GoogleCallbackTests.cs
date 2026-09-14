@@ -143,6 +143,63 @@ public sealed class GoogleCallbackTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
 
+    /// <summary>
+    /// Refusing the consent screen. Not in the spec's test plan — the spec did not
+    /// cover the path at all, and without a handler it answers 500.
+    /// </summary>
+    [Fact]
+    public async Task A_refused_consent_is_sent_back_to_login_and_creates_nothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var email = UniqueEmail("refused");
+        var subject = UniqueSubject();
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        factory.GoogleAccount.Subject = subject;
+        factory.GoogleAccount.Email = email;
+
+        using var client = factory.CreateApiClient();
+
+        using var callback = await client.GetAsync(
+            $"{CallbackPath}?error=access_denied",
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Found, callback.StatusCode);
+        Assert.Equal("/login?error=cancelled", callback.Headers.Location?.ToString());
+
+        Assert.Equal(0, await CountUsersAsync(email, cancellationToken));
+        Assert.Equal(0, await CountLoginsForSubjectAsync(subject, cancellationToken));
+
+        using var me = await client.GetAsync("/api/auth/me", cancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+    }
+
+    /// <summary>
+    /// The other half of the same branch. Without it, a wrong constant in the
+    /// non-refusal case would go unnoticed.
+    /// </summary>
+    [Fact]
+    public async Task Any_other_google_failure_is_sent_back_to_login_as_a_failure()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var email = UniqueEmail("failed");
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        factory.GoogleAccount.Subject = UniqueSubject();
+        factory.GoogleAccount.Email = email;
+
+        using var client = factory.CreateApiClient();
+
+        using var callback = await client.GetAsync(
+            $"{CallbackPath}?error=temporarily_unavailable",
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Found, callback.StatusCode);
+        Assert.Equal("/login?error=auth_failed", callback.Headers.Location?.ToString());
+
+        Assert.Equal(0, await CountUsersAsync(email, cancellationToken));
+    }
+
     /// <summary>Runs one callback and returns the id of the user it signed in.</summary>
     private static async Task<Guid> SignInAsync(
         IdentityApiFactory factory,

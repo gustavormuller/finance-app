@@ -123,10 +123,31 @@ describe('the login page', () => {
     expect(screen.getByRole('link', { name: 'Sign in with Google' })).toBeInTheDocument();
   });
 
+  it.each([
+    ['cancelled', /cancelled/i],
+    ['auth_failed', /could not be completed/i],
+  ])('explains a %s callback', async (code, expected) => {
+    stubMeStatus(401, null);
+
+    renderAt(`/login?error=${code}`);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(expected);
+  });
+
   it('shows no message when there is no error in the query string', async () => {
     stubMeStatus(401, null);
 
     renderAt('/login');
+
+    expect(await screen.findByRole('link', { name: 'Sign in with Google' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows no message for an error code it does not recognise', async () => {
+    stubMeStatus(401, null);
+
+    // A stale bookmark must not render an empty alert box.
+    renderAt('/login?error=something-else');
 
     expect(await screen.findByRole('link', { name: 'Sign in with Google' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
