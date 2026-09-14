@@ -15,9 +15,12 @@ const loginRoute = createRoute({
   // The callback sends the browser here with ?error=unverified when Google will not
   // vouch for the address. Anything else in the query string is dropped rather than
   // rendered.
-  validateSearch: (search: Record<string, unknown>): { error: string | undefined } => ({
-    error: typeof search.error === 'string' ? search.error : undefined,
-  }),
+  //
+  // The key is omitted rather than set to undefined: under exactOptionalPropertyTypes
+  // a present-but-undefined key is still required, and navigating to /login would
+  // have to pass a search object every time.
+  validateSearch: (search: Record<string, unknown>): { error?: string } =>
+    typeof search.error === 'string' ? { error: search.error } : {},
 
   component: LoginPage,
 });
