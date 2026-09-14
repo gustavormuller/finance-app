@@ -2,6 +2,7 @@ using System.Reflection;
 using Finance.Api.Application;
 using Finance.Api.Domain;
 using Finance.Api.Domain.Identity;
+using Finance.Api.Domain.Transactions;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,6 +38,12 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
     /// </summary>
     protected ICurrentUser CurrentUser { get; } = currentUser;
 
+    public DbSet<Account> Accounts => Set<Account>();
+
+    public DbSet<Category> Categories => Set<Category>();
+
+    public DbSet<Transaction> Transactions => Set<Transaction>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -56,6 +63,8 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
                 .IsUnique()
                 .HasDatabaseName("EmailIndex");
         });
+
+        modelBuilder.ConfigureTransactions();
 
         // ADR-007, the part that matters: one loop, not one line per entity. A new
         // user-owned entity is isolated because it implements IUserOwned, not because
