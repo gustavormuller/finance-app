@@ -32,6 +32,13 @@ public sealed class ExternalSignIn(
     SignInManager<AppUser> signInManager,
     ILogger<ExternalSignIn> logger)
 {
+    /// <summary>
+    /// Declared here rather than next to the provider that produces it, because both
+    /// the Google mapping and the development login have to agree with the check
+    /// below on the spelling.
+    /// </summary>
+    public const string EmailVerifiedClaimType = "email_verified";
+
     public async Task<ExternalSignInOutcome> SignInAsync(string provider, ClaimsPrincipal externalUser)
     {
         var email = externalUser.FindFirstValue(ClaimTypes.Email)
@@ -96,11 +103,15 @@ public sealed class ExternalSignIn(
     }
 
     /// <summary>
-    /// Google sends <c>email_verified</c> as a JSON boolean, which the claim action
-    /// maps to the string <c>"true"</c>. A missing claim counts as not verified.
+    /// A missing claim counts as not verified, and so does one that will not parse.
     /// </summary>
-    private static bool IsEmailVerified(ClaimsPrincipal externalUser) =>
-        bool.TryParse(externalUser.FindFirstValue("email_verified"), out var verified) && verified;
+    /// <remarks>
+    /// Internal rather than private so the unit tests can drive the fail-closed
+    /// property through the real check instead of a copy of it.
+    /// </remarks>
+    internal static bool IsEmailVerified(ClaimsPrincipal externalUser) =>
+        bool.TryParse(externalUser.FindFirstValue(EmailVerifiedClaimType), out var verified)
+        && verified;
 
     private static void Verify(IdentityResult result, string operation)
     {

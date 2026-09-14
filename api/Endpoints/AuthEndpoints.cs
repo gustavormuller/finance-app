@@ -84,7 +84,7 @@ public static class AuthEndpoints
                 // through the same branch a returning Google user takes.
                 new(ClaimTypes.NameIdentifier, $"dev-{request.Email}"),
                 new(ClaimTypes.Email, request.Email),
-                new("email_verified", "true"),
+                new(ExternalSignIn.EmailVerifiedClaimType, "true"),
             };
 
             if (!string.IsNullOrWhiteSpace(request.DisplayName))

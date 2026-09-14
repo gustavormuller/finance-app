@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using System.Text.Json;
 using System.Threading.RateLimiting;
 using Finance.Api.Application;
 using Finance.Api.Domain.Identity;
@@ -72,18 +70,15 @@ public static class AuthenticationSetup
             // token that expires in seven days while the consent screen is in Testing.
             options.SaveTokens = false;
 
-            // Google sends email_verified as a JSON boolean, and none of the default
-            // claim actions map it. ExternalSignIn refuses to create anything without
-            // it, so it has to survive the trip from the userinfo payload to the
-            // principal. A missing or non-boolean value is left out, and therefore
-            // read as not verified.
+            // None of Google's default claim actions map email_verified, and
+            // ExternalSignIn refuses to create anything without it, so it has to
+            // survive the trip from the userinfo payload to the principal. The reading
+            // itself is in GoogleUserInfo, where a unit test can reach it.
             options.Events.OnCreatingTicket = context =>
             {
-                if (context.User.TryGetProperty("email_verified", out var verified)
-                    && verified.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                foreach (var claim in GoogleUserInfo.ReadUnmappedClaims(context.User))
                 {
-                    context.Identity?.AddClaim(
-                        new Claim("email_verified", verified.GetBoolean() ? "true" : "false"));
+                    context.Identity?.AddClaim(claim);
                 }
 
                 return Task.CompletedTask;
