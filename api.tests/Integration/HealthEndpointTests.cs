@@ -25,6 +25,16 @@ internal sealed class HealthApiFactory(string connectionString, bool migrateOnSt
             {
                 ["ConnectionStrings:Default"] = connectionString,
                 ["Database:MigrateOnStartup"] = migrateOnStartup ? "true" : "false",
+
+                // All required at boot since 002. None of them matters to the health
+                // endpoints, but a host that cannot answer where it is served from,
+                // where its Data Protection keys live, or how to reach Google refuses
+                // to start at all.
+                ["App:Origin"] = "https://localhost",
+                ["DataProtection:KeysPath"] =
+                    Path.Combine(Path.GetTempPath(), "finance-app-tests", Guid.NewGuid().ToString("N")),
+                ["Google:ClientId"] = "test-client-id",
+                ["Google:ClientSecret"] = "test-client-secret",
             }));
     }
 }

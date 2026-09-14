@@ -17,16 +17,47 @@ builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
     options.UseNpgsql(serviceProvider.GetRequiredService<IConfiguration>().GetConnectionString("Default")));
 
+builder.Services.AddFinanceAuthentication();
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
-if (string.IsNullOrWhiteSpace(app.Configuration.GetConnectionString("Default")))
+// Everything the process cannot run without, checked once, at boot, with a message
+// that says what the setting is for. In development these come from user secrets
+// (UserSecretsId finance-app-api), in production from the environment. Each of them
+// otherwise fails later and worse: inside Npgsql, inside the Google handler on every
+// single request, at the first sign-in, or — for the keys — silently, as sessions
+// quietly dying on every restart.
+Require(
+    "ConnectionStrings:Default",
+    "the PostgreSQL connection string");
+Require(
+    "Google:ClientId",
+    "the OAuth client id from the Google Cloud Console; Google is the only way in");
+Require(
+    "Google:ClientSecret",
+    "the OAuth client secret matching Google:ClientId");
+Require(
+    ConfigurationKeys.AppOrigin,
+    "the exact scheme, host and port the browser loads the application from; every "
+    + "mutating request to /api must carry it as its Origin header");
+Require(
+    ConfigurationKeys.DataProtectionKeysPath,
+    "the directory holding the Data Protection key ring; without one, every restart "
+    + "invalidates every session");
+
+var appOrigin = app.Configuration[ConfigurationKeys.AppOrigin]!;
+
+void Require(string key, string purpose)
 {
-    // In development this comes from user secrets (UserSecretsId finance-app-api),
-    // in production from the environment. Failing at boot with a readable message
-    // beats failing later inside Npgsql.
+    if (!string.IsNullOrWhiteSpace(app.Configuration[key]))
+    {
+        return;
+    }
+
     throw new InvalidOperationException(
-        "ConnectionStrings:Default is not configured. In development, set it with "
-        + "`dotnet user-secrets set \"ConnectionStrings:Default\" \"...\" --project api`.");
+        $"{key} is not configured. It is {purpose}. In development, set it with "
+        + $"`dotnet user-secrets set \"{key}\" \"...\" --project api`.");
 }
 
 // The deploy model is `git pull && docker compose up -d --build` with no separate
@@ -39,12 +70,24 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", defaultValue: true))
     await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }
 
+app.UseRouting();
+
+// Before authentication, so a cross-origin request is refused without its cookie ever
+// being looked at.
+app.UseApiOriginCheck(appOrigin);
+
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Liveness: the process is up. No database work — scripts/verify-e2e.sh polls this to
 // know the API is ready, and e2e/smoke.spec.ts asserts its shape.
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 // Readiness: the process can serve traffic, which means the database answers.
 app.MapHealthEndpoints();
+
+app.MapAuthEndpoints(app.Environment);
 
 app.Run();
 
