@@ -1,8 +1,14 @@
+using Finance.Api.Application;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// The query filters read the caller's id from the request, so the context needs an
+// ICurrentUser in every scope, including the ones that serve no request at all.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
 // The connection string is read from the built service provider rather than from
 // builder.Configuration, because configuration sources added by the host — including

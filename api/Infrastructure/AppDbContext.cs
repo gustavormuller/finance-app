@@ -1,16 +1,22 @@
+using Finance.Api.Application;
 using Microsoft.EntityFrameworkCore;
 
 namespace Finance.Api.Infrastructure;
 
 /// <summary>
-/// Deliberately empty. 001 is a walking skeleton: the point of the context and its
-/// empty initial migration is to prove the EF Core pipeline reaches PostgreSQL before
-/// anything depends on it.
+/// The single EF Core context. Per ADR-016 there is no repository layer over it:
+/// <c>Application/</c> uses this type directly.
 /// </summary>
 /// <remarks>
-/// The first real tables arrive with Identity in 002. Per ADR-007, every domain entity
-/// added here carries a <c>UserId</c> and a global query filter configured in
-/// <see cref="DbContext.OnModelCreating"/>; <c>prices</c> and <c>benchmarks</c> are the
-/// only exceptions, being shared market data.
+/// Not sealed, and taking the non-generic <see cref="DbContextOptions"/>, so
+/// <c>api.tests</c> can derive a context carrying one throwaway
+/// <see cref="Domain.IUserOwned"/> entity and prove the generic query filter works
+/// before any real entity depends on it.
 /// </remarks>
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options);
+public class AppDbContext(DbContextOptions options, ICurrentUser currentUser) : DbContext(options)
+{
+    /// <summary>
+    /// The user every <see cref="Domain.IUserOwned"/> query is filtered by.
+    /// </summary>
+    protected ICurrentUser CurrentUser { get; } = currentUser;
+}

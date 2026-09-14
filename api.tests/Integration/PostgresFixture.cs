@@ -1,3 +1,4 @@
+using Npgsql;
 using Testcontainers.PostgreSql;
 
 namespace Finance.Api.Tests.Integration;
@@ -17,6 +18,27 @@ public sealed class PostgresFixture : IAsyncLifetime
     public string ConnectionString => _container.GetConnectionString();
 
     public ValueTask InitializeAsync() => new(_container.StartAsync());
+
+    /// <summary>
+    /// Creates an empty database on the same container and returns a connection
+    /// string for it. The query-filter test builds its schema with
+    /// <c>EnsureCreated</c>, which does nothing on a database that already has
+    /// tables, so it needs one of its own.
+    /// </summary>
+    public async Task<string> CreateEmptyDatabaseAsync(CancellationToken cancellationToken)
+    {
+        var name = "filter_" + Guid.NewGuid().ToString("N");
+
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        // CREATE DATABASE takes no parameters. The name is a generated identifier,
+        // never input.
+        await using var command = new NpgsqlCommand($"CREATE DATABASE \"{name}\";", connection);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        return new NpgsqlConnectionStringBuilder(ConnectionString) { Database = name }.ConnectionString;
+    }
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();
 }
