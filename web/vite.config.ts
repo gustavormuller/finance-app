@@ -10,14 +10,18 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // changeOrigin is deliberately absent. It rewrites the Host header to the
+    // target, and ASP.NET builds the Google redirect_uri from the incoming Host:
+    // rewriting it produces http://localhost:5080/api/auth/google/callback, which
+    // neither matches the Google Cloud Console entry nor lands the browser back in
+    // the SPA. /health does not care, but the two blocks should not differ without
+    // a reason.
     proxy: {
       '/api': {
         target: API_URL,
-        changeOrigin: true,
       },
       '/health': {
         target: API_URL,
-        changeOrigin: true,
       },
     },
   },
