@@ -1,8 +1,11 @@
 import { createRootRoute, createRoute } from '@tanstack/react-router';
 
+import AccountsPage from './routes/AccountsPage';
+import CategoriesPage from './routes/CategoriesPage';
 import HomePage from './routes/HomePage';
 import LoginPage from './routes/LoginPage';
 import ProtectedLayout from './routes/ProtectedLayout';
+import TransactionsPage from './routes/TransactionsPage';
 
 // No component: the default root renders an Outlet, and the application shell lives
 // in App.tsx, outside the router.
@@ -41,7 +44,27 @@ const homeRoute = createRoute({
   component: HomePage,
 });
 
+// 003's three screens, all nested under the pathless protected layout so they are
+// guarded by construction rather than by each page remembering to check.
+const transactionsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/transactions',
+  component: TransactionsPage,
+});
+
+const accountsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/accounts',
+  component: AccountsPage,
+});
+
+const categoriesRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/categories',
+  component: CategoriesPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, accountsRoute, categoriesRoute]),
 ]);

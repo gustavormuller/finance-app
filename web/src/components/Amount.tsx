@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils';
+
 /**
  * A signed amount of money.
  *
@@ -8,10 +10,32 @@
  * Colour is never the only carrier of the sign. The sign itself is always printed, so
  * the row still reads correctly in greyscale and for a red/green deficiency.
  */
-export default function Amount(props: {
+export default function Amount({
+  value,
+  className,
+}: {
   value: number;
   currency?: string;
   className?: string;
 }): React.JSX.Element {
-  throw new Error(`Amount is not implemented (value=${props.value})`);
+  const magnitude = Math.abs(value).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  return (
+    <span
+      data-testid="amount"
+      className={cn(
+        'amount tabular-nums',
+        value < 0 ? 'text-foreground' : 'text-green-700 dark:text-green-500',
+        className,
+      )}
+    >
+      {/* U+2212, a real minus sign: it is the width of a digit, so a column of
+          negatives stays aligned where a hyphen would not. */}
+      {value < 0 ? '−' : '+'}
+      {magnitude}
+    </span>
+  );
 }

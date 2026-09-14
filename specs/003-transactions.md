@@ -76,7 +76,12 @@ Unique index: `(UserId, Name)`.
 | `ParentId` | `Guid?` | FK to `Category`, `RESTRICT` on delete |
 | `CreatedAt` | `timestamptz` | |
 
-Unique index: `(UserId, ParentId, Name)`.
+Unique index: `(UserId, ParentId, Name)`, **`NULLS NOT DISTINCT`**.
+The qualifier is not optional: `ParentId` is null for every top-level category, and
+PostgreSQL's default treats each of those nulls as distinct from the others — so
+without it the index constrains child names only, and a second top-level `Food` sits
+happily next to the seeded one. Requires PostgreSQL 15 or later.
+
 A child's `Kind` must equal its parent's. A category whose `ParentId` is set may not itself be a parent.
 
 ### `Transaction : IUserOwned`

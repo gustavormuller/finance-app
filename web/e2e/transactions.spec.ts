@@ -26,13 +26,20 @@ async function createTransaction(
   await page.goto('/transactions');
   await page.getByRole('button', { name: 'New transaction' }).click();
 
-  await page.getByLabel('Account').selectOption({ label: values.account });
-  await page.getByLabel('Category').selectOption({ label: values.category });
+  // Exact, because getByLabel matches substrings and the filter bar on this same
+  // page is labelled "Filter by account" and "Filter by category".
+  await page.getByLabel('Account', { exact: true }).selectOption({ label: values.account });
+  await page.getByLabel('Category', { exact: true }).selectOption({ label: values.category });
   await page.getByLabel('Amount').fill(values.amount);
   await page.getByLabel('Date').fill(values.date);
   await page.getByLabel('Description').fill(values.description);
 
   await page.getByRole('button', { name: 'Create transaction' }).click();
+
+  // Wait for the form to close, which it only does once the POST has succeeded.
+  // Returning straight after the click lets the next navigation abort the request
+  // in flight, and the row silently never exists.
+  await expect(page.getByRole('button', { name: 'Create transaction' })).toBeHidden();
 }
 
 /** Spec E2E test 1. */
