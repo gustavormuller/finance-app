@@ -59,7 +59,13 @@ internal static class TransactionsModel
                 .HasForeignKey(entity => entity.ParentId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            category.HasIndex(entity => new { entity.UserId, entity.ParentId, entity.Name }).IsUnique();
+            // NULLS NOT DISTINCT, because ParentId is null for every top-level
+            // category and PostgreSQL otherwise treats those nulls as all different
+            // from each other — which would leave the index constraining child names
+            // and silently allowing a second top-level "Food" next to the seeded one.
+            category.HasIndex(entity => new { entity.UserId, entity.ParentId, entity.Name })
+                .IsUnique()
+                .AreNullsDistinct(false);
         });
 
         modelBuilder.Entity<Transaction>(transaction =>

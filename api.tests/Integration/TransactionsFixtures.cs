@@ -65,9 +65,14 @@ internal static class TransactionsFixtures
         CreatedAt = DateTimeOffset.UtcNow,
     };
 
+    /// <summary>
+    /// The default name deliberately avoids all eight seeded categories: every user
+    /// now starts with those, and the unique index counts a second top-level "Food"
+    /// as the duplicate it is.
+    /// </summary>
     public static Category ACategory(
         Guid userId,
-        string name = "Food",
+        string name = "Groceries",
         CategoryKind kind = CategoryKind.Expense,
         Guid? parentId = null) => new()
     {

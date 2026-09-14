@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using Finance.Api.Domain.Identity;
+using Finance.Api.Domain.Transactions;
+using Finance.Api.Infrastructure;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Finance.Api.Application;
 
@@ -30,6 +33,7 @@ public enum ExternalSignInOutcome
 public sealed class ExternalSignIn(
     UserManager<AppUser> users,
     SignInManager<AppUser> signInManager,
+    AppDbContext database,
     ILogger<ExternalSignIn> logger)
 {
     /// <summary>
@@ -82,19 +86,38 @@ public sealed class ExternalSignIn(
 
         if (user is null)
         {
+            var createdAt = DateTimeOffset.UtcNow;
+
             user = new AppUser
             {
                 Email = email,
                 UserName = email,
                 DisplayName = displayName,
                 AiEnabled = false,
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = createdAt,
             };
+
+            // The default categories are part of creating an account rather than a
+            // follow-up step: a user who exists without them opens the transactions
+            // form with an empty category dropdown and nothing they can submit. One
+            // transaction over all three writes, so a failure leaves no half-made
+            // account behind. UserManager writes through this same scoped context, so
+            // its own SaveChanges enlists here.
+            await using var creation = await database.Database.BeginTransactionAsync();
 
             Verify(await users.CreateAsync(user), "create user");
             Verify(await users.AddLoginAsync(user, login), $"add {provider} login");
 
-            logger.LogInformation("Created account {UserId} from a {Provider} sign-in.", user.Id, provider);
+            database.Categories.AddRange(DefaultCategories.For(user.Id, createdAt));
+            await database.SaveChangesAsync();
+
+            await creation.CommitAsync();
+
+            logger.LogInformation(
+                "Created account {UserId} from a {Provider} sign-in, with {CategoryCount} default categories.",
+                user.Id,
+                provider,
+                DefaultCategories.All.Count);
         }
 
         await signInManager.SignInAsync(user, isPersistent: true);
