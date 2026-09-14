@@ -1,12 +1,22 @@
 /// <reference types="vitest/config" />
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 // The API port here must match api/Properties/launchSettings.json.
 const API_URL = process.env.API_URL ?? 'http://localhost:5080';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+
+  // shadcn/ui generates imports as '@/components/...', so the alias has to exist
+  // in both the bundler and the typechecker.
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,
