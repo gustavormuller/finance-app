@@ -69,7 +69,7 @@ Microsoft.AspNetCore.Identity.EntityFrameworkCore
 Microsoft.AspNetCore.Authentication.Google
 ```
 
-`AddIdentityApiEndpoints<AppUser>()` delivers `/register`, `/login`, `/refresh` and e-mail confirmation as ready-made minimal API endpoints.
+`AddIdentityApiEndpoints<AppUser>()` is **not** used: it ships `/register`, `/login` and `/refresh`, and there are no local accounts to register or log in. Sign-in is Google only (002), so the endpoints are hand-written and there is no password, no password reset and no e-mail confirmation to support.
 
 ### Cookie, not JWT
 
@@ -120,7 +120,7 @@ It blocks nothing, but it is real work that has to enter the roadmap before the 
 
 **Duplicate accounts by e-mail.** Someone creates an account with a password and later signs in with Google using the same e-mail → two accounts. Handle it explicitly with `AddLoginAsync` to link the external login to the existing account. It is not automatic and it *will* happen.
 
-**Google redirect URI.** It has to match exactly what is registered in the Google Cloud Console, including scheme and trailing slash: `https://domain.com/signin-google`. The cause of most integration errors.
+**Google redirect URI.** It has to match exactly what is registered in the Google Cloud Console, including scheme and trailing slash: `https://domain.com/api/auth/google/callback` (002 chose that path over the framework default `/signin-google`, because `/api/*` is already proxied). The cause of most integration errors. ASP.NET builds it from the incoming `Host` header, so anything rewriting Host — a proxy with `changeOrigin` — produces a URI that will not match.
 
 **Do not depend on Google's refresh token.** A consent screen in "Testing" mode has a refresh token that expires in 7 days. Use Google only to establish identity on first login and issue my own cookie from then on — session lifetime becomes mine.
 
