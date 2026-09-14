@@ -1,5 +1,11 @@
 import { createRootRoute, createRoute } from '@tanstack/react-router';
 
+import VariantA from './design-preview/VariantA';
+import VariantB from './design-preview/VariantB';
+import VariantC from './design-preview/VariantC';
+import VariantD from './design-preview/VariantD';
+import VariantE from './design-preview/VariantE';
+import VariantF from './design-preview/VariantF';
 import HomePage from './routes/HomePage';
 import LoginPage from './routes/LoginPage';
 import ProtectedLayout from './routes/ProtectedLayout';
@@ -41,7 +47,33 @@ const homeRoute = createRoute({
   component: HomePage,
 });
 
+/**
+ * Throwaway. Six styling directions for the transactions list, rendered from one
+ * static fixture so the screenshots are comparable and reproducible.
+ *
+ * Deliberately not behind the protected layout — they touch no API — and
+ * deliberately not linked from anywhere: they are reached by typing the URL, seen
+ * once, and deleted at the start of checkpoint 5.
+ */
+const designPreviewRoutes = (
+  [
+    ['a', VariantA],
+    ['b', VariantB],
+    ['c', VariantC],
+    ['d', VariantD],
+    ['e', VariantE],
+    ['f', VariantF],
+  ] as const
+).map(([slug, component]) =>
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: `/design-preview/${slug}`,
+    component,
+  }),
+);
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   protectedRoute.addChildren([homeRoute]),
+  ...designPreviewRoutes,
 ]);
