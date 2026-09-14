@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Finance.Api.Application;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
@@ -16,6 +17,12 @@ builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 // in during Build().
 builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
     options.UseNpgsql(serviceProvider.GetRequiredService<IConfiguration>().GetConnectionString("Default")));
+
+// Enums cross the wire as their names. "Checking" survives a renumbering of the
+// enum and reads the same in a 400 message, an OpenAPI schema and the generated TS
+// client; the columns stay int.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddFinanceAuthentication();
 builder.Services.AddAuthorization();
@@ -88,6 +95,10 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapHealthEndpoints();
 
 app.MapAuthEndpoints(app.Environment);
+
+app.MapAccountEndpoints();
+app.MapCategoryEndpoints();
+app.MapTransactionEndpoints();
 
 app.Run();
 

@@ -21,12 +21,22 @@ namespace Finance.Api.Domain.Transactions;
 /// </remarks>
 public readonly record struct Money(decimal Amount, string Currency)
 {
+    private const int Places = 2;
+
+    /// <summary>
+    /// Added to every rounded amount so the scale is exactly two, never fewer.
+    /// <see cref="Math.Round(decimal, int, MidpointRounding)"/> only ever removes
+    /// digits, so 3000 stays 3000 and would serialise as <c>3000</c> — and the spec
+    /// requires an amount on the wire to carry two decimals.
+    /// </summary>
+    private const decimal TwoPlaces = 0.00m;
+
     /// <summary>
     /// Two decimal places, <see cref="MidpointRounding.ToEven"/>, fixed at
     /// construction so no amount anywhere in the system carries a third digit the
-    /// column could not store.
+    /// column could not store, or fewer than the column will hand back.
     /// </summary>
-    public decimal Amount { get; } = Math.Round(Amount, 2, MidpointRounding.ToEven);
+    public decimal Amount { get; } = Math.Round(Amount, Places, MidpointRounding.ToEven) + TwoPlaces;
 
     /// <summary>A three-letter uppercase ISO 4217 code.</summary>
     public string Currency { get; } = RequireIsoCode(Currency);
@@ -45,6 +55,15 @@ public readonly record struct Money(decimal Amount, string Currency)
 
     public static bool operator >=(Money left, Money right) => Compare(left, right) >= 0;
 
+    /// <summary>
+    /// Whether a string is acceptable as a currency. Public so callers holding one
+    /// before there is a <see cref="Money"/> to build — an account being created, for
+    /// instance — can reject it as a named field instead of catching the exception
+    /// below.
+    /// </summary>
+    public static bool IsIsoCode(string? currency) =>
+        currency is { Length: 3 } && currency.All(char.IsAsciiLetterUpper);
+
     private static string RequireIsoCode(string currency)
     {
         ArgumentNullException.ThrowIfNull(currency);
@@ -53,7 +72,7 @@ public readonly record struct Money(decimal Amount, string Currency)
         // means something upstream is not normalising, and silently fixing it here
         // would hide that until two spellings of the same currency stopped comparing
         // equal.
-        if (currency.Length != 3 || !currency.All(char.IsAsciiLetterUpper))
+        if (!IsIsoCode(currency))
         {
             throw new ArgumentException(
                 $"'{currency}' is not a three-letter uppercase ISO 4217 code.",
