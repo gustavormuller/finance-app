@@ -14,22 +14,7 @@ const queryClient = new QueryClient();
  * after the router mounts, and an unauthenticated visit to / now ends up on /login —
  * where 001's e2e specs still expect to find both after navigating to /.
  */
-/*
- * Throwaway, with the design previews themselves: those pages are screenshotted to
- * compare styling directions, so the application chrome must not sit above them.
- * Removed when src/design-preview/ is deleted.
- */
-const isDesignPreview = window.location.pathname.startsWith('/design-preview/');
-
 export default function App() {
-  if (isDesignPreview) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    );
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <main>
