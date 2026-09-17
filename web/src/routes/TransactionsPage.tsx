@@ -3,7 +3,9 @@ import { useState } from 'react';
 
 import { api, type Transaction } from '@/api/finance';
 import Amount from '@/components/Amount';
+import Alert from '@/components/Alert';
 import EmptyState from '@/components/EmptyState';
+import { formatDate } from '@/lib/labels';
 import TransactionForm from '@/components/TransactionForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,10 +93,10 @@ export default function TransactionsPage() {
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Transactions</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Lançamentos</h2>
 
         {!creating && !editing && (
-          <Button onClick={() => setCreating(true)}>New transaction</Button>
+          <Button onClick={() => setCreating(true)}>Novo lançamento</Button>
         )}
       </div>
 
@@ -103,7 +105,7 @@ export default function TransactionsPage() {
           <TransactionForm
             accounts={accounts.data ?? []}
             categories={categories.data ?? []}
-            submitLabel={editing ? 'Save transaction' : 'Create transaction'}
+            submitLabel={editing ? 'Salvar lançamento' : 'Criar lançamento'}
             onCancel={close}
             onSubmit={async (input) => {
               await save.mutateAsync(input);
@@ -125,9 +127,9 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="grid gap-2">
-          <Label htmlFor="filter-from">From</Label>
+          <Label htmlFor="filter-from">De</Label>
           <Input
             id="filter-from"
             type="date"
@@ -137,7 +139,7 @@ export default function TransactionsPage() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="filter-to">To</Label>
+          <Label htmlFor="filter-to">Até</Label>
           <Input
             id="filter-to"
             type="date"
@@ -148,28 +150,24 @@ export default function TransactionsPage() {
 
         <FilterSelect
           id="filter-account"
-          label="Filter by account"
+          label="Filtrar por conta"
           value={filter.accountId}
           onChange={(accountId) => page1({ accountId })}
           options={(accounts.data ?? []).map((account) => [account.id, account.name])}
-          allLabel="All accounts"
+          allLabel="Todas as contas"
         />
 
         <FilterSelect
           id="filter-category"
-          label="Filter by category"
+          label="Filtrar por categoria"
           value={filter.categoryId}
           onChange={(categoryId) => page1({ categoryId })}
           options={(categories.data ?? []).map((category) => [category.id, category.name])}
-          allLabel="All categories"
+          allLabel="Todas as categorias"
         />
       </div>
 
-      {failure && (
-        <p role="alert" className="text-destructive mb-4 text-sm">
-          {failure}
-        </p>
-      )}
+      {failure && <Alert>{failure}</Alert>}
 
       {items.length === 0 && !transactions.isLoading ? (
         <EmptyState filtered={isFiltered} />
@@ -177,35 +175,48 @@ export default function TransactionsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[110px]">Date</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Account</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="w-[130px]" />
+              {/* On a phone there is not room for five columns and the amount is the
+                  one you came for, so date, category and account move under the
+                  description instead of pushing the amount off the side. */}
+              <TableHead className="hidden w-[110px] md:table-cell">Data</TableHead>
+              <TableHead>Descrição</TableHead>
+              <TableHead className="hidden md:table-cell">Categoria</TableHead>
+              <TableHead className="hidden md:table-cell">Conta</TableHead>
+              <TableHead className="text-right">Valor</TableHead>
+              <TableHead className="w-auto md:w-[130px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.map((transaction) => (
               <TableRow key={transaction.id}>
-                <TableCell className="tabular-nums">{transaction.date}</TableCell>
-                <TableCell className="font-medium">{transaction.description}</TableCell>
-                <TableCell>{transaction.categoryName}</TableCell>
-                <TableCell>{transaction.accountName}</TableCell>
+                <TableCell className="hidden tabular-nums md:table-cell">
+                  {formatDate(transaction.date)}
+                </TableCell>
+                <TableCell className="font-medium">
+                  {transaction.description}
+                  <span className="text-muted-foreground block text-xs font-normal md:hidden">
+                    <span className="tabular-nums">{formatDate(transaction.date)}</span> ·{' '}
+                    {transaction.categoryName} · {transaction.accountName}
+                  </span>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">{transaction.categoryName}</TableCell>
+                <TableCell className="hidden md:table-cell">{transaction.accountName}</TableCell>
                 <TableCell className="text-right">
                   <Amount value={transaction.amount} />
                 </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(transaction)}>
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => remove.mutate(transaction.id)}
-                  >
-                    Delete
-                  </Button>
+                <TableCell>
+                  <div className="flex flex-wrap justify-end gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(transaction)}>
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => remove.mutate(transaction.id)}
+                    >
+                      Excluir
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -216,7 +227,7 @@ export default function TransactionsPage() {
       {total > PAGE_SIZE && (
         <div className="mt-6 flex items-center justify-between">
           <p className="text-muted-foreground text-sm">
-            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
           </p>
 
           <div className="flex gap-2">
@@ -226,7 +237,7 @@ export default function TransactionsPage() {
               disabled={page === 1}
               onClick={() => setPage((current) => current - 1)}
             >
-              Previous
+              Anterior
             </Button>
             <Button
               variant="outline"
@@ -234,7 +245,7 @@ export default function TransactionsPage() {
               disabled={page * PAGE_SIZE >= total}
               onClick={() => setPage((current) => current + 1)}
             >
-              Next
+              Próxima
             </Button>
           </div>
         </div>

@@ -38,7 +38,7 @@ test('an unauthenticated visit to / lands on the login page', async ({ page }) =
   await page.goto('/');
 
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole('link', { name: 'Sign in with Google' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Entrar com o Google' })).toBeVisible();
 });
 
 test('a signed-in visitor sees their display name on /', async ({ page }) => {
@@ -47,7 +47,7 @@ test('a signed-in visitor sees their display name on /', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByTestId('current-user')).toHaveText('Ada Lovelace');
-  await expect(page.getByRole('link', { name: 'Sign in with Google' })).toBeHidden();
+  await expect(page.getByRole('link', { name: 'Entrar com o Google' })).toBeHidden();
 });
 
 test('logging out returns to the login page and leaves / protected', async ({ page }) => {
@@ -56,7 +56,7 @@ test('logging out returns to the login page and leaves / protected', async ({ pa
   await page.goto('/');
   await expect(page.getByTestId('current-user')).toHaveText('Grace Hopper');
 
-  await page.getByRole('button', { name: 'Log out' }).click();
+  await page.getByRole('button', { name: 'Sair' }).click();
 
   await expect(page).toHaveURL(/\/login$/);
 

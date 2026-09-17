@@ -102,14 +102,17 @@ Index: `(UserId, Date DESC)` — the access pattern for essentially every dashbo
 
 ### Default categories
 
-Seeded on user creation, all with `ParentId = null`:
+Seeded on user creation, all with `ParentId = null`. The names are Portuguese
+because they are data a person reads, not identifiers:
 
-- Income: `Salary`, `Other income`
-- Expense: `Housing`, `Food`, `Transport`, `Health`, `Leisure`, `Other`
+- Income: `Salário`, `Outras receitas`
+- Expense: `Moradia`, `Alimentação`, `Transporte`, `Saúde`, `Lazer`, `Outros`
 
 ## Validation rules
 
 Every rule below returns `400` with a problem-details body naming the offending field.
+The field names are English (they are the wire contract); the messages beside them are
+pt-BR, because the UI renders them verbatim.
 
 1. `Amount` may not be zero.
 2. Transaction `Currency` must equal its account's `Currency`.
@@ -173,7 +176,7 @@ Transaction response shape:
 
 ## UI behaviour
 
-Three routes, all behind the existing protected layout.
+Three routes, all behind the existing protected layout. All copy is pt-BR.
 
 **`/accounts`** — list, create, edit, delete. Delete shows the `409` reason rather than failing silently.
 
@@ -265,10 +268,10 @@ bash scripts/verify-e2e.sh
 Manual, once:
 
 1. Sign in with real Google on a fresh account
-2. Confirm the eight default categories are present
+2. Confirm the eight default categories are present, in Portuguese
 3. Create a `Checking` account in BRL
-4. Add an expense of `42.90` under Food — the list shows `−42.90`
-5. Add income of `3000.00` under Salary — shows `+3000.00`
+4. Add an expense of `42,90` under Alimentação — the list shows `−42,90`
+5. Add income of `3000,00` under Salário — shows `+3.000,00`
 6. In `psql`: `SELECT "Amount", pg_typeof("Amount") FROM "Transactions";` → values exact, type `numeric`
 7. Try deleting the account → `409` with a readable reason
 8. Change the date filter to the previous month → the list empties, with the no-results message, not the no-data one

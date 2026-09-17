@@ -6,6 +6,7 @@ import type { Account, Category, TransactionInput } from '@/api/finance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { categoryKindLabels } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
 export interface TransactionFormValues {
@@ -53,17 +54,17 @@ function categoryLabel(category: Category, all: Category[]): string {
 }
 
 const schema = z.object({
-  accountId: z.string().min(1, 'Choose an account.'),
-  categoryId: z.string().min(1, 'Choose a category.'),
+  accountId: z.string().min(1, 'Escolha uma conta.'),
+  categoryId: z.string().min(1, 'Escolha uma categoria.'),
   amount: z
     .string()
-    .min(1, 'Enter an amount.')
-    .refine((typed) => Number.isFinite(parseAmount(typed)), 'Enter a number.')
+    .min(1, 'Informe um valor.')
+    .refine((typed) => Number.isFinite(parseAmount(typed)), 'Informe um número.')
     // Mirrors the API's rule 1, so the user is told before a round trip rather than
     // after one. The API still enforces it; this is a courtesy, not the guarantee.
-    .refine((typed) => parseAmount(typed) !== 0, 'An amount cannot be zero.'),
-  date: z.string().min(1, 'Choose a date.'),
-  description: z.string().trim().min(1, 'Enter a description.'),
+    .refine((typed) => parseAmount(typed) !== 0, 'O valor não pode ser zero.'),
+  date: z.string().min(1, 'Escolha uma data.'),
+  description: z.string().trim().min(1, 'Informe uma descrição.'),
 });
 
 /** The class stack shadcn/ui's Input uses, so a native select sits level with one. */
@@ -129,10 +130,10 @@ export default function TransactionForm({
 
   return (
     <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2" noValidate>
-      <Field label="Account" error={errors.accountId?.message}>
+      <Field name="account" label="Conta" error={errors.accountId?.message}>
         {(id) => (
           <select id={id} className={cn(selectClasses)} {...register('accountId')}>
-            <option value="">Choose an account</option>
+            <option value="">Escolha uma conta</option>
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name}
@@ -142,12 +143,12 @@ export default function TransactionForm({
         )}
       </Field>
 
-      <Field label="Category" error={errors.categoryId?.message}>
+      <Field name="category" label="Categoria" error={errors.categoryId?.message}>
         {(id) => (
           <select id={id} className={cn(selectClasses)} {...register('categoryId')}>
-            <option value="">Choose a category</option>
+            <option value="">Escolha uma categoria</option>
             {(['Income', 'Expense'] as const).map((kind) => (
-              <optgroup key={kind} label={kind}>
+              <optgroup key={kind} label={categoryKindLabels[kind]}>
                 {byKind[kind].map((category) => (
                   <option key={category.id} value={category.id}>
                     {categoryLabel(category, categories)}
@@ -159,7 +160,7 @@ export default function TransactionForm({
         )}
       </Field>
 
-      <Field label="Amount" error={errors.amount?.message}>
+      <Field name="amount" label="Valor" error={errors.amount?.message}>
         {(id) => (
           <Input
             id={id}
@@ -171,12 +172,12 @@ export default function TransactionForm({
         )}
       </Field>
 
-      <Field label="Date" error={errors.date?.message}>
+      <Field name="date" label="Data" error={errors.date?.message}>
         {(id) => <Input id={id} type="date" {...register('date')} />}
       </Field>
 
       <div className="sm:col-span-2">
-        <Field label="Description" error={errors.description?.message}>
+        <Field name="description" label="Descrição" error={errors.description?.message}>
           {(id) => <Input id={id} {...register('description')} />}
         </Field>
       </div>
@@ -188,7 +189,7 @@ export default function TransactionForm({
 
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            Cancelar
           </Button>
         )}
       </div>
@@ -202,15 +203,19 @@ export default function TransactionForm({
  * what lets the tests find every field by its visible label.
  */
 function Field({
+  name,
   label,
   error,
   children,
 }: {
+  /** ASCII, and independent of the visible label: the label is Portuguese and
+      accented, and an id is not the place for either. */
+  name: string;
   label: string;
   error?: string | undefined;
   children: (id: string) => React.ReactNode;
 }) {
-  const id = `field-${label.toLowerCase()}`;
+  const id = `field-${name}`;
 
   return (
     <div className="grid gap-2">

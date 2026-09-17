@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { api, type Category, type CategoryInput, type CategoryKind } from '@/api/finance';
+import Alert from '@/components/Alert';
+import { categoryKindLabels, categoryKindPlurals } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,11 +62,11 @@ export default function CategoriesPage() {
   const possibleParents = (categories.data ?? []).filter((category) => category.parentId === null);
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8">
+    <section className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Categories</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Categorias</h2>
 
-        {!creating && !editing && <Button onClick={() => setCreating(true)}>New category</Button>}
+        {!creating && !editing && <Button onClick={() => setCreating(true)}>Nova categoria</Button>}
       </div>
 
       {(creating || editing) && (
@@ -83,37 +85,37 @@ export default function CategoriesPage() {
           }}
         >
           <div className="grid gap-2">
-            <Label htmlFor="category-name">Name</Label>
+            <Label htmlFor="category-name">Nome</Label>
             <Input id="category-name" name="name" defaultValue={editing?.name ?? ''} required />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="category-kind">Kind</Label>
+            <Label htmlFor="category-kind">Tipo</Label>
             <select
               id="category-kind"
               name="kind"
               className={selectClasses}
               defaultValue={editing?.kind ?? 'Expense'}
             >
-              <option value="Income">Income</option>
-              <option value="Expense">Expense</option>
+              <option value="Income">{categoryKindLabels.Income}</option>
+              <option value="Expense">{categoryKindLabels.Expense}</option>
             </select>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="category-parent">Parent</Label>
+            <Label htmlFor="category-parent">Categoria mãe</Label>
             <select
               id="category-parent"
               name="parentId"
               className={selectClasses}
               defaultValue={editing?.parentId ?? ''}
             >
-              <option value="">None (top level)</option>
+              <option value="">Nenhuma (nível principal)</option>
               {possibleParents
                 .filter((parent) => parent.id !== editing?.id)
                 .map((parent) => (
                   <option key={parent.id} value={parent.id}>
-                    {parent.name} ({parent.kind})
+                    {parent.name} ({categoryKindLabels[parent.kind]})
                   </option>
                 ))}
             </select>
@@ -121,25 +123,21 @@ export default function CategoriesPage() {
 
           <div className="flex gap-2 sm:col-span-3">
             <Button type="submit" disabled={save.isPending}>
-              {editing ? 'Save category' : 'Create category'}
+              {editing ? 'Salvar categoria' : 'Criar categoria'}
             </Button>
             <Button type="button" variant="outline" onClick={close}>
-              Cancel
+              Cancelar
             </Button>
           </div>
         </form>
       )}
 
-      {failure && (
-        <p role="alert" className="text-destructive mb-4 text-sm">
-          {failure}
-        </p>
-      )}
+      {failure && <Alert>{failure}</Alert>}
 
       {(['Income', 'Expense'] as const).map((kind) => (
         <div key={kind} className="mb-8">
           <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-[0.1em] uppercase">
-            {kind}
+            {categoryKindPlurals[kind]}
           </h3>
 
           <ul className="border-border border-t">
@@ -186,10 +184,10 @@ function Row({
 
       <span className="flex gap-1">
         <Button variant="ghost" size="sm" onClick={() => onEdit(category)}>
-          Edit
+          Editar
         </Button>
         <Button variant="ghost" size="sm" onClick={() => onDelete(category.id)}>
-          Delete
+          Excluir
         </Button>
       </span>
     </div>

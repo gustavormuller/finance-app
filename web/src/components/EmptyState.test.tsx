@@ -25,12 +25,12 @@ describe('EmptyState', () => {
   it('invites a first entry when there is no data at all', () => {
     render(<EmptyState filtered={false} />);
 
-    expect(screen.getByText(/no transactions yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/nenhum lançamento ainda/i)).toBeInTheDocument();
   });
 
   it('points at the filter when the filter is what emptied the list', () => {
     render(<EmptyState filtered />);
 
-    expect(screen.getByText(/no transactions match/i)).toBeInTheDocument();
+    expect(screen.getByText(/nenhum lançamento corresponde/i)).toBeInTheDocument();
   });
 });

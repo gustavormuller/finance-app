@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { api, type Account, type AccountInput, type AccountType } from '@/api/finance';
+import Alert from '@/components/Alert';
+import { accountTypeLabels, accountTypes } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,8 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
-const TYPES: AccountType[] = ['Checking', 'Savings', 'CreditCard', 'Cash', 'Investment'];
 
 const selectClasses =
   'border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 ' +
@@ -53,11 +53,11 @@ export default function AccountsPage() {
   });
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8">
+    <section className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Accounts</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Contas</h2>
 
-        {!creating && !editing && <Button onClick={() => setCreating(true)}>New account</Button>}
+        {!creating && !editing && <Button onClick={() => setCreating(true)}>Nova conta</Button>}
       </div>
 
       {(creating || editing) && (
@@ -75,28 +75,28 @@ export default function AccountsPage() {
           }}
         >
           <div className="grid gap-2">
-            <Label htmlFor="account-name">Name</Label>
+            <Label htmlFor="account-name">Nome</Label>
             <Input id="account-name" name="name" defaultValue={editing?.name ?? ''} required />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="account-type">Type</Label>
+            <Label htmlFor="account-type">Tipo</Label>
             <select
               id="account-type"
               name="type"
               className={selectClasses}
               defaultValue={editing?.type ?? 'Checking'}
             >
-              {TYPES.map((type) => (
+              {accountTypes.map((type) => (
                 <option key={type} value={type}>
-                  {type}
+                  {accountTypeLabels[type]}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="account-currency">Currency</Label>
+            <Label htmlFor="account-currency">Moeda</Label>
             <Input
               id="account-currency"
               name="currency"
@@ -108,32 +108,30 @@ export default function AccountsPage() {
 
           <div className="flex gap-2 sm:col-span-3">
             <Button type="submit" disabled={save.isPending}>
-              {editing ? 'Save account' : 'Create account'}
+              {editing ? 'Salvar conta' : 'Criar conta'}
             </Button>
             <Button type="button" variant="outline" onClick={close}>
-              Cancel
+              Cancelar
             </Button>
           </div>
         </form>
       )}
 
-      {failure && (
-        <p role="alert" className="text-destructive mb-4 text-sm">
-          {failure}
-        </p>
-      )}
+      {failure && <Alert>{failure}</Alert>}
 
       {accounts.data?.length === 0 ? (
         <p className="text-muted-foreground border-border border-t py-16 text-center text-sm">
-          No accounts yet. Add the first one to start recording transactions.
+          Nenhuma conta ainda. Cadastre a primeira para começar a registrar lançamentos.
         </p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Currency</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Tipo</TableHead>
+              {/* Only BRL exists in practice, so it is the first thing a phone can
+                  afford to drop. */}
+              <TableHead className="hidden sm:table-cell">Moeda</TableHead>
               <TableHead className="w-[140px]" />
             </TableRow>
           </TableHeader>
@@ -141,15 +139,17 @@ export default function AccountsPage() {
             {(accounts.data ?? []).map((account) => (
               <TableRow key={account.id}>
                 <TableCell className="font-medium">{account.name}</TableCell>
-                <TableCell>{account.type}</TableCell>
-                <TableCell className="tabular-nums">{account.currency}</TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(account)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => remove.mutate(account.id)}>
-                    Delete
-                  </Button>
+                <TableCell>{accountTypeLabels[account.type]}</TableCell>
+                <TableCell className="hidden tabular-nums sm:table-cell">{account.currency}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap justify-end gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(account)}>
+                      Editar
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => remove.mutate(account.id)}>
+                      Excluir
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

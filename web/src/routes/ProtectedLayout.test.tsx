@@ -103,7 +103,7 @@ describe('the protected layout', () => {
 
     // Flashing the login page at someone who turns out to be signed in is worse than
     // showing nothing for a moment.
-    expect(screen.queryByRole('link', { name: 'Sign in with Google' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Entrar com o Google' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('current-user')).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/');
   });
@@ -119,13 +119,13 @@ describe('the login page', () => {
 
     renderAt('/login?error=unverified');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/not verified/i);
-    expect(screen.getByRole('link', { name: 'Sign in with Google' })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não está verificado/i);
+    expect(screen.getByRole('link', { name: 'Entrar com o Google' })).toBeInTheDocument();
   });
 
   it.each([
-    ['cancelled', /cancelled/i],
-    ['auth_failed', /could not be completed/i],
+    ['cancelled', /cancelada/i],
+    ['auth_failed', /não foi possível concluir/i],
   ])('explains a %s callback', async (code, expected) => {
     stubMeStatus(401, null);
 
@@ -139,7 +139,7 @@ describe('the login page', () => {
 
     renderAt('/login');
 
-    expect(await screen.findByRole('link', { name: 'Sign in with Google' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Entrar com o Google' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -149,7 +149,7 @@ describe('the login page', () => {
     // A stale bookmark must not render an empty alert box.
     renderAt('/login?error=something-else');
 
-    expect(await screen.findByRole('link', { name: 'Sign in with Google' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Entrar com o Google' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

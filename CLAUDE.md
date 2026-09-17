@@ -13,7 +13,13 @@ a request contradicts an ADR, stop and say so instead of silently deviating.
 - Migration: `cd api && dotnet ef migrations add <Name>`
 
 ## Non-negotiable rules
-- Everything in English: code, comments, identifiers, commit messages, docs.
+- Code, comments, identifiers, commit messages, specs, ADRs and docs: English.
+- Anything a person reads on screen: pt-BR. That includes the seeded category names,
+  every problem-details message the API returns (they are rendered verbatim), and all
+  UI copy. Enum members, field names and routes are identifiers, so they stay English
+  and are mapped to Portuguese for display in `web/src/lib/labels.ts`.
+- A C# file containing non-ASCII needs a UTF-8 BOM. Roslyn falls back to the system
+  codepage without one, and the accents compile into mojibake silently.
 - IMPORTANT: money is always `decimal`. Never `double` or `float`, not even in a local.
 - Every domain entity has `UserId` and a global query filter. No exceptions.
   `prices` and `benchmarks` are shared market data — no `UserId`, no filter.

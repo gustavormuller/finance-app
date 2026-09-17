@@ -16,13 +16,13 @@ export default function EmptyState({
   return (
     <div className="border-border text-muted-foreground border-t py-16 text-center">
       <p className="text-foreground text-sm font-medium">
-        {filtered ? 'No transactions match this filter' : 'No transactions yet'}
+        {filtered ? 'Nenhum lançamento corresponde a este filtro' : 'Nenhum lançamento ainda'}
       </p>
 
       <p className="mt-1 text-sm">
         {filtered
-          ? 'Try widening the date range, or clearing the account and category filters.'
-          : 'Add your first one to start tracking where the money goes.'}
+          ? 'Tente ampliar o período, ou limpar os filtros de conta e categoria.'
+          : 'Registre o primeiro para começar a acompanhar para onde o dinheiro vai.'}
       </p>
 
       {children && <div className="mt-4">{children}</div>}

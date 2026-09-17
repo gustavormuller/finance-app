@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 
 import { useMe } from '../auth/useMe';
+import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -36,16 +37,54 @@ export default function HomePage() {
   }
 
   return (
-    <section>
-      <p>
-        Signed in as <strong data-testid="current-user">{user.displayName ?? user.email}</strong>
+    <section className="mx-auto max-w-5xl px-4 py-8">
+      <h2 className="text-2xl font-semibold tracking-tight">Início</h2>
+
+      <p className="text-muted-foreground mt-1 text-sm">
+        Conectado como{' '}
+        <strong data-testid="current-user" className="text-foreground font-medium">
+          {user.displayName ?? user.email}
+        </strong>
       </p>
 
-      <button type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>
-        Log out
-      </button>
+      {/*
+        Three doors rather than a dashboard. The dashboard is 005's, and an empty
+        panel promising one would be worse than a plain list of where to go.
+      */}
+      <div className="mt-8 grid gap-3 sm:grid-cols-3">
+        <Shortcut to="/transactions" title="Lançamentos" hint="Registrar e consultar entradas e saídas" />
+        <Shortcut to="/accounts" title="Contas" hint="Bancos, cartões e dinheiro em espécie" />
+        <Shortcut to="/categories" title="Categorias" hint="Como as despesas e receitas são agrupadas" />
+      </div>
 
-      {logout.isError && <p role="alert">Could not sign out. Try again.</p>}
+      <div className="mt-10">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => logout.mutate()}
+          disabled={logout.isPending}
+        >
+          Sair
+        </Button>
+
+        {logout.isError && (
+          <p role="alert" className="text-destructive mt-2 text-sm">
+            Não foi possível sair. Tente novamente.
+          </p>
+        )}
+      </div>
     </section>
+  );
+}
+
+function Shortcut({ to, title, hint }: { to: string; title: string; hint: string }) {
+  return (
+    <Link
+      to={to}
+      className="hover:bg-accent block rounded-lg border p-4 transition-colors"
+    >
+      <span className="font-medium">{title}</span>
+      <span className="text-muted-foreground mt-1 block text-sm">{hint}</span>
+    </Link>
   );
 }

@@ -19,14 +19,14 @@ const accounts: Account[] = [
 const categories: Category[] = [
   {
     id: 'cat-expense',
-    name: 'Food',
+    name: 'Alimentação',
     kind: 'Expense',
     parentId: null,
     createdAt: '2026-09-01T00:00:00Z',
   },
   {
     id: 'cat-income',
-    name: 'Salary',
+    name: 'Salário',
     kind: 'Income',
     parentId: null,
     createdAt: '2026-09-01T00:00:00Z',
@@ -41,19 +41,19 @@ async function fillAndSubmit(amount: string, categoryId: string) {
     <TransactionForm
       accounts={accounts}
       categories={categories}
-      submitLabel="Save"
+      submitLabel="Salvar"
       onSubmit={onSubmit}
     />,
   );
 
-  await user.selectOptions(screen.getByLabelText('Account'), 'acc-1');
-  await user.selectOptions(screen.getByLabelText('Category'), categoryId);
-  await user.clear(screen.getByLabelText('Amount'));
-  await user.type(screen.getByLabelText('Amount'), amount);
-  await user.clear(screen.getByLabelText('Date'));
-  await user.type(screen.getByLabelText('Date'), '2026-09-13');
-  await user.type(screen.getByLabelText('Description'), 'Supermarket');
-  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await user.selectOptions(screen.getByLabelText('Conta'), 'acc-1');
+  await user.selectOptions(screen.getByLabelText('Categoria'), categoryId);
+  await user.clear(screen.getByLabelText('Valor'));
+  await user.type(screen.getByLabelText('Valor'), amount);
+  await user.clear(screen.getByLabelText('Data'));
+  await user.type(screen.getByLabelText('Data'), '2026-09-13');
+  await user.type(screen.getByLabelText('Descrição'), 'Supermercado');
+  await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
   return onSubmit;
 }
@@ -75,7 +75,7 @@ describe('TransactionForm', () => {
       amount: -42.9,
       currency: 'BRL',
       date: '2026-09-13',
-      description: 'Supermarket',
+      description: 'Supermercado',
     });
   });
 
@@ -98,7 +98,7 @@ describe('TransactionForm', () => {
   it('refuses a zero amount and does not submit', async () => {
     const onSubmit = await fillAndSubmit('0', 'cat-expense');
 
-    expect(await screen.findByText(/zero/i)).toBeInTheDocument();
+    expect(await screen.findByText(/não pode ser zero/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -120,15 +120,16 @@ describe('TransactionForm', () => {
       <TransactionForm
         accounts={accounts}
         categories={categories}
-        submitLabel="Save"
+        submitLabel="Salvar"
         onSubmit={vi.fn()}
       />,
     );
 
     const groups = screen
-      .getByLabelText('Category')
+      .getByLabelText('Categoria')
       .querySelectorAll('optgroup');
 
-    expect([...groups].map((group) => group.label)).toEqual(['Income', 'Expense']);
+    // The members stay English on the wire; only the reading of them is Portuguese.
+    expect([...groups].map((group) => group.label)).toEqual(['Receita', 'Despesa']);
   });
 });
