@@ -1,4 +1,4 @@
-using Finance.Api.Application;
+﻿using Finance.Api.Application;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +57,7 @@ public static class CategoryEndpoints
 
             if (!await TrySaveAsync(database, cancellationToken))
             {
-                return Problems.Conflict($"A category called '{category.Name}' already exists here.");
+                return Problems.Conflict($"Já existe uma categoria chamada '{category.Name}' neste nível.");
             }
 
             return Results.Created($"/api/categories/{category.Id}", Describe(category));
@@ -88,7 +88,7 @@ public static class CategoryEndpoints
 
             if (!await TrySaveAsync(database, cancellationToken))
             {
-                return Problems.Conflict($"A category called '{category.Name}' already exists here.");
+                return Problems.Conflict($"Já existe uma categoria chamada '{category.Name}' neste nível.");
             }
 
             return Results.Ok(Describe(category));
@@ -113,7 +113,7 @@ public static class CategoryEndpoints
             if (children > 0)
             {
                 return Problems.Conflict(
-                    $"'{category.Name}' still has {children} child categor(y/ies). Delete them first.");
+                    $"'{category.Name}' ainda tem {children} subcategoria(s). Exclua-as antes.");
             }
 
             var referencing = await database.Transactions
@@ -122,8 +122,8 @@ public static class CategoryEndpoints
             if (referencing > 0)
             {
                 return Problems.Conflict(
-                    $"'{category.Name}' still has {referencing} transaction(s). "
-                    + "Recategorise or delete them first.");
+                    $"'{category.Name}' ainda tem {referencing} lançamento(s). "
+                    + "Recategorize-os ou exclua-os antes.");
             }
 
             database.Categories.Remove(category);
@@ -152,7 +152,7 @@ public static class CategoryEndpoints
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return Problems.Validation("name", "Name is required.");
+            return Problems.Validation("name", "O nome é obrigatório.");
         }
 
         if (request.ParentId is not { } parentId)
@@ -162,7 +162,7 @@ public static class CategoryEndpoints
 
         if (parentId == editing)
         {
-            return Problems.Validation("parentId", "A category cannot be its own parent.");
+            return Problems.Validation("parentId", "Uma categoria não pode ser mãe de si mesma.");
         }
 
         // Through the query filter: another user's category is not a parent, it is a
@@ -172,21 +172,21 @@ public static class CategoryEndpoints
 
         if (parent is null)
         {
-            return Problems.Validation("parentId", "No such category.");
+            return Problems.Validation("parentId", "Categoria não encontrada.");
         }
 
         if (parent.ParentId is not null)
         {
             return Problems.Validation(
                 "parentId",
-                "Categories are two levels deep. That category is already a child.");
+                "As categorias têm no máximo dois níveis, e essa já é uma subcategoria.");
         }
 
         if (parent.Kind != request.Kind)
         {
             return Problems.Validation(
                 "kind",
-                $"A child of '{parent.Name}' must be {parent.Kind}, not {request.Kind}.");
+                $"Uma subcategoria de '{parent.Name}' precisa ser do mesmo tipo que ela.");
         }
 
         if (editing is { } id
@@ -194,7 +194,7 @@ public static class CategoryEndpoints
         {
             return Problems.Validation(
                 "parentId",
-                "That category has children of its own, so it cannot become a child.");
+                "Essa categoria tem subcategorias, então não pode virar subcategoria.");
         }
 
         return null;

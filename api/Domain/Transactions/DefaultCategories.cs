@@ -1,4 +1,4 @@
-namespace Finance.Api.Domain.Transactions;
+﻿namespace Finance.Api.Domain.Transactions;
 
 /// <summary>
 /// The categories every new account starts with.
@@ -17,14 +17,14 @@ public static class DefaultCategories
 {
     public static readonly IReadOnlyList<(string Name, CategoryKind Kind)> All =
     [
-        ("Salary", CategoryKind.Income),
-        ("Other income", CategoryKind.Income),
-        ("Housing", CategoryKind.Expense),
-        ("Food", CategoryKind.Expense),
-        ("Transport", CategoryKind.Expense),
-        ("Health", CategoryKind.Expense),
-        ("Leisure", CategoryKind.Expense),
-        ("Other", CategoryKind.Expense),
+        ("Salário", CategoryKind.Income),
+        ("Outras receitas", CategoryKind.Income),
+        ("Moradia", CategoryKind.Expense),
+        ("Alimentação", CategoryKind.Expense),
+        ("Transporte", CategoryKind.Expense),
+        ("Saúde", CategoryKind.Expense),
+        ("Lazer", CategoryKind.Expense),
+        ("Outros", CategoryKind.Expense),
     ];
 
     public static IEnumerable<Category> For(Guid userId, DateTimeOffset createdAt) =>

@@ -1,4 +1,4 @@
-using Finance.Api.Application;
+﻿using Finance.Api.Application;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -221,8 +221,8 @@ public static class TransactionEndpoints
             .SingleOrDefaultAsync(entity => entity.Id == request.CategoryId, cancellationToken);
 
         if (Problems.Validation(
-                account is null ? new RuleViolation("accountId", "No such account.") : null,
-                category is null ? new RuleViolation("categoryId", "No such category.") : null)
+                account is null ? new RuleViolation("accountId", "Conta não encontrada.") : null,
+                category is null ? new RuleViolation("categoryId", "Categoria não encontrada.") : null)
             is { } unresolved)
         {
             return (unresolved, null, null);
@@ -230,7 +230,7 @@ public static class TransactionEndpoints
 
         if (string.IsNullOrWhiteSpace(request.Description))
         {
-            return (Problems.Validation("description", "Description is required."), null, null);
+            return (Problems.Validation("description", "A descrição é obrigatória."), null, null);
         }
 
         // Checked before Money is constructed, so a bad code is a named field rather
@@ -240,7 +240,7 @@ public static class TransactionEndpoints
             return (
                 Problems.Validation(
                     "currency",
-                    "Currency must be a three-letter uppercase ISO 4217 code."),
+                    "A moeda deve ser um código ISO 4217 de três letras maiúsculas."),
                 null,
                 null);
         }
@@ -250,8 +250,8 @@ public static class TransactionEndpoints
             return (
                 Problems.Validation(
                     "currency",
-                    $"'{account.Name}' is in {account.Currency}, so this transaction cannot be "
-                    + $"in {request.Currency}."),
+                    $"'{account.Name}' está em {account.Currency}, então o lançamento não pode "
+                    + $"estar em {request.Currency}."),
                 null,
                 null);
         }

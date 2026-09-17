@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using Finance.Api.Domain.Transactions;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,7 +35,7 @@ public sealed class DefaultCategoriesTests(PostgresFixture postgres)
                 .OrderBy(category => category.Name, StringComparer.Ordinal));
 
         Assert.Equal(
-            ["Other income", "Salary"],
+            ["Outras receitas", "Salário"],
             seeded.Where(category => category.Kind == CategoryKind.Income)
                 .Select(category => category.Name)
                 .Order(StringComparer.Ordinal));

@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using Finance.Api.Domain.Transactions;
 
@@ -131,7 +131,7 @@ public sealed class CategoryEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
         var reason = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("child", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("subcategoria", reason, StringComparison.OrdinalIgnoreCase);
 
         var categories = await user.Client.GetFromJsonAsync<List<TransactionsFixtures.CategoryItem>>(
             "/api/categories", cancellationToken);
@@ -160,7 +160,7 @@ public sealed class CategoryEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
         var reason = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("transaction", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("lançamento", reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -195,7 +195,7 @@ public sealed class CategoryEndpointTests(PostgresFixture postgres)
         using var response = await user.Client.SendAsync(
             TransactionsFixtures.Post("/api/categories", new
             {
-                name = "Food",
+                name = "Alimentação",
                 kind = "Expense",
                 parentId = (Guid?)null,
             }),

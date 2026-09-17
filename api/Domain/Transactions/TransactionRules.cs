@@ -1,4 +1,4 @@
-namespace Finance.Api.Domain.Transactions;
+﻿namespace Finance.Api.Domain.Transactions;
 
 /// <summary>
 /// A rejected field and the reason, ready to become one entry of a problem-details
@@ -17,7 +17,10 @@ public readonly record struct RuleViolation(string Field, string Message);
 /// </remarks>
 public static class TransactionRules
 {
-    /// <summary>The field name the API reports for an amount rejection.</summary>
+    /// <summary>
+    /// The field name the API reports for an amount rejection. Field names are part of
+    /// the wire contract and stay English; only the messages beside them are Portuguese.
+    /// </summary>
     public const string AmountField = "amount";
 
     /// <summary>The field name the API reports for a date rejection.</summary>
@@ -32,7 +35,7 @@ public static class TransactionRules
     /// <summary>Spec rule 1. Zero is not a movement of money.</summary>
     public static RuleViolation? ValidateAmount(decimal amount) =>
         amount == 0m
-            ? new RuleViolation(AmountField, "Amount may not be zero.")
+            ? new RuleViolation(AmountField, "O valor não pode ser zero.")
             : null;
 
     /// <summary>
@@ -46,9 +49,9 @@ public static class TransactionRules
     public static RuleViolation? ValidateSign(decimal amount, CategoryKind kind) => kind switch
     {
         CategoryKind.Income when amount < 0m =>
-            new RuleViolation(AmountField, "An income category requires a positive amount."),
+            new RuleViolation(AmountField, "Uma categoria de receita exige um valor positivo."),
         CategoryKind.Expense when amount > 0m =>
-            new RuleViolation(AmountField, "An expense category requires a negative amount."),
+            new RuleViolation(AmountField, "Uma categoria de despesa exige um valor negativo."),
         _ => null,
     };
 
@@ -66,7 +69,7 @@ public static class TransactionRules
         return date < MinimumDate || date > latest
             ? new RuleViolation(
                 DateField,
-                $"Date must be between {MinimumDate:yyyy-MM-dd} and {latest:yyyy-MM-dd}.")
+                $"A data deve estar entre {MinimumDate:dd/MM/yyyy} e {latest:dd/MM/yyyy}.")
             : null;
     }
 }

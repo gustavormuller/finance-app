@@ -1,4 +1,4 @@
-using Finance.Api.Application;
+﻿using Finance.Api.Application;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +57,7 @@ public static class AccountEndpoints
 
             if (!await TrySaveAsync(database, cancellationToken))
             {
-                return Problems.Conflict($"An account called '{account.Name}' already exists.");
+                return Problems.Conflict($"Já existe uma conta chamada '{account.Name}'.");
             }
 
             return Results.Created($"/api/accounts/{account.Id}", Describe(account));
@@ -89,7 +89,7 @@ public static class AccountEndpoints
 
             if (!await TrySaveAsync(database, cancellationToken))
             {
-                return Problems.Conflict($"An account called '{account.Name}' already exists.");
+                return Problems.Conflict($"Já existe uma conta chamada '{account.Name}'.");
             }
 
             return Results.Ok(Describe(account));
@@ -117,8 +117,8 @@ public static class AccountEndpoints
             if (referencing > 0)
             {
                 return Problems.Conflict(
-                    $"'{account.Name}' still has {referencing} transaction(s). "
-                    + "Move or delete them first.");
+                    $"'{account.Name}' ainda tem {referencing} lançamento(s). "
+                    + "Mova ou exclua os lançamentos antes de excluir a conta.");
             }
 
             database.Accounts.Remove(account);
@@ -133,10 +133,10 @@ public static class AccountEndpoints
     private static IResult? Validate(AccountRequest request) =>
         Problems.Validation(
             string.IsNullOrWhiteSpace(request.Name)
-                ? new RuleViolation("name", "Name is required.")
+                ? new RuleViolation("name", "O nome é obrigatório.")
                 : null,
             request.Currency is not null && !Money.IsIsoCode(request.Currency)
-                ? new RuleViolation("currency", "Currency must be a three-letter uppercase ISO 4217 code.")
+                ? new RuleViolation("currency", "A moeda deve ser um código ISO 4217 de três letras maiúsculas.")
                 : null);
 
     private static async Task<bool> TrySaveAsync(AppDbContext database, CancellationToken cancellationToken)

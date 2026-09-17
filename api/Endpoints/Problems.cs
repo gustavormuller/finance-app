@@ -1,4 +1,4 @@
-using Finance.Api.Domain.Transactions;
+﻿using Finance.Api.Domain.Transactions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -51,7 +51,7 @@ internal static class Problems
     /// </summary>
     public static IResult Conflict(string reason) =>
         Results.Problem(
-            title: "Conflict",
+            title: "Conflito",
             detail: reason,
             statusCode: StatusCodes.Status409Conflict);
 

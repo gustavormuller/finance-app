@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 
 namespace Finance.Api.Tests.Integration;
@@ -79,9 +79,9 @@ public sealed class AccountEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
         // The spec asks the UI to show the reason rather than fail silently, so the
-        // body has to carry one.
+        // body has to carry one — in Portuguese, because it is shown verbatim.
         var reason = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("transaction", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("lançamento", reason, StringComparison.OrdinalIgnoreCase);
 
         var accounts = await user.Client.GetFromJsonAsync<List<TransactionsFixtures.AccountItem>>(
             "/api/accounts", cancellationToken);
