@@ -1,4 +1,12 @@
-import type { AccountType, CategoryKind } from '@/api/finance';
+import type {
+  AccountType,
+  AmountCulture,
+  CategoryKind,
+  ImportBatchStatus,
+  ImportSource,
+  SignMode,
+  StagedRowStatus,
+} from '@/api/finance';
 
 /**
  * How the API's enum members are written on screen.
@@ -24,6 +32,33 @@ export const categoryKindLabels: Record<CategoryKind, string> = {
 export const categoryKindPlurals: Record<CategoryKind, string> = {
   Income: 'Receitas',
   Expense: 'Despesas',
+};
+
+export const importSourceLabels: Record<ImportSource, string> = {
+  Ofx: 'OFX',
+  Csv: 'CSV',
+};
+
+export const importBatchStatusLabels: Record<ImportBatchStatus, string> = {
+  Staged: 'Em revisão',
+  Committed: 'Confirmada',
+};
+
+export const stagedRowStatusLabels: Record<StagedRowStatus, string> = {
+  Ready: 'Pronta',
+  Duplicate: 'Duplicada',
+  Invalid: 'Inválida',
+};
+
+export const signModeLabels: Record<SignMode, string> = {
+  Signed: 'Valor com sinal (negativo sai)',
+  SignedInverted: 'Valor com sinal invertido (positivo sai, como em faturas)',
+  DebitCredit: 'Colunas separadas de débito e crédito',
+};
+
+export const amountCultureLabels: Record<AmountCulture, string> = {
+  'pt-BR': 'Brasileiro (1.234,56)',
+  'en-US': 'Americano (1,234.56)',
 };
 
 export const accountTypes: AccountType[] = [
