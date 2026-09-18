@@ -33,3 +33,14 @@ export async function devLogin(page: Page, email: string, displayName: string) {
 export function uniqueEmail(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
 }
+
+/** An account by way of the real screen, so every spec starts from a state a person could reach. */
+export async function createAccount(page: Page, name: string) {
+  await page.goto('/accounts');
+  await page.getByRole('button', { name: 'Nova conta' }).click();
+  await page.getByLabel('Nome').fill(name);
+  await page.getByLabel('Tipo').selectOption('Checking');
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+
+  await expect(page.getByRole('cell', { name })).toBeVisible();
+}
