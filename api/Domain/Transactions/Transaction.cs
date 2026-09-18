@@ -1,4 +1,4 @@
-namespace Finance.Api.Domain.Transactions;
+﻿namespace Finance.Api.Domain.Transactions;
 
 /// <summary>
 /// One dated movement of money. A fact, above the line: never overwritten by a
@@ -38,4 +38,23 @@ public sealed class Transaction : IUserOwned
 
     /// <summary>When the row was written. This one <em>is</em> an instant.</summary>
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>
+    /// The batch that imported this row, so a whole import can be undone. Null for
+    /// a row entered by hand.
+    /// </summary>
+    public Guid? ImportBatchId { get; set; }
+
+    /// <summary>
+    /// The institution's own id for the movement — the OFX <c>FITID</c>. Unique per
+    /// account where present, which is what makes a re-import of the same file a
+    /// no-op. Null for manual rows and CSV imports.
+    /// </summary>
+    public string? ExternalId { get; set; }
+
+    /// <summary>
+    /// The dedupe and history key (ADR-012 rung 2). Null for rows created before
+    /// 004, which are never matched — they were entered by hand. No backfill.
+    /// </summary>
+    public string? NormalizedDescription { get; set; }
 }
