@@ -109,8 +109,8 @@ public sealed class DuplicateMatcherTests
     {
         var rows = new[]
         {
-            Row(0, date: null),
-            Row(1, date: null),
+            new DuplicateCandidate(0, null, Date: null, -42.90m, "PAG IFOOD"),
+            new DuplicateCandidate(1, null, Date: null, -42.90m, "PAG IFOOD"),
             Row(2, amount: null),
             Row(3, amount: null),
             Row(4, normalized: ""),
