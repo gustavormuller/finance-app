@@ -3,6 +3,7 @@ import { createRootRoute, createRoute } from '@tanstack/react-router';
 import AccountsPage from './routes/AccountsPage';
 import CategoriesPage from './routes/CategoriesPage';
 import HomePage from './routes/HomePage';
+import ImportPage from './routes/ImportPage';
 import LoginPage from './routes/LoginPage';
 import ProtectedLayout from './routes/ProtectedLayout';
 import TransactionsPage from './routes/TransactionsPage';
@@ -49,7 +50,19 @@ const homeRoute = createRoute({
 const transactionsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/transactions',
+
+  // 004's done step links here with the batch it just wrote, so the list opens on
+  // exactly those rows. Anything else in the query string is dropped.
+  validateSearch: (search: Record<string, unknown>): { importBatchId?: string } =>
+    typeof search.importBatchId === 'string' ? { importBatchId: search.importBatchId } : {},
+
   component: TransactionsPage,
+});
+
+const importRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/import',
+  component: ImportPage,
 });
 
 const accountsRoute = createRoute({
@@ -66,5 +79,5 @@ const categoriesRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, accountsRoute, categoriesRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute]),
 ]);

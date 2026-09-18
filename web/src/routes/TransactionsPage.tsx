@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { api, type Transaction } from '@/api/finance';
@@ -41,7 +42,15 @@ function isoDay(date: Date) {
 
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState({ ...currentMonth(), accountId: '', categoryId: '' });
+
+  // Arriving from an import's done step: show that batch, whatever its dates, rather
+  // than the current month with most of it filtered out.
+  const { importBatchId } = useSearch({ strict: false }) as { importBatchId?: string };
+  const [filter, setFilter] = useState(
+    importBatchId
+      ? { from: '', to: '', accountId: '', categoryId: '', importBatchId }
+      : { ...currentMonth(), accountId: '', categoryId: '', importBatchId: '' },
+  );
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [creating, setCreating] = useState(false);
@@ -88,7 +97,11 @@ export default function TransactionsPage() {
   const items = transactions.data?.items ?? [];
   const total = transactions.data?.total ?? 0;
   const isFiltered =
-    filter.from !== '' || filter.to !== '' || filter.accountId !== '' || filter.categoryId !== '';
+    filter.from !== '' ||
+    filter.to !== '' ||
+    filter.accountId !== '' ||
+    filter.categoryId !== '' ||
+    filter.importBatchId !== '';
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
@@ -166,6 +179,15 @@ export default function TransactionsPage() {
           allLabel="Todas as categorias"
         />
       </div>
+
+      {filter.importBatchId !== '' && (
+        <p className="bg-secondary text-secondary-foreground mb-6 flex items-center justify-between gap-4 rounded-md px-3 py-2 text-sm">
+          <span>Mostrando apenas os lançamentos de uma importação.</span>
+          <Link to="/transactions" search={{}} className="underline" onClick={() => page1({ importBatchId: '' })}>
+            Mostrar todos
+          </Link>
+        </p>
+      )}
 
       {failure && <Alert>{failure}</Alert>}
 

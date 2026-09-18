@@ -5,6 +5,7 @@ import RequireAuth from './RequireAuth';
 const LINKS: [string, string][] = [
   ['/', 'Início'],
   ['/transactions', 'Lançamentos'],
+  ['/import', 'Importar'],
   ['/accounts', 'Contas'],
   ['/categories', 'Categorias'],
 ];
