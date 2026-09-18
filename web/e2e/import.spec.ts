@@ -22,8 +22,13 @@ async function uploadOfx(page: Page, account: string) {
   await expect(page.getByRole('heading', { name: '3. Revisão' })).toBeVisible();
 }
 
+/** The current step's own controls; the history underneath offers the same verbs for other batches. */
+function step(page: Page) {
+  return page.getByTestId('import-step');
+}
+
 async function commit(page: Page) {
-  await page.getByRole('button', { name: 'Confirmar importação' }).click();
+  await step(page).getByRole('button', { name: 'Confirmar importação' }).click();
 
   await expect(page.getByRole('heading', { name: '4. Concluído' })).toBeVisible();
 }
@@ -60,9 +65,9 @@ test('uploading the same OFX again marks every row duplicate and commits nothing
 
   await expect(page.getByTestId('preview-counts')).toHaveText(/0 prontas · 3 duplicadas · 0 inválidas · 0 a importar/);
   await expect(page.getByTestId('staged-row-Duplicate')).toHaveCount(3);
-  await expect(page.getByRole('button', { name: 'Confirmar importação' })).toBeDisabled();
+  await expect(step(page).getByRole('button', { name: 'Confirmar importação' })).toBeDisabled();
 
-  await page.getByRole('button', { name: 'Descartar' }).click();
+  await step(page).getByRole('button', { name: 'Descartar' }).click();
   await expect(page.getByRole('heading', { name: '1. Arquivo' })).toBeVisible();
 
   await page.goto('/transactions');
@@ -112,9 +117,9 @@ test('undoing a committed batch removes its rows from the list', async ({ page }
   await uploadOfx(page, 'Caixa');
   await commit(page);
 
-  await page.getByRole('button', { name: 'Desfazer' }).click();
-  await expect(page.getByRole('alertdialog')).toHaveText(/excluir 3 lançamentos\?/);
-  await page.getByRole('button', { name: 'Confirmar' }).click();
+  await step(page).getByRole('button', { name: 'Desfazer' }).click();
+  await expect(step(page).getByRole('alertdialog')).toHaveText(/excluir 3 lançamentos\?/);
+  await step(page).getByRole('button', { name: 'Confirmar' }).click();
 
   await expect(page.getByRole('heading', { name: '1. Arquivo' })).toBeVisible();
   await expect(page.getByText('Nenhuma importação ainda.')).toBeVisible();

@@ -67,6 +67,9 @@ export default function ImportPage(): React.JSX.Element {
     queryKey: ['imports', batchId, filter, page],
     queryFn: () => api.getImport(batchId!, { page, pageSize: ROWS_PER_PAGE, ...(filter ? { status: filter } : {}) }),
     enabled: batchId !== null,
+    // A batch that was just discarded or committed answers 404; retrying that with
+    // backoff would only keep the page busy.
+    retry: false,
   });
 
   const fail = (error: unknown) =>
@@ -159,8 +162,10 @@ export default function ImportPage(): React.JSX.Element {
     },
     onSuccess: async (done) => {
       setFailure(null);
-      await refresh();
+      // The step changes before the refresh, so the detail query is disabled rather
+      // than refetched against a batch whose rows are gone.
       setStep({ kind: 'done', ...done });
+      await refresh();
     },
     onError: fail,
   });
@@ -169,8 +174,8 @@ export default function ImportPage(): React.JSX.Element {
     mutationFn: (id: string) => api.discardImport(id),
     onSuccess: async () => {
       setFailure(null);
-      await refresh();
       setStep({ kind: 'file' });
+      await refresh();
     },
     onError: fail,
   });
@@ -179,8 +184,8 @@ export default function ImportPage(): React.JSX.Element {
     mutationFn: (id: string) => api.undoImport(id),
     onSuccess: async () => {
       setFailure(null);
-      await refresh();
       setStep({ kind: 'file' });
+      await refresh();
     },
     onError: fail,
   });
@@ -223,6 +228,9 @@ export default function ImportPage(): React.JSX.Element {
         {STEP_TITLES[step.kind]}
       </h3>
 
+      {/* One container for the current step, so its buttons are distinguishable from
+          the history's, which offers the same verbs for other batches. */}
+      <div data-testid="import-step">
       {step.kind === 'file' && (
         <FileStep
           accounts={accounts.data ?? []}
@@ -269,6 +277,7 @@ export default function ImportPage(): React.JSX.Element {
           onNew={() => setStep({ kind: 'file' })}
         />
       )}
+      </div>
 
       <div className="mt-12">
         <h3 className="mb-3 text-base font-semibold">Histórico</h3>
