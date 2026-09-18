@@ -52,6 +52,7 @@ public static class TransactionEndpoints
             DateOnly? to = null,
             Guid? accountId = null,
             Guid? categoryId = null,
+            Guid? importBatchId = null,
             int page = 1,
             int pageSize = DefaultPageSize) =>
         {
@@ -80,6 +81,12 @@ public static class TransactionEndpoints
             if (categoryId is { } onlyCategory)
             {
                 query = query.Where(transaction => transaction.CategoryId == onlyCategory);
+            }
+
+            // 004: the "see what this import wrote" link from the done step.
+            if (importBatchId is { } onlyBatch)
+            {
+                query = query.Where(transaction => transaction.ImportBatchId == onlyBatch);
             }
 
             var total = await query.CountAsync(cancellationToken);

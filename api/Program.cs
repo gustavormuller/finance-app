@@ -27,6 +27,10 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddFinanceAuthentication();
 builder.Services.AddAuthorization();
 
+// 004's use cases. Scoped, like the context they take (ADR-016).
+builder.Services.AddScoped<ImportStaging>();
+builder.Services.AddScoped<ImportCommands>();
+
 var app = builder.Build();
 
 // Everything the process cannot run without, checked once, at boot, with a message
@@ -99,6 +103,8 @@ app.MapAuthEndpoints(app.Environment);
 app.MapAccountEndpoints();
 app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
+app.MapImportEndpoints();
+app.MapCsvTemplateEndpoints();
 
 app.Run();
 
