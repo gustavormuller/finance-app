@@ -31,11 +31,11 @@
 | ORM | EF Core | good migrations, typed LINQ, global query filters |
 | Auth | ASP.NET Core Identity + Google OAuth | native to the framework, R$0, scales to SaaS |
 | Database | PostgreSQL 16 (container) | R$0, relational, good with time series |
-| Queue / jobs | pg-boss (or Hangfire) | runs on the existing Postgres, zero extra services |
+| Queue / jobs | Hangfire or a hosted `BackgroundService` (decided in 009) | runs in the API process on the existing Postgres, zero extra services |
 | Frontend | Vite + React + TanStack Router | SPA, no SSR needed |
 | UI | shadcn/ui + Tailwind | ready-made components, no Figma |
 | Charts | Recharts | enough for dashboard and series |
-| Shared types | OpenAPI → `openapi-typescript` | TS client generated at build time |
+| Shared types | Hand-written TS client (`web/src/api/`) | the integration tests declare the same shapes independently and keep it honest; OpenAPI generation is not set up |
 | E-mail | Resend (free tier) or SES | alerts and notifications |
 | AI | Claude or OpenAI API, with a spending ceiling | scheduled monthly analysis |
 | Backup | `pg_dump` + `age` + rclone → B2/R2 | encrypted, off the machine |
@@ -47,7 +47,7 @@
 | ECS Fargate | ~R$55/month in idle compute alone |
 | Aurora Serverless v2 / RDS | minimum of R$82–235/month |
 | ALB | R$88/month fixed, with no traffic to justify it |
-| BullMQ + Upstash Redis | pg-boss solves it on the existing database |
+| BullMQ + Upstash Redis | an in-process scheduler on the existing database solves it (ADR-003) |
 | Worker in a separate service | there is no independent scaling to optimise |
 | better-auth | TypeScript library, incompatible with a .NET backend |
 | Astro landing page | there is no audience |
@@ -172,7 +172,7 @@ finance-app/
 │   ├── src/
 │   │   ├── routes/
 │   │   ├── components/
-│   │   └── api/               # client generated from OpenAPI
+│   │   └── api/               # hand-written API client and types
 │   └── e2e/                   # Playwright
 ├── deploy/
 │   ├── docker-compose.yml
@@ -195,7 +195,7 @@ Browser
          └── VPS
                ├── Caddy          → frontend static files + /api proxy
                ├── api (.NET)     → API + jobs in the same process
-               └── postgres       → data + pg-boss queues
+               └── postgres       → data + job state
 ```
 
 ### docker-compose (skeleton)
@@ -325,6 +325,14 @@ upload → parse (OFX/CSV) → normalize → deduplicate
 
 Preview and undo come free out of this structure. They are not separate features to build later.
 
+Deduplication does not hash. The key is `ExternalId` (the OFX `FITID`) when the
+institution supplies one, otherwise date + amount + `NormalizedDescription`. The
+normalized description is stored as a column rather than folded into a hash because
+§3's history lookup needs the same key — one column serves both (004).
+
+Import runs synchronously in the request (004). A few hundred rows is milliseconds of
+work; the job infrastructure below arrives with 009, which actually needs it.
+
 ### 3. Cascading categorization, AI last
 
 ```
@@ -358,9 +366,10 @@ public readonly record struct Money(decimal Amount, string Currency)
 | nightly | `sync-market-data` | `prices`, `benchmarks` |
 | nightly (after sync) | `rebuild-snapshots` | `portfolio_daily` |
 | monthly | `monthly-analysis` | AI analysis, only for `ai_enabled` |
-| on demand | `process-import` | `staged_transactions` |
-| on demand | `categorize-batch` | categories |
+| on demand | `categorize-batch` | categories (AI rung, 009) |
 | on demand | `rebuild-snapshots-from(date)` | `portfolio_daily` from the date onward |
+
+Import is not a job: it runs synchronously in the request (004, §2 above).
 
 The last one closes the loop: editing an old event triggers recomputation of everything that came after. It is the only way to keep derivation consistent with the source of truth without recomputing everything every time.
 
@@ -633,8 +642,8 @@ This is the only cost that scales linearly with users. With the per-user ceiling
 ### Phase 2 — Import
 - [ ] OFX parser (the most reliable format from BR banks)
 - [ ] CSV parser with column mapping
-- [ ] Templates: Nubank, Inter, Itaú
-- [ ] Duplicate detection (hash of date + amount + normalized description)
+- [ ] User-saved CSV templates (no built-in bank layouts: they go stale)
+- [ ] Duplicate detection (`ExternalId`, else date + amount + normalized description)
 - [ ] Preview before confirming + undo batch
 
 ### Phase 3 — Dashboard
@@ -754,7 +763,7 @@ In production these live in the VPS `.env`, outside git, `chmod 600`.
 |---|---|
 | Oracle Cloud Always Free | R$0 |
 | .com.br domain (R$40/year) | ~R$3 |
-| Cloudflare Tunnel, Caddy, Postgres, pg-boss | R$0 |
+| Cloudflare Tunnel, Caddy, Postgres, in-process jobs | R$0 |
 | Identity + Google OAuth | R$0 |
 | Resend / SES | R$0 |
 | BCB, brapi, CoinGecko, Binance, Twelve Data | R$0 |
@@ -791,10 +800,11 @@ Oracle Always Free zeroes the host cost. The risk of a unilateral rule change is
 ### ADR-002 — .NET instead of NestJS
 Reverted from the previous plan, which prioritised delivery speed for a SaaS. With learning as a goal, .NET composes with existing professional experience. Technically: native `decimal` (JS only has float64) and EF Core's `HasQueryFilter` applying tenant isolation automatically on every query, joins included — a guarantee that matters with open registration.
 *Correction:* memory consumption was used as an argument in an earlier revision; with 12 GB on Oracle, it stopped being a factor.
-*Trade-off:* loses shared types. Mitigated with a TS client generated from OpenAPI.
+*Trade-off:* loses shared types. The TS client is hand-written; the integration tests declare the same shapes independently and fail when the endpoints drift. Generating it from OpenAPI was the original plan and may still happen, but the build machinery is not set up and nothing depends on it.
 
-### ADR-003 — pg-boss instead of BullMQ + Redis
-BullMQ requires Redis, one more service to run and pay for. pg-boss uses the existing Postgres.
+### ADR-003 — In-process jobs on the existing Postgres, not BullMQ + Redis *(amended in 004)*
+BullMQ requires Redis, one more service to run and pay for. The job runner uses the existing Postgres instead.
+**Amendment.** The original text named pg-boss. pg-boss is a Node.js library and cannot run inside the .NET process that ADR-004 requires, so it was never a valid choice here. Background jobs will be Hangfire or a hosted `BackgroundService`, decided in 009 — the first feature that needs a scheduler. 004's import is synchronous, in the request, and needs no job at all.
 *Trade-off:* no Bull Board. A jobs table with status solves it.
 
 ### ADR-004 — Jobs in the same process as the API
@@ -894,4 +904,4 @@ Transaction CRUD stays CRUD.
 - [EF Core — Global Query Filters](https://learn.microsoft.com/ef/core/querying/filters)
 - [Caddy](https://caddyserver.com/docs/)
 - [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
-- [pg-boss](https://github.com/timgit/pg-boss)
+- [Hangfire](https://www.hangfire.io/)
