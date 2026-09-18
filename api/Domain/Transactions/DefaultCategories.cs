@@ -15,16 +15,22 @@
 /// </remarks>
 public static class DefaultCategories
 {
+    /// <summary>Where an imported expense lands when nothing in history says otherwise (004).</summary>
+    public const string OtherExpenseName = "Outros";
+
+    /// <summary>Where an imported income lands when nothing in history says otherwise (004).</summary>
+    public const string OtherIncomeName = "Outras receitas";
+
     public static readonly IReadOnlyList<(string Name, CategoryKind Kind)> All =
     [
         ("Salário", CategoryKind.Income),
-        ("Outras receitas", CategoryKind.Income),
+        (OtherIncomeName, CategoryKind.Income),
         ("Moradia", CategoryKind.Expense),
         ("Alimentação", CategoryKind.Expense),
         ("Transporte", CategoryKind.Expense),
         ("Saúde", CategoryKind.Expense),
         ("Lazer", CategoryKind.Expense),
-        ("Outros", CategoryKind.Expense),
+        (OtherExpenseName, CategoryKind.Expense),
     ];
 
     public static IEnumerable<Category> For(Guid userId, DateTimeOffset createdAt) =>

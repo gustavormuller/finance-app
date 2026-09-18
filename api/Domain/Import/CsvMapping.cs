@@ -31,7 +31,11 @@ public sealed record CsvMapping(
     /// mode requires, and references that do not exist in the table. Field names
     /// match the request body, so the endpoint can report them as a 400.
     /// </summary>
-    public IReadOnlyList<RuleViolation> Validate(CsvTable table)
+    /// <param name="table">
+    /// Null when there is no file yet — a template being saved — in which case the
+    /// references are required but not resolved.
+    /// </param>
+    public IReadOnlyList<RuleViolation> Validate(CsvTable? table)
     {
         var violations = new List<RuleViolation>();
 
@@ -117,7 +121,7 @@ public sealed record CsvMapping(
         List<RuleViolation> violations,
         string field,
         string? reference,
-        CsvTable table,
+        CsvTable? table,
         bool required)
     {
         if (string.IsNullOrWhiteSpace(reference))
@@ -130,7 +134,7 @@ public sealed record CsvMapping(
             return;
         }
 
-        if (ResolveColumn(reference, table) is null)
+        if (table is not null && ResolveColumn(reference, table) is null)
         {
             violations.Add(new RuleViolation(field, $"Coluna \"{reference}\" não encontrada no arquivo."));
         }
