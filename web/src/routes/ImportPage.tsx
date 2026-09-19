@@ -8,6 +8,7 @@ import {
   type CsvMappingInput,
   type CsvPreview,
   type ImportBatch,
+  type ImportBatchDetail,
   type StagedRow,
   type StagedRowPatch,
   type StagedRowStatus,
@@ -146,10 +147,38 @@ export default function ImportPage(): React.JSX.Element {
     onError: fail,
   });
 
+  const detailKey = ['imports', batchId, filter, page];
+
   const patchRow = useMutation({
     mutationFn: ({ row, patch }: { row: StagedRow; patch: StagedRowPatch }) =>
       api.patchImportRow(batchId!, row.id, patch),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['imports', batchId] }),
+    // Optimistic: a checkbox that only ticks after a round trip reads as broken.
+    // The refetch after success puts the server's truth back either way.
+    onMutate: ({ row, patch }) =>
+      queryClient.setQueryData<ImportBatchDetail>(detailKey, (current) => {
+        if (!current) {
+          return current;
+        }
+
+        const included = patch.include ?? row.included;
+
+        return {
+          ...current,
+          counts: {
+            ...current.counts,
+            included: current.counts.included + Number(included) - Number(row.included),
+          },
+          rows: {
+            ...current.rows,
+            items: current.rows.items.map((item) =>
+              item.id === row.id
+                ? { ...item, included, categoryId: patch.categoryId ?? item.categoryId }
+                : item,
+            ),
+          },
+        };
+      }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['imports', batchId] }),
     onError: fail,
   });
 
