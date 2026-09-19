@@ -142,8 +142,11 @@ public static class CsvStatementParser
     /// The width most records agree on. A record with empty trailing fields — a
     /// data line ending in a delimiter — supports every width between its trimmed
     /// and its raw length, so a header without the trailing delimiter still wins.
-    /// Records of one field do not vote when anything wider exists: a title line
-    /// above a table is not a vote for one-column files. Ties go to the wider table.
+    /// Only a width some record actually fills to the last column is a candidate:
+    /// when every line ends in a delimiter, Bradesco-style, the column nothing
+    /// ever fills is not a column. Records of one field do not vote when anything
+    /// wider exists: a title line above a table is not a vote for one-column files.
+    /// Ties go to the wider table.
     /// </summary>
     private static int ModalFieldCount(List<(int RowNumber, string[] Fields)> records)
     {
@@ -151,11 +154,11 @@ public static class CsvStatementParser
             .Select(record => (Min: TrimmedWidth(record.Fields), Max: record.Fields.Length))
             .ToList();
 
-        var candidates = spans.Select(span => span.Max).Where(width => width > 1).Distinct().ToList();
+        var candidates = spans.Select(span => span.Min).Where(width => width > 1).Distinct().ToList();
 
         if (candidates.Count == 0)
         {
-            candidates = spans.Select(span => span.Max).Distinct().ToList();
+            candidates = spans.Select(span => span.Min).Distinct().ToList();
         }
 
         return candidates

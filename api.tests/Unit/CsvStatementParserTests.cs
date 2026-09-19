@@ -118,6 +118,26 @@ public sealed class CsvStatementParserTests
         });
     }
 
+    /// <summary>Bradesco ends every line, header included, with a delimiter.</summary>
+    [Fact]
+    public void A_trailing_delimiter_on_every_line_does_not_invent_a_column()
+    {
+        var table = CsvStatementParser.Parse(
+            "Extrato de: Ag: 1234 | Conta: 0012345-6\n"
+            + "Data;Histórico;Docto.;Crédito (R$);Débito (R$);Saldo (R$);\n"
+            + "05/08/26;TED RECEBIDA;1234;2.000,00;;3.234,56;\n"
+            + "06/08/26;PAGTO COBRANCA;5566;;-189,45;3.045,11;\n",
+            ';',
+            hasHeader: true);
+
+        Assert.Equal(1, table.SkippedRows);
+        Assert.Equal(6, table.ColumnCount);
+        Assert.Equal(["Data", "Histórico", "Docto.", "Crédito (R$)", "Débito (R$)", "Saldo (R$)"], table.Headers);
+        Assert.Equal(2, table.Records.Count);
+        Assert.All(table.Records, record => Assert.Equal(6, record.Fields.Count));
+        Assert.Equal("-189,45", table.Records[1].Fields[4]);
+    }
+
     [Fact]
     public void An_empty_last_column_is_not_a_trailing_delimiter()
     {
