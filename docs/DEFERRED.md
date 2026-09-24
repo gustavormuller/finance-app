@@ -1844,3 +1844,159 @@ Full handoff: `docs/handoffs/007.md`. **007 is complete in code; these steps nee
   - **For CP6 (E2E 36).** Under `FakeProviders` every close is 10 and every benchmark is
     0.05, both dated yesterday. So a real TWR is 0 unless the fakes get a shape (007
     handoff).
+
+## 008 · checkpoint 5
+
+- **008 · CP5 · no ADR conflict; nothing to stop on.** The checkpoint is web only. There is
+  no API change and no migration. Every figure on screen is the API's, formatted in pt-BR.
+  The one figure made in the browser is the benchmark table's difference, and it is made
+  exactly (below). Enum members, periods and benchmark codes stay English on the wire and
+  are named in `web/src/lib/labels.ts`, as CLAUDE.md says.
+- **008 · CP5 · what was built.**
+  - `/investments/returns`, linked from `/investments` ("Rentabilidade" beside the heading)
+    and not from the navigation, since the spec says "linked from the positions page".
+  - `/investments/$assetId/returns`, the spec's "asset's own returns page". The spec names
+    no path for it, so the path is mine. It uses the same report as the portfolio's page
+    and adds the FX split for a non-BRL asset. It is reached from the per-asset table only.
+    `AssetPage` (007) has no link to it yet (**for the human / CP6:** add one if wanted).
+  - In `components/returns/`: `PeriodSelector`, `Headline`, `ComparisonChart`,
+    `BenchmarksTable`, `AssetReturnsTable`, `FxSplit`, `ReturnsReport` (shared by both
+    pages), `queries.ts` and `benchmarks.ts`.
+  - Library code: `lib/rates.ts` (`formatRate`, `formatPoints`, `NO_DATA`, `perYear`,
+    `showsAnnualised`, `signTone`), `rateUnits` and `pointsDifference` in `lib/decimal.ts`,
+    and the benchmark and period labels in `lib/labels.ts`. The response types and
+    `api.portfolioReturns` / `api.assetReturns` are in `api/finance.ts`.
+- **008 · CP5 · DECISION PENDING HUMAN: annualised TWR for a year or less is not shown.**
+  This is the CP4 handoff's default, and the spec says nothing that overrides it ("annualise
+  when the period exceeds one year").
+  - When `period.days <= 365`, the headline shows `twr.total` labelled "no período". It does
+    not show `twr.annualised`. The benchmark table shows the period's returns only.
+  - When `period.days > 365`, the headline adds the annualised TWR ("a.a."), and the
+    benchmark table adds an "Ao ano" column.
+  - XIRR and the timing effect are always a year's rate and always labelled "a.a.". So for a
+    short period the timing effect is still `xirr - twr.annualised`, a difference of two
+    annual rates, and it can be large and noisy. For example, 1% over 10 days is about 44% a
+    year. **For the human:** confirm, or say to show the annualised TWR always, or to hide
+    the timing effect below some number of days.
+- **008 · CP5 · PENDING HUMAN: "the same red as expenses".** The app has no red for expenses.
+  `Amount` prints an expense in ink, and the charts use `--chart-expense`, which is orange
+  (`#eb6834`). 005 · CP3 chose blue and orange over green and red for colour-vision reasons.
+  - A negative timing effect is therefore `text-chart-expense`. A positive one is
+    `text-green-700 dark:text-green-500`, the same green as `Amount`. Zero and `null` are
+    in ink.
+  - The sign is always printed, so colour is never the only carrier.
+  - The orange on white is about 3:1. That passes WCAG AA only as large text. The headline
+    figure is 24px semibold, so it counts as large text. **For the human:** confirm the
+    orange, or name a red token.
+  - Test 33 asserts the class.
+- **008 · CP5 · the benchmark table** (spec silent on the details):
+  - The rows are "Carteira" first, then every benchmark the API sent. Benchmarks are in the
+    spec's configuration order (CDI, SELIC, IPCA + 6%, Dólar, S&P 500), not the API's code
+    order. A code the client does not know is appended and shown as sent.
+  - "Carteira menos referência" is `twr.total - benchmark.total` in percentage points
+    (`+1,91 p.p.`). It is always on the **period's** returns, including past a year, where
+    the annualised columns are also shown. **For the human:** say if past a year the
+    difference should be on the annualised figures.
+  - The difference is exact. `rateUnits` recovers the API's 10-place decimal from the
+    float64 with `toFixed(10)`, which is exact because the float is within half a unit
+    of it. The difference is then taken in `bigint` and rounded once, half to even, to a
+    hundredth of a point. `0.3 - 0.1` gives exactly 20,00 p.p.
+  - A `null` benchmark shows "Sem dados" in every cell, the difference included.
+- **008 · CP5 · null and placeholders.**
+  - Any `null` rate reads "Sem dados" (`NO_DATA`), never NaN or a blank. XIRR's "a.a."
+    suffix is dropped when there is no rate.
+  - The empty response (CP4's 200 of nulls) shows "Nenhuma posição valorizada neste
+    período." in place of the report.
+  - `fx: null` on a BRL asset is not missing data, so the per-asset table says "Ativo em
+    reais". On a USD asset with no split it says "Sem dados".
+- **008 · CP5 · the chart.**
+  - Recharts, base 100. The portfolio's index is drawn in `var(--primary)` at 2.5px. The
+    spec asks for "the primary colour", and in the stock neutral theme that is near-black.
+  - Each benchmark is `var(--muted-foreground)` at 1.5px, told apart by its dash pattern.
+    Five muted colours cannot be told apart, and dashes also survive greyscale.
+  - Every benchmark that could anchor has a toggle. All are on by default (spec silent). A
+    `null` benchmark has no toggle and no line, since it has no key in `series`.
+  - The default tooltip lists every visible series on the hovered date, to two places. A
+    visually hidden table gives the same at each month's last point, as 007's value chart
+    does.
+  - `ResponsiveContainer` gets an `initialDimension`, so jsdom draws the lines. Test 34
+    checks that each line's `path` is present or absent in the SVG. It does not only check
+    the button state.
+- **008 · CP5 · the period selector.**
+  - It has four buttons (`aria-pressed`). A preset fetches on click. "Personalizado" shows
+    "De" and "Até" date inputs, which fetch only on "Aplicar".
+  - The period is part of the query key, so a change is a new request (test 35). Every
+    returns query sits under `['investments', 'returns']`, so a movement write refreshes it.
+  - A 400's `from` and `to` messages show under their inputs as sent. A `period` message
+    shows as an alert. Any other failure shows a pt-BR alert. On an asset's page, a 404
+    shows "Ativo não encontrado."
+  - Queries do not retry a 4xx, so a 400 shows at once, not after three retries.
+  - The period is component state. It is not in the URL, so it is lost on reload and
+    cannot be linked to (spec silent).
+- **008 · CP5 · the per-asset table.**
+  - It lists every position `/api/investments/assets` returns, closed and just-added
+    included. It uses one `/api/returns/assets/{id}` call per asset, in the selected period
+    (CP4 handoff: no list route). An asset with nothing in the period reads "Sem dados".
+    **For the human:** hide those rows, or add a list route if many assets make this slow.
+  - The columns are TWR for the period, XIRR "a.a.", the asset's own-currency return, and
+    the exchange rate's return. The asset's own page shows the three-way split (asset,
+    exchange rate, total in reais).
+- **008 · CP5 · invented pt-BR copy, for a native review:**
+  - "Rentabilidade"
+  - "Rentabilidade (TWR)", "O desempenho dos ativos, sem o efeito de quando você aportou."
+  - "Retorno do dinheiro (XIRR)", "O retorno real, com a data e o valor de cada aporte e
+    resgate."
+  - "no período", "a.a.", "Sem dados"
+  - "Desde o início", "No ano", "12 meses", "Personalizado", "De", "Até", "Aplicar"
+  - "Carteira e referências, base 100", "Referências no gráfico"
+  - "Comparação com referências", "Referência", "No período", "Ao ano", "Carteira menos
+    referência", "p.p."
+  - "Por ativo", "TWR no período", "Ativo na moeda", "Câmbio", "Ativo em reais", "Ativo em
+    USD", "Total em reais"
+  - "Nenhuma posição valorizada neste período.", "Ativo não encontrado.", "Não foi possível
+    carregar a rentabilidade. Recarregue a página para tentar de novo."
+
+  The spec's own strings ("Efeito do timing" and its sentence) are used verbatim.
+- **008 · CP5 · numbers on the wire.** Rates are displayed from JSON's float64 through
+  `Intl.NumberFormat` to two places, which is display only. The API rounds them to 10 places
+  (CP4), so nothing visible is lost.
+- **008 · CP5 · counts.** Web 115 → 142 (+27):
+  - 10 library tests (4 decimal, 3 labels, 3 rates);
+  - 17 page tests (headline and test 33 ×2, test 34, test 35, 400s, 404, empty state,
+    benchmark table, per-asset table, asset page).
+
+  .NET 759 and E2E 21 are unchanged. Both verify scripts are green.
+- **008 · CP5 · test-first.** Each feat commit was preceded by a test commit that failed. Three
+  test corrections landed on their own, before the feats that needed them:
+  - `c84b753`: the half-way values of the points difference were off by 100;
+  - `368b530`: the refetched headline is read across its spans, and a literal no-break
+    space the linter refused is escaped;
+  - `052b1d9`: the asset 404 is stubbed with `{}`. The API's bare 404 has an empty body,
+    which the client reads as `{}`. The stub's `null` crashed the client's problem parsing,
+    which a real 404 cannot do.
+- **008 · CP5 · diff sizes.** Every commit is under ~200 lines except `c4cdc72`, the page tests,
+  at 211. It was left as one commit because the tests share their fixtures. The first
+  headline feat was 245 lines, so it was split before handoff into `d1a8280` (101) and
+  `cbb9ca1` (146).
+- **008 · CP5 · handoff to CP6** (E2E test 36 and `docs/handoffs/008.md`).
+  - **The fakes need a shape.** Under `MarketData:FakeProviders`,
+    `FakeMarketDataProviders` returns one close of `10` dated `to`, and one benchmark value
+    of `0.05` dated `to`. So every price is flat, and every TWR, XIRR and asset-only return
+    is 0. Test 36 needs "non-zero TWR", so the fake closes have to vary by date.
+  - **Do not break 006/007's E2E.** 007's tests 31–33 buy 100 PETR4 today and assert a value
+    of `R$ 1.000,00` and a result of `+R$ 45,10`. Both read the latest close, so that close
+    must stay `10`.
+  - One shape that keeps them: a close per day over the requested `[from, to]`, derived
+    from the date, with the close on `to` equal to `10` (for example, 1% lower for each
+    day before `to`). Check that the 006 sync test's item counts do not depend on one row
+    per asset.
+  - **Test 36 itself.** A buy dated today has only one daily row, which is the base day,
+    so its TWR is 0 by construction (CP2). Date the buy some days back and make sure the
+    sync covers those days, so there are several rows. Then assert a non-zero headline TWR
+    and that `comparison-chart` is visible. A real TWR needs a price change after the buy.
+  - The E2E's first real-browser pass over these pages is CP6's. Everything here was run
+    in jsdom only. The wire shape was checked against CP4's integration tests: camelCase
+    fields, benchmark codes as keys, and dates as `yyyy-MM-dd`.
+  - **The handoff should list the open items:** CP1–CP4's pending decisions, this
+    checkpoint's two (annualised TWR for short periods, and the expense colour), the p.p.
+    basis past a year, per-asset rows with no data, and the copy review.
