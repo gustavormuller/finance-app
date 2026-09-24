@@ -251,6 +251,12 @@ public sealed class ImportStaging(AppDbContext database)
 
             row.CategoryId = CategorySuggester.Suggest(row.Amount!.Value, remembered, defaultExpense, defaultIncome);
 
+            // 009: rung 3 may only touch a row the sign default filed. A remembered category
+            // wins even where it is the default itself: history chose it.
+            row.CategorySource = row.CategoryId is null ? CategorySource.None
+                : row.CategoryId == remembered?.Id ? CategorySource.History
+                : CategorySource.Default;
+
             if (row.CategoryId is null)
             {
                 row.Status = StagedRowStatus.Invalid;
