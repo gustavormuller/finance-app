@@ -17,6 +17,12 @@ public sealed class MarketDataOptions
 
     public BcbOptions Bcb { get; set; } = new();
 
+    /// <summary>
+    /// Benchmarks served as an asset's closes by a price provider, stored in
+    /// <c>Benchmarks</c> under their code: <c>IVVB11</c> from brapi, an S&amp;P 500 proxy in BRL.
+    /// </summary>
+    public Dictionary<string, PriceBenchmark> PriceBenchmarks { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     public BrapiOptions Brapi { get; set; } = new();
 
     public CoinGeckoOptions CoinGecko { get; set; } = new();
@@ -37,6 +43,16 @@ public sealed class BcbOptions
 public sealed class SgsSeries
 {
     public int Code { get; set; }
+
+    public BenchmarkUnit Unit { get; set; }
+}
+
+/// <summary>A benchmark read through an <see cref="IPriceProvider"/>: which one, its symbol there, and the unit.</summary>
+public sealed class PriceBenchmark
+{
+    public Domain.MarketData.ProviderKind Provider { get; set; }
+
+    public string Symbol { get; set; } = "";
 
     public BenchmarkUnit Unit { get; set; }
 }
