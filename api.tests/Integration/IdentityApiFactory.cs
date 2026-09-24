@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
@@ -91,11 +91,19 @@ internal sealed class TestGoogleHandler(
 /// <c>Secure</c>, and a cookie container will not send one back over <c>http</c>. The
 /// alternative — relaxing <c>CookieSecurePolicy</c> under test — would leave the
 /// production cookie policy untested.
+/// <para>
+/// <paramref name="services"/> runs after every other registration, so a test can swap
+/// a service for a fake: the market-data providers, for instance. <paramref name="settings"/>
+/// is added over the default configuration, for a switch such as
+/// <c>MarketData:FakeProviders</c>.
+/// </para>
 /// </remarks>
 internal sealed class IdentityApiFactory(
     string connectionString,
     string? keysPath = null,
-    string environment = "Development")
+    string environment = "Development",
+    Action<IServiceCollection>? services = null,
+    IReadOnlyDictionary<string, string?>? settings = null)
     : WebApplicationFactory<Program>
 {
     /// <summary>The origin the Origin check is configured to accept.</summary>
@@ -112,6 +120,12 @@ internal sealed class IdentityApiFactory(
     {
         builder.UseEnvironment(environment);
 
+        // No file watchers on appsettings and user secrets. Each watching host holds
+        // inotify instances, the suite boots hundreds of hosts, and Linux caps a user
+        // at 128 instances by default: past that, hosts fail to start with an
+        // IOException that looks like a flaky test. Nothing here edits config on disk.
+        builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
+
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -119,11 +133,18 @@ internal sealed class IdentityApiFactory(
                 ["App:Origin"] = AppOrigin,
                 ["DataProtection:KeysPath"] = _keysPath,
 
+                // The nightly market-data job would sync against the real providers.
+                ["MarketData:ScheduledSync"] = "false",
+
+                // The analysis sweep would run every other test's stale rows in this
+                // shared database. The job itself stays on: it only runs what a host enqueues.
+                ["Ai:AnalysisSweep"] = "false",
+
                 // The real handler is never asked to talk to Google, but OAuthOptions
                 // validates that both are present before it will run at all.
                 ["Google:ClientId"] = "test-client-id",
                 ["Google:ClientSecret"] = "test-client-secret",
-            }));
+            }).AddInMemoryCollection(settings ?? new Dictionary<string, string?>()));
 
         builder.ConfigureServices(services =>
         {
@@ -144,6 +165,11 @@ internal sealed class IdentityApiFactory(
                 options.SchemeMap[GoogleDefaults.AuthenticationScheme].HandlerType =
                     typeof(TestGoogleHandler));
         });
+
+        if (services is not null)
+        {
+            builder.ConfigureServices(services);
+        }
     }
 
     /// <summary>

@@ -71,4 +71,27 @@ public sealed class DefaultCategoriesTests(PostgresFixture postgres)
             DefaultCategories.All.Count,
             await context.Categories.CountAsync(cancellationToken));
     }
+
+    /// <summary>
+    /// 005 spec integration test 19. Transfers between the user's own accounts need a
+    /// home from day one, or the card-bill payment counts as an expense twice.
+    /// </summary>
+    [Fact]
+    public async Task A_new_user_has_a_top_level_transfer_category()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        await factory.MigrateAsync(cancellationToken);
+
+        var user = await factory.SignInNewUserAsync("defaults-transfer", cancellationToken);
+
+        await using var context = TransactionsFixtures.ContextFor(postgres.ConnectionString, user.Id);
+
+        var transfer = await context.Categories
+            .SingleAsync(category => category.Name == "Transferência", cancellationToken);
+
+        Assert.Equal(CategoryKind.Transfer, transfer.Kind);
+        Assert.Null(transfer.ParentId);
+    }
 }

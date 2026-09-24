@@ -8,9 +8,12 @@
  * independently and assert against the real endpoints.
  */
 
+import type { AuthenticatedUser } from '@/auth/useMe';
+
 export type AccountType = 'Checking' | 'Savings' | 'CreditCard' | 'Cash' | 'Investment';
 
-export type CategoryKind = 'Income' | 'Expense';
+/** `Transfer` (005) moves money between the user's own accounts: any sign, never income or expense. */
+export type CategoryKind = 'Income' | 'Expense' | 'Transfer';
 
 export interface Account {
   id: string;
@@ -18,6 +21,8 @@ export interface Account {
   type: AccountType;
   currency: string;
   createdAt: string;
+  /** The balance before every recorded transaction (005). A number for the reason `Transaction.amount` is. */
+  openingBalance: number;
 }
 
 export interface Category {
@@ -70,6 +75,8 @@ export interface AccountInput {
   name: string;
   type: AccountType;
   currency: string;
+  /** Omitted on create means 0; omitted on update keeps the stored value. */
+  openingBalance?: number;
 }
 
 export interface CategoryInput {
@@ -97,6 +104,13 @@ export type ImportBatchStatus = 'Staged' | 'Committed';
 export type StagedRowStatus = 'Ready' | 'Duplicate' | 'Invalid';
 
 export type SignMode = 'Signed' | 'SignedInverted' | 'DebitCredit';
+
+/**
+ * Which rung of the cascade chose a staged row's category (009): `Default` is the sign
+ * default, the only rows "Sugerir com IA" sends; `Ai` came from that; `User` was picked
+ * by hand in the preview.
+ */
+export type CategorySource = 'None' | 'History' | 'Default' | 'Ai' | 'User';
 
 /** The cultures the API's amount parser knows. Case-sensitive, stored as written. */
 export type AmountCulture = 'pt-BR' | 'en-US';
@@ -177,6 +191,7 @@ export interface StagedRow {
   rawDescription: string;
   externalId: string | null;
   categoryId: string | null;
+  categorySource: CategorySource;
   status: StagedRowStatus;
   included: boolean;
   issues: string[];
@@ -220,6 +235,277 @@ export interface CommitResult {
 
 export interface UndoResult {
   deleted: number;
+}
+
+/** `suggested`: rows the AI moved off the default; `skipped`: rows sent and left as they were. */
+export interface SuggestResult {
+  suggested: number;
+  skipped: number;
+}
+
+// ---- 005: dashboard -----------------------------------------------------------
+
+/**
+ * The dashboard's money is signed as stored — `expense` and every Expense category
+ * `amount` are negative — and is only displayed here, never computed with, for the
+ * reason `Transaction.amount` gives.
+ */
+export interface AccountBalance {
+  accountId: string;
+  name: string;
+  type: AccountType;
+  currency: string;
+  balance: number;
+  /** True for every non-BRL account: listed, but not added to `total`. */
+  excludedFromTotal: boolean;
+}
+
+export interface MonthSummary {
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface DashboardSummary {
+  balances: AccountBalance[];
+  total: number;
+  month: MonthSummary;
+}
+
+export interface MonthTotals {
+  /** `YYYY-MM`. */
+  month: string;
+  income: number;
+  expense: number;
+}
+
+export interface CategoryTotal {
+  categoryId: string;
+  name: string;
+  amount: number;
+  /** Fraction of the month's total for the kind, 4 places, positive. */
+  share: number;
+}
+
+/** The kinds the breakdown accepts; a Transfer is neither and the API refuses it. */
+export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
+
+// ---- 006: market data -----------------------------------------------------------
+
+export type MarketAssetClass = 'StockBr' | 'Fii' | 'EtfBr' | 'Bdr' | 'StockUs' | 'Crypto';
+
+export type ProviderKind = 'Brapi' | 'CoinGecko' | 'TwelveData';
+
+export type SyncTrigger = 'Scheduled' | 'Manual';
+
+export type SyncRunStatus = 'Running' | 'Succeeded' | 'PartialFailure' | 'Failed';
+
+/** A shared catalogue entry: every user sees and registers into the same one. */
+export interface MarketAsset {
+  id: string;
+  ticker: string;
+  name: string;
+  class: MarketAssetClass;
+  currency: string;
+  provider: ProviderKind;
+  providerSymbol: string;
+  isActive: boolean;
+  lastSyncedAt: string | null;
+  createdAt: string;
+}
+
+export interface MarketAssetInput {
+  ticker: string;
+  /** Omitted or blank, the API uses the ticker. */
+  name?: string;
+  class: MarketAssetClass;
+  provider: ProviderKind;
+  providerSymbol: string;
+  currency: string;
+}
+
+/** An item that failed, and why; `error` is already pt-BR. */
+export interface SyncFailure {
+  item: string;
+  error: string;
+}
+
+export interface ProviderSyncSummary {
+  rowsWritten: number;
+  itemsSynced: number;
+  itemsFailed: number;
+  error: string | null;
+  failures: SyncFailure[];
+}
+
+export interface SyncRun {
+  id: string;
+  startedAt: string;
+  finishedAt: string | null;
+  trigger: SyncTrigger;
+  status: SyncRunStatus;
+  /** Keyed by provider name: a `ProviderKind` member, or `Bcb` for the benchmark series. */
+  summary: Record<string, ProviderSyncSummary>;
+}
+
+// ---- 007: investments -----------------------------------------------------------
+
+export type MovementKind = 'Buy' | 'Sell' | 'Dividend' | 'Jcp' | 'Split';
+
+/**
+ * One held asset (`GET /api/investments/assets`). Figures are numbers for the reason
+ * `Transaction.amount` gives, and are only displayed. The valuation, `price` through
+ * `unrealisedPct`, is null until the asset has a daily row; `realisedBrl` and
+ * `dividendsBrl` are null for a USD asset while no USDBRL rate exists.
+ */
+export interface Position {
+  assetId: string;
+  ticker: string;
+  name: string;
+  class: MarketAssetClass;
+  currency: string;
+  nickname: string | null;
+  quantity: number;
+  averageCost: number;
+  price: number | null;
+  priceDate: string | null;
+  valueBrl: number | null;
+  costBasisBrl: number | null;
+  unrealisedBrl: number | null;
+  unrealisedPct: number | null;
+  realisedBrl: number | null;
+  dividendsBrl: number | null;
+}
+
+export interface PortfolioSummary {
+  totalBrl: number;
+  totalCostBrl: number;
+  unrealisedBrl: number;
+}
+
+/** Either a catalogue entry already there, or 006's registration body. */
+export type AddAssetInput = { marketAssetId: string } | MarketAssetInput;
+
+export interface Movement {
+  id: string;
+  assetId: string;
+  date: string;
+  kind: MovementKind;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  fees: number;
+  currency: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+/** `currency` is omitted: the API takes the asset's. */
+export interface MovementInput {
+  date: string;
+  kind: MovementKind;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  fees: number;
+  notes: string | null;
+}
+
+export interface DailyRow {
+  date: string;
+  quantity: number;
+  averageCost: number;
+  price: number;
+  priceDate: string;
+  fxRate: number;
+  valueBrl: number;
+  costBasisBrl: number;
+}
+
+// ---- 008: returns ---------------------------------------------------------------
+
+/** The `period` query value; `custom` takes `from`/`to` (`YYYY-MM-DD`). */
+export type ReturnsPeriodKind = 'inception' | 'ytd' | '12m' | 'custom';
+
+export interface ReturnsQuery {
+  period: ReturnsPeriodKind;
+  from?: string;
+  to?: string;
+}
+
+/** `days` runs from the base day (base 100) to `to`. */
+export interface ReturnsPeriod {
+  from: string;
+  to: string;
+  days: number;
+}
+
+/** Rates are fractions (`0.1234` is 12,34%). `annualised` is null past `decimal`'s range. */
+export interface PeriodReturn {
+  total: number;
+  annualised: number | null;
+}
+
+export interface FxSplit {
+  native: number;
+  fx: number;
+  total: number;
+}
+
+/**
+ * One point of the base-100 chart: `date`, `portfolio`, and a key per benchmark code
+ * that could anchor. A benchmark that is null in `benchmarks` has no key here.
+ */
+export interface ReturnsPoint {
+  date: string;
+  portfolio: number;
+  [code: string]: number | string;
+}
+
+/**
+ * `GET /api/returns/portfolio`. Everything but `benchmarks` and `series` is null when
+ * nothing was held in the period. `benchmarks` is keyed by code, ordered by code.
+ */
+export interface Returns {
+  period: ReturnsPeriod | null;
+  twr: PeriodReturn | null;
+  xirr: number | null;
+  timingEffect: number | null;
+  benchmarks: Record<string, PeriodReturn | null>;
+  series: ReturnsPoint[];
+}
+
+/** `GET /api/returns/assets/{id}`: the same, and the FX split, null for a BRL asset. */
+export interface AssetReturns extends Returns {
+  fx: FxSplit | null;
+}
+
+// ---- 009: AI -------------------------------------------------------------------
+
+export type AnalysisStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+
+/**
+ * One month's analysis. `content` is the provider's markdown, only when `Completed`, and
+ * untrusted: render it with `Markdown`, never as HTML. `error` is pt-BR, only when `Failed`.
+ */
+export interface AiAnalysis {
+  id: string;
+  month: string;
+  status: AnalysisStatus;
+  content: string | null;
+  error: string | null;
+  promptVersion: string;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+/** The month's AI spend against the cap. `spentBrl` has up to 4 places; display only. */
+export interface AiUsage {
+  month: string;
+  spentBrl: number;
+  budgetBrl: number;
+  calls: number;
 }
 
 /**
@@ -360,6 +646,65 @@ export const api = {
   discardImport: (id: string) => request<void>(`/api/imports/${id}`, { method: 'DELETE' }),
 
   undoImport: (id: string) => request<UndoResult>(`/api/imports/${id}/undo`, { method: 'POST' }),
+
+  suggestCategories: (id: string) =>
+    request<SuggestResult>(`/api/imports/${id}/suggest`, { method: 'POST' }),
+
+  /** Answers the whole of `GET /api/auth/me`, so the caller can put it straight in the cache. */
+  updateMe: (input: { aiEnabled: boolean }) =>
+    request<AuthenticatedUser>('/api/auth/me', { method: 'PATCH', body: JSON.stringify(input) }),
+
+  requestAnalysis: (month: string) =>
+    request<{ analysisId: string }>('/api/ai/analyses', { method: 'POST', body: JSON.stringify({ month }) }),
+
+  listAnalyses: (month: string) => request<AiAnalysis[]>(`/api/ai/analyses?${searchParams({ month })}`),
+
+  aiUsage: () => request<AiUsage>('/api/ai/usage'),
+
+  dashboardSummary: (month: string) =>
+    request<DashboardSummary>(`/api/dashboard/summary?${searchParams({ month })}`),
+
+  dashboardMonthly: (months: number) =>
+    request<MonthTotals[]>(`/api/dashboard/monthly?${searchParams({ months })}`),
+
+  dashboardByCategory: (month: string, kind: BreakdownKind) =>
+    request<CategoryTotal[]>(`/api/dashboard/by-category?${searchParams({ month, kind })}`),
+
+  searchMarketAssets: (q: string) => request<MarketAsset[]>(`/api/market-data/assets?${searchParams({ q })}`),
+
+  registerMarketAsset: (input: MarketAssetInput) =>
+    request<MarketAsset>('/api/market-data/assets', { method: 'POST', body: JSON.stringify(input) }),
+
+  listSyncRuns: () => request<SyncRun[]>('/api/market-data/sync-runs'),
+
+  triggerSync: () =>
+    request<{ syncRunId: string }>('/api/market-data/sync', { method: 'POST', body: JSON.stringify({}) }),
+
+  listPositions: () => request<Position[]>('/api/investments/assets'),
+
+  portfolioSummary: () => request<PortfolioSummary>('/api/investments/summary'),
+
+  addAsset: (input: AddAssetInput) =>
+    request<Position>('/api/investments/assets', { method: 'POST', body: JSON.stringify(input) }),
+
+  removeAsset: (id: string) => request<void>(`/api/investments/assets/${id}`, { method: 'DELETE' }),
+
+  listMovements: (assetId: string) => request<Movement[]>(`/api/investments/assets/${assetId}/movements`),
+
+  createMovement: (assetId: string, input: MovementInput) =>
+    request<Movement>(`/api/investments/assets/${assetId}/movements`, { method: 'POST', body: JSON.stringify(input) }),
+
+  updateMovement: (id: string, input: MovementInput) =>
+    request<Movement>(`/api/investments/movements/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  deleteMovement: (id: string) => request<void>(`/api/investments/movements/${id}`, { method: 'DELETE' }),
+
+  listDaily: (assetId: string) => request<DailyRow[]>(`/api/investments/assets/${assetId}/daily`),
+
+  portfolioReturns: (query: ReturnsQuery) => request<Returns>(`/api/returns/portfolio?${searchParams(query)}`),
+
+  assetReturns: (assetId: string, query: ReturnsQuery) =>
+    request<AssetReturns>(`/api/returns/assets/${assetId}?${searchParams(query)}`),
 
   listCsvTemplates: () => request<CsvTemplate[]>('/api/csv-templates'),
 

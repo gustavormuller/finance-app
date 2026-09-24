@@ -26,6 +26,9 @@ internal sealed class HealthApiFactory(string connectionString, bool migrateOnSt
                 ["ConnectionStrings:Default"] = connectionString,
                 ["Database:MigrateOnStartup"] = migrateOnStartup ? "true" : "false",
 
+                // The nightly market-data job would sync against the real providers.
+                ["MarketData:ScheduledSync"] = "false",
+
                 // All required at boot since 002. None of them matters to the health
                 // endpoints, but a host that cannot answer where it is served from,
                 // where its Data Protection keys live, or how to reach Google refuses

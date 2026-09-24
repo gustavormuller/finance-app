@@ -31,6 +31,10 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* 005 dashboard series. Blue and orange rather than green and red: the pair keeps
+     its separation under every colour-vision deficiency, which green/red does not. */
+  --chart-income: #2a78d6;
+  --chart-expense: #eb6834;
 }
 
 .dark {
@@ -52,6 +56,8 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  --chart-income: #3987e5;
+  --chart-expense: #d95926;
 }
 
 @theme inline {
@@ -77,6 +83,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chart-income: var(--chart-income);
+  --color-chart-expense: var(--chart-expense);
 }
 
 @layer base {

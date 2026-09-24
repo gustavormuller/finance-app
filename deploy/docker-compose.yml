@@ -1,0 +1,88 @@
+# Production stack (spec 010). Run from the repository root, through deploy/deploy.sh:
+#
+#   docker compose --env-file /opt/finance/.env -f deploy/docker-compose.yml <command>
+#
+# --env-file feeds the ${...} below (POSTGRES_PASSWORD, TUNNEL_TOKEN); env_file hands
+# the same file to the API as its configuration. FINANCE_ENV_FILE points both at
+# another file, for a local run of this stack.
+#
+# Nothing publishes a port. cloudflared dials out to Cloudflare and reaches Caddy on
+# this network; Caddy reaches the API; the API reaches PostgreSQL.
+
+name: finance
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finance
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set; pass --env-file /opt/finance/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance -d finance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    image: finance-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: ${FINANCE_ENV_FILE:-/opt/finance/.env}
+    environment:
+      # Pinned here, not in .env: the key ring must be on the dpkeys volume, or every
+      # restart signs everyone out.
+      DataProtection__KeysPath: /keys
+      # Caddy and cloudflared live on this network only; X-Forwarded-Proto and
+      # X-Forwarded-For are honoured from nowhere else. Must match the subnet below.
+      ForwardedHeaders__KnownNetworks__0: 172.30.0.0/24
+    volumes:
+      - dpkeys:/keys
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The Vite build, written here by deploy.sh (the webdist of the spec). A bind
+      # mount, so a new build is live without restarting Caddy.
+      - ./webdist:/srv:ro
+      - caddydata:/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    depends_on:
+      - caddy
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN is not set; pass --env-file /opt/finance/.env}
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  pgdata:
+  dpkeys:
+  caddydata:

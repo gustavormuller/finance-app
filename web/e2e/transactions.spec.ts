@@ -1,48 +1,13 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-import { devLogin, uniqueEmail } from './support';
+import { createAccount, createTransaction, devLogin, uniqueEmail } from './support';
 
 /**
  * Spec E2E tests 1 to 3, against the real API and a real PostgreSQL.
  *
- * Every test signs in as its own fresh account, so the eight seeded categories are
+ * Every test signs in as its own fresh account, so the seeded categories are
  * there and nothing else is.
  */
-
-async function createAccount(page: Page, name: string) {
-  await page.goto('/accounts');
-  await page.getByRole('button', { name: 'Nova conta' }).click();
-  await page.getByLabel('Nome').fill(name);
-  // By value, not label: the option reads "Conta corrente" but the wire contract is
-  // still the English enum member.
-  await page.getByLabel('Tipo').selectOption('Checking');
-  await page.getByRole('button', { name: 'Criar conta' }).click();
-
-  await expect(page.getByRole('cell', { name })).toBeVisible();
-}
-
-async function createTransaction(
-  page: Page,
-  values: { account: string; category: string; amount: string; date: string; description: string },
-) {
-  await page.goto('/transactions');
-  await page.getByRole('button', { name: 'Novo lançamento' }).click();
-
-  // Exact, because getByLabel matches substrings and the filter bar on this same
-  // page is labelled "Filtrar por conta" and "Filtrar por categoria".
-  await page.getByLabel('Conta', { exact: true }).selectOption({ label: values.account });
-  await page.getByLabel('Categoria', { exact: true }).selectOption({ label: values.category });
-  await page.getByLabel('Valor').fill(values.amount);
-  await page.getByLabel('Data').fill(values.date);
-  await page.getByLabel('Descrição').fill(values.description);
-
-  await page.getByRole('button', { name: 'Criar lançamento' }).click();
-
-  // Wait for the form to close, which it only does once the POST has succeeded.
-  // Returning straight after the click lets the next navigation abort the request
-  // in flight, and the row silently never exists.
-  await expect(page.getByRole('button', { name: 'Criar lançamento' })).toBeHidden();
-}
 
 /** Spec E2E test 1. */
 test('an expense and an income are created and shown with the correct sign', async ({ page }) => {

@@ -19,6 +19,8 @@ public static class AuthEndpoints
 
     private sealed record MeResponse(Guid Id, string Email, string? DisplayName, bool AiEnabled);
 
+    private sealed record MePatch(bool? AiEnabled);
+
     private sealed record DevLoginRequest(string Email, string? DisplayName);
 
     public static IEndpointRouteBuilder MapAuthEndpoints(
@@ -44,6 +46,32 @@ public static class AuthEndpoints
                 return user is null
                     ? Results.Unauthorized()
                     : Results.Ok(new MeResponse(user.Id, user.Email!, user.DisplayName, user.AiEnabled));
+            })
+            .RequireAuthorization();
+
+        // 009: the user's own ai_enabled (ADR-010), the only way to turn AI on from the app.
+        // Answers with the whole of GET /api/auth/me, aiEnabled included.
+        routes.MapPatch("/api/auth/me", async (MePatch patch, ClaimsPrincipal principal, UserManager<AppUser> users) =>
+            {
+                if (patch.AiEnabled is not { } aiEnabled)
+                {
+                    return Problems.Validation("aiEnabled", "Informe se a IA deve ficar ligada ou desligada.");
+                }
+
+                var user = await users.GetUserAsync(principal);
+                if (user is null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                user.AiEnabled = aiEnabled;
+                var saved = await users.UpdateAsync(user);
+                if (!saved.Succeeded)
+                {
+                    throw new InvalidOperationException($"Could not save ai_enabled: {string.Join("; ", saved.Errors.Select(error => error.Code))}");
+                }
+
+                return Results.Ok(new MeResponse(user.Id, user.Email!, user.DisplayName, user.AiEnabled));
             })
             .RequireAuthorization();
 

@@ -40,6 +40,13 @@ public sealed class StagedTransaction : IUserOwned
     /// <summary>The suggestion, or the user's correction. Null when nothing resolved.</summary>
     public Guid? CategoryId { get; set; }
 
+    /// <summary>
+    /// Which rung of the cascade chose <see cref="CategoryId"/>, or that the user did.
+    /// Not in 009's data model: rung 3 may only touch <see cref="CategorySource.Default"/>
+    /// rows, and the preview marks <see cref="CategorySource.Ai"/> ones.
+    /// </summary>
+    public CategorySource CategorySource { get; set; }
+
     public StagedRowStatus Status { get; set; }
 
     /// <summary>

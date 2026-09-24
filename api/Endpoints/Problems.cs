@@ -1,4 +1,5 @@
-﻿using Finance.Api.Domain.Transactions;
+﻿using Finance.Api.Application.Ai;
+using Finance.Api.Domain.Transactions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -54,6 +55,51 @@ internal static class Problems
             title: "Conflito",
             detail: reason,
             statusCode: StatusCodes.Status409Conflict);
+
+    /// <summary>
+    /// A refusal that resolves itself with time. <c>Retry-After</c> says how long, in
+    /// whole seconds, rounded up.
+    /// </summary>
+    public static IResult TooManyRequests(HttpContext context, string reason, TimeSpan retryAfter)
+    {
+        context.Response.Headers.RetryAfter =
+            ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        return Results.Problem(
+            title: "Muitas solicitações",
+            detail: reason,
+            statusCode: StatusCodes.Status429TooManyRequests);
+    }
+
+    /// <summary>Whether <see cref="Ai"/> has an answer for this failure.</summary>
+    public static bool IsAiFailure(Exception exception) =>
+        exception is AiDisabledException or AiBudgetExceededException or AiProviderException;
+
+    /// <summary>
+    /// 009: an AI gate or provider failure as the pt-BR problem its status stands for: 403
+    /// AI off, 402 budget spent, 504 timed out, 502 any other provider failure. Never the
+    /// exception's message, which is English and may name the model.
+    /// </summary>
+    public static IResult Ai(Exception exception) => exception switch
+    {
+        AiDisabledException => Results.Problem(
+            title: "IA desligada",
+            detail: AiFailureText.Disabled,
+            statusCode: StatusCodes.Status403Forbidden),
+        AiBudgetExceededException => Results.Problem(
+            title: "Limite de IA atingido",
+            detail: AiFailureText.BudgetExceeded,
+            statusCode: StatusCodes.Status402PaymentRequired),
+        AiProviderTimeoutException => Results.Problem(
+            title: "A IA demorou demais",
+            detail: AiFailureText.Timeout,
+            statusCode: StatusCodes.Status504GatewayTimeout),
+        AiProviderException => Results.Problem(
+            title: "Falha no serviço de IA",
+            detail: AiFailureText.ProviderFailed,
+            statusCode: StatusCodes.Status502BadGateway),
+        _ => throw new ArgumentException("Not an AI failure.", nameof(exception), exception),
+    };
 
     /// <summary>
     /// Turns a unique-index violation into the 409 it is. Caught rather than

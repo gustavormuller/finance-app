@@ -1,4 +1,4 @@
-using Finance.Api.Domain.Transactions;
+﻿using Finance.Api.Domain.Transactions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Finance.Api.Infrastructure;
@@ -41,6 +41,13 @@ internal static class TransactionsModel
             // Two accounts called "Nubank" under one user is a mistake every time.
             // Scoped to the user, so it says nothing about anyone else's names.
             account.HasIndex(entity => new { entity.UserId, entity.Name }).IsUnique();
+
+            // 005: NOT NULL DEFAULT 0, so existing accounts start where they did —
+            // their balance is the sum of their transactions.
+            account.Property(entity => entity.OpeningBalance)
+                .HasColumnType("numeric(18,2)")
+                .HasDefaultValue(0m)
+                .IsRequired();
         });
 
         modelBuilder.Entity<Category>(category =>

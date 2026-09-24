@@ -23,6 +23,99 @@ namespace Finance.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Finance.Api.Domain.Ai.AiAnalysis", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Month")
+                        .IsRequired()
+                        .HasColumnType("char(7)");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Month")
+                        .IsUnique();
+
+                    b.ToTable("AiAnalyses");
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.Ai.AiUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CostBrl")
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Month")
+                        .IsRequired()
+                        .HasColumnType("char(7)");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Month");
+
+                    b.ToTable("AiUsage", (string)null);
+                });
+
             modelBuilder.Entity("Finance.Api.Domain.Identity.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -229,6 +322,9 @@ namespace Finance.Api.Migrations
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("CategorySource")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Currency")
                         .HasColumnType("char(3)");
 
@@ -276,6 +372,235 @@ namespace Finance.Api.Migrations
                     b.ToTable("StagedTransactions");
                 });
 
+            modelBuilder.Entity("Finance.Api.Domain.Investments.Asset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MarketAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nickname")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MarketAssetId");
+
+                    b.HasIndex("UserId", "MarketAssetId")
+                        .IsUnique();
+
+                    b.ToTable("Assets");
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.Investments.Movement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("char(3)");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Fees")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.HasIndex("UserId", "AssetId", "Date");
+
+                    b.ToTable("Movements");
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.Investments.PortfolioDaily", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("AverageCost")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("CostBasisBrl")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("FxRate")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<DateOnly>("PriceDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("ValueBrl")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("UserId", "AssetId", "Date");
+
+                    b.HasIndex("AssetId");
+
+                    b.ToTable("PortfolioDaily", (string)null);
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.MarketData.Benchmark", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.HasKey("Code", "Date");
+
+                    b.ToTable("Benchmarks");
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.MarketData.MarketAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Class")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("char(3)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProviderSymbol")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Ticker")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "ProviderSymbol")
+                        .IsUnique();
+
+                    b.ToTable("MarketAssets");
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.MarketData.Price", b =>
+                {
+                    b.Property<Guid>("MarketAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Close")
+                        .HasColumnType("numeric(18,8)");
+
+                    b.HasKey("MarketAssetId", "Date");
+
+                    b.ToTable("Prices");
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.MarketData.SyncRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt")
+                        .IsDescending();
+
+                    b.ToTable("SyncRuns");
+                });
+
             modelBuilder.Entity("Finance.Api.Domain.Transactions.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -295,6 +620,11 @@ namespace Finance.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("OpeningBalance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
@@ -480,6 +810,24 @@ namespace Finance.Api.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Finance.Api.Domain.Ai.AiAnalysis", b =>
+                {
+                    b.HasOne("Finance.Api.Domain.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.Ai.AiUsage", b =>
+                {
+                    b.HasOne("Finance.Api.Domain.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Finance.Api.Domain.Import.CsvTemplate", b =>
                 {
                     b.HasOne("Finance.Api.Domain.Identity.AppUser", null)
@@ -521,6 +869,60 @@ namespace Finance.Api.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.Investments.Asset", b =>
+                {
+                    b.HasOne("Finance.Api.Domain.MarketData.MarketAsset", null)
+                        .WithMany()
+                        .HasForeignKey("MarketAssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Finance.Api.Domain.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.Investments.Movement", b =>
+                {
+                    b.HasOne("Finance.Api.Domain.Investments.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Finance.Api.Domain.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.Investments.PortfolioDaily", b =>
+                {
+                    b.HasOne("Finance.Api.Domain.Investments.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Finance.Api.Domain.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Finance.Api.Domain.MarketData.Price", b =>
+                {
+                    b.HasOne("Finance.Api.Domain.MarketData.MarketAsset", null)
+                        .WithMany()
+                        .HasForeignKey("MarketAssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

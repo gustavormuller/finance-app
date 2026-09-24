@@ -8,10 +8,13 @@ import {
   type CsvMappingInput,
   type CsvPreview,
   type ImportBatch,
+  type ImportBatchDetail,
   type StagedRow,
   type StagedRowPatch,
   type StagedRowStatus,
+  type SuggestResult,
 } from '@/api/finance';
+import { useMe } from '@/auth/useMe';
 import DoneStep from '@/components/import/DoneStep';
 import FileStep from '@/components/import/FileStep';
 import ImportHistory from '@/components/import/ImportHistory';
@@ -33,6 +36,28 @@ const STEP_TITLES: Record<Step['kind'], string> = {
 };
 
 const ROWS_PER_PAGE = 100;
+
+/** What a suggestion did, in a sentence: the rows the AI moved, and those it left. */
+function suggestionNotice({ suggested, skipped }: SuggestResult): string {
+  if (suggested === 0 && skipped === 0) {
+    return 'Nenhuma linha na categoria padrão para a IA sugerir.';
+  }
+
+  const moved =
+    suggested === 0
+      ? 'A IA não sugeriu nenhuma categoria.'
+      : suggested === 1
+        ? '1 categoria sugerida pela IA.'
+        : `${suggested} categorias sugeridas pela IA.`;
+  const left =
+    skipped === 0
+      ? ''
+      : skipped === 1
+        ? ' 1 linha continuou na categoria padrão.'
+        : ` ${skipped} linhas continuaram na categoria padrão.`;
+
+  return moved + left;
+}
 
 /** The sentence a refusal becomes, with the fields a 400 named appended. */
 function describe(error: unknown): string {
@@ -56,6 +81,9 @@ export default function ImportPage(): React.JSX.Element {
   const [failure, setFailure] = useState<{ message: string; openBatchId: string | null } | null>(null);
   const [filter, setFilter] = useState<StagedRowStatus | ''>('');
   const [page, setPage] = useState(1);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const me = useMe();
 
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.listAccounts });
   const categories = useQuery({ queryKey: ['categories'], queryFn: api.listCategories });
@@ -82,6 +110,7 @@ export default function ImportPage(): React.JSX.Element {
 
   const openPreview = (id: string) => {
     setFailure(null);
+    setNotice(null);
     setFilter('');
     setPage(1);
     setStep({ kind: 'preview', batchId: id });
@@ -146,10 +175,60 @@ export default function ImportPage(): React.JSX.Element {
     onError: fail,
   });
 
+  const detailKey = ['imports', batchId, filter, page];
+
   const patchRow = useMutation({
     mutationFn: ({ row, patch }: { row: StagedRow; patch: StagedRowPatch }) =>
       api.patchImportRow(batchId!, row.id, patch),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['imports', batchId] }),
+    // Optimistic: a checkbox that only ticks after a round trip reads as broken.
+    // The refetch after success puts the server's truth back either way.
+    onMutate: ({ row, patch }) =>
+      queryClient.setQueryData<ImportBatchDetail>(detailKey, (current) => {
+        if (!current) {
+          return current;
+        }
+
+        const included = patch.include ?? row.included;
+
+        return {
+          ...current,
+          counts: {
+            ...current.counts,
+            included: current.counts.included + Number(included) - Number(row.included),
+          },
+          rows: {
+            ...current.rows,
+            items: current.rows.items.map((item) =>
+              item.id === row.id
+                ? {
+                    ...item,
+                    included,
+                    categoryId: patch.categoryId ?? item.categoryId,
+                    // A category picked by hand is the user's (009), which drops the AI marker.
+                    categorySource: patch.categoryId ? 'User' : item.categorySource,
+                  }
+                : item,
+            ),
+          },
+        };
+      }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['imports', batchId] }),
+    onError: fail,
+  });
+
+  // 009: rung 3 on the rows the sign default filed. The rows are refetched, not patched
+  // from the answer, which carries only counts.
+  const suggest = useMutation({
+    mutationFn: () => api.suggestCategories(batchId!),
+    onMutate: () => {
+      setFailure(null);
+      setNotice(null);
+    },
+    onSuccess: (result) => setNotice(suggestionNotice(result)),
+    onSettled: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['imports', batchId] }),
+      queryClient.invalidateQueries({ queryKey: ['ai', 'usage'] }),
+    ]),
     onError: fail,
   });
 
@@ -195,6 +274,7 @@ export default function ImportPage(): React.JSX.Element {
     rePreview.isPending ||
     uploadCsv.isPending ||
     patchRow.isPending ||
+    suggest.isPending ||
     commit.isPending ||
     discard.isPending ||
     undo.isPending;
@@ -260,6 +340,10 @@ export default function ImportPage(): React.JSX.Element {
           filter={filter}
           busy={busy}
           error={error}
+          // A call can take up to 30 s per batch of rows, so the wait is said out loud.
+          notice={suggest.isPending ? 'Pedindo sugestões à IA…' : notice}
+          aiEnabled={me.data?.aiEnabled ?? false}
+          onSuggest={() => suggest.mutate()}
           onFilter={(next) => { setFilter(next); setPage(1); }}
           onPage={setPage}
           onPatchRow={(row, patch) => patchRow.mutate({ row, patch })}

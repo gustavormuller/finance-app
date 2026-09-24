@@ -21,7 +21,8 @@ public static class CategorySuggester
     /// Null when nothing acceptable exists, which makes the row Invalid with
     /// "Categoria não encontrada" rather than filed somewhere at random. Every
     /// candidate is held to 003's rule 3: its kind has to agree with the sign, or the
-    /// commit would be refused anyway.
+    /// commit would be refused anyway. The sign default is only ever Expense or
+    /// Income, never a Transfer (005).
     /// </summary>
     public static Guid? Suggest(
         decimal amount,
@@ -32,6 +33,13 @@ public static class CategorySuggester
         if (amount == 0m)
         {
             return null;
+        }
+
+        // 005 amendment 2: a transfer accepts either sign (rule 3), so a remembered
+        // transfer is kept whichever side of it this statement shows.
+        if (history is { Kind: CategoryKind.Transfer } transfer)
+        {
+            return transfer.Id;
         }
 
         var kind = amount < 0m ? CategoryKind.Expense : CategoryKind.Income;

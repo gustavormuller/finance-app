@@ -263,7 +263,8 @@ internal static class ImportFixtures
         Guid? CategoryId,
         string Status,
         bool Included,
-        List<string> Issues);
+        List<string> Issues,
+        string? CategorySource = null);
 
     public sealed record RowPage(List<RowItem> Items, int Page, int PageSize, int Total);
 

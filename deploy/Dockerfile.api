@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+#
+# The API image (spec 010). Built on the server, so Docker picks the host's
+# architecture (arm64 on the Oracle A1 instance) for both stages; no cross-compilation.
+# Build context is the repository root:
+#   docker compose -f deploy/docker-compose.yml build api
+# What the context may carry is in Dockerfile.api.dockerignore, next to this file.
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Restore first, from the project file and the repository-wide build settings only, so
+# a code change does not invalidate the package layer.
+COPY global.json Directory.Build.props .editorconfig ./
+COPY api/Api.csproj api/
+RUN dotnet restore api/Api.csproj
+
+# The monthly-analysis prompt is an embedded resource (009), so publish carries it.
+COPY api/ api/
+RUN dotnet publish api/Api.csproj --configuration Release --no-restore --output /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+
+# The Data Protection key ring. A named volume mounted here starts out with this
+# directory's owner, so the non-root user can write the keys.
+RUN mkdir /keys && chown "$APP_UID" /keys
+
+WORKDIR /app
+COPY --from=build /app .
+
+# APP_UID is the image's own non-root user ("app").
+USER $APP_UID
+
+# The image's default ASPNETCORE_HTTP_PORTS is 8080.
+EXPOSE 8080
+
+# Liveness only: /health does no database work. /api/health is the readiness check.
+# The runtime image ships no HTTP client, and installing one for this is not worth a
+# package layer, so bash speaks HTTP/1.1 to the port and reads the status line.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+
+# `docker compose run --rm api migrate` applies the migrations and exits (decision 2).
+ENTRYPOINT ["dotnet", "Finance.Api.dll"]

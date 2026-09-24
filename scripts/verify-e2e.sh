@@ -46,7 +46,17 @@ step "building API"
 dotnet build "$ROOT_DIR/api" --nologo
 
 step "starting API at $API_URL"
+# MarketData__ScheduledSync=false: the nightly market-data job would otherwise run at
+# once (no sync run in the last 26 hours) against the real providers.
+# MarketData__FakeProviders=true: the manual sync the E2E suite triggers runs on fixed,
+# network-free providers, with no ten-minute window between runs, because this
+# database is shared by every test and kept between runs. Refused outside Development.
+# Ai__FakeProvider=true: AI calls get a canned answer and never leave the machine (009).
+# Refused outside Development too.
 ASPNETCORE_ENVIRONMENT=Development \
+  MarketData__ScheduledSync=false \
+  MarketData__FakeProviders=true \
+  Ai__FakeProvider=true \
   dotnet "$ROOT_DIR/api/bin/Debug/net10.0/Finance.Api.dll" \
   --contentRoot "$ROOT_DIR/api" --urls "$API_URL" &
 API_PID=$!

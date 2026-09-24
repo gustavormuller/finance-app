@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Finance.Api.Application;
+using Finance.Api.Application.Ai;
 using Finance.Api.Domain.Import;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
@@ -53,7 +54,8 @@ public static class ImportEndpoints
         Guid? CategoryId,
         StagedRowStatus Status,
         bool Included,
-        IReadOnlyList<string> Issues);
+        IReadOnlyList<string> Issues,
+        CategorySource CategorySource);
 
     private sealed record RowCounts(int Ready, int Duplicates, int Invalid, int Included);
 
@@ -66,6 +68,8 @@ public static class ImportEndpoints
     private sealed record CommitResponse(int Committed, int Skipped);
 
     private sealed record UndoResponse(int Deleted);
+
+    private sealed record SuggestResponse(int Suggested, int Skipped);
 
     public static IEndpointRouteBuilder MapImportEndpoints(this IEndpointRouteBuilder routes)
     {
@@ -92,6 +96,31 @@ public static class ImportEndpoints
                 ImportCommandProblem.NotFound => Results.NotFound(),
                 ImportCommandProblem.WrongStatus => Problems.Conflict("Este lote já foi confirmado."),
                 _ => Results.Ok(new CommitResponse(result.Committed, result.Skipped)),
+            };
+        });
+
+        // 009: rung 3 on the rows the sign default filed. Synchronous (decision 4); the
+        // gateway times the call out at Ai:Categorisation:TimeoutSeconds.
+        imports.MapPost("/{id:guid}/suggest", async (
+            Guid id, CategorisationCascade cascade, ILoggerFactory loggers, CancellationToken cancellationToken) =>
+        {
+            SuggestResult result;
+            try
+            {
+                result = await cascade.SuggestAsync(id, cancellationToken);
+            }
+            catch (Exception failure) when (Problems.IsAiFailure(failure))
+            {
+                // The reason stays in the log (keys redacted by the adapters), never in the answer.
+                loggers.CreateLogger(nameof(ImportEndpoints)).LogWarning(failure, "AI suggestion for batch {BatchId} refused or failed", id);
+                return Problems.Ai(failure);
+            }
+
+            return result.Problem switch
+            {
+                ImportCommandProblem.NotFound => Results.NotFound(),
+                ImportCommandProblem.WrongStatus => Problems.Conflict("Este lote já foi confirmado e não pode mais ser editado."),
+                _ => Results.Ok(new SuggestResponse(result.Suggested, result.Skipped)),
             };
         });
 
@@ -389,6 +418,7 @@ public static class ImportEndpoints
             }
 
             row.CategoryId = categoryId;
+            row.CategorySource = CategorySource.User;
         }
 
         if (patch.Include is { } include)
@@ -470,5 +500,6 @@ public static class ImportEndpoints
         row.CategoryId,
         row.Status,
         row.Included,
-        row.Issues is null ? [] : JsonSerializer.Deserialize<List<string>>(row.Issues) ?? []);
+        row.Issues is null ? [] : JsonSerializer.Deserialize<List<string>>(row.Issues) ?? [],
+        row.CategorySource);
 }

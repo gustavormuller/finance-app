@@ -31,7 +31,7 @@
 | ORM | EF Core | good migrations, typed LINQ, global query filters |
 | Auth | ASP.NET Core Identity + Google OAuth | native to the framework, R$0, scales to SaaS |
 | Database | PostgreSQL 16 (container) | R$0, relational, good with time series |
-| Queue / jobs | Hangfire or a hosted `BackgroundService` (decided in 009) | runs in the API process on the existing Postgres, zero extra services |
+| Jobs | hosted `BackgroundService` + Cronos for scheduled jobs (006), + `Channel<T>` with a row as state for on-demand jobs (009); ADR-003 | runs in the API process on the existing Postgres, zero extra services |
 | Frontend | Vite + React + TanStack Router | SPA, no SSR needed |
 | UI | shadcn/ui + Tailwind | ready-made components, no Figma |
 | Charts | Recharts | enough for dashboard and series |
@@ -331,7 +331,7 @@ normalized description is stored as a column rather than folded into a hash beca
 §3's history lookup needs the same key — one column serves both (004).
 
 Import runs synchronously in the request (004). A few hundred rows is milliseconds of
-work; the job infrastructure below arrives with 009, which actually needs it.
+work; the job infrastructure arrived with 006's nightly market-data sync (ADR-003).
 
 ### 3. Cascading categorization, AI last
 
@@ -396,8 +396,9 @@ The dependency arrows point inward: input adapters (Endpoints, Jobs) and output 
 
 ```csharp
 // Application/ or Domain/
-public interface IMarketDataProvider { Task<IReadOnlyList<Price>> GetDailyAsync(...); }
-public interface IAiProvider         { Task<string> AnalyzeAsync(...); }
+public interface IPriceProvider     { Task<IReadOnlyList<DailyClose>> GetDailyClosesAsync(...); }
+public interface IBenchmarkProvider { Task<IReadOnlyList<DailyValue>> GetSeriesAsync(...); }
+public interface IAiProvider        { Task<AiCompletion> CompleteAsync(AiRequest request, CancellationToken ct); }
 ```
 
 Concrete justification, not dogma: there are already four market sources (brapi, BCB, CoinGecko/Binance, Twelve Data) and the AI provider may change. This is exactly the case ports-and-adapters was invented for.
@@ -457,11 +458,14 @@ movements       id, user_id, asset_id, date,
 ### Market data (shared, no user_id)
 
 ```
-prices          asset_key, date, close NUMERIC(18,8), currency   -- PK (asset_key, date)
-benchmarks      code, date, value NUMERIC(18,8)                  -- CDI, IPCA, USD, IVVB11
+market_assets   id, ticker, name, class, currency, provider, provider_symbol,
+                is_active, last_synced_at, created_at    -- unique (provider, provider_symbol)
+prices          market_asset_id, date, close NUMERIC(18,8)   -- PK (market_asset_id, date)
+benchmarks      code, date, value NUMERIC(18,8)              -- PK (code, date); CDI, SELIC, IPCA, USDBRL, IVVB11
+sync_runs       id, started_at, finished_at, trigger, status, summary JSONB
 ```
 
-`asset_key` is the market identifier (ticker + source), not `assets.id` — that way two people holding PETR4 share the same price series.
+*Corrected in 006:* `prices` is keyed by `market_asset_id`, an FK to the shared `market_assets` catalogue — not by an `asset_key` string, and not by `assets.id`. Two people holding PETR4 point at the same catalogue row and so share the same price series. The currency lives on the catalogue row; prices are stored in it. None of these four tables has a `user_id` or a query filter.
 
 **Never store a consolidated position as a column.** The position on any date is derived from the sum of `movements` up to that date. That is what makes it possible to recompute everything when an old entry is corrected — and it will be.
 
@@ -616,10 +620,13 @@ Cache by normalized description: same store → same category without a new call
 ### Cost control
 
 ```
-ai_usage    id, user_id, month, input_tokens, output_tokens, cost_brl
+AiUsage       id, user_id, month char(7), purpose, provider, model,
+              input_tokens, output_tokens, cost_brl NUMERIC(10,4), succeeded, created_at
+AiAnalyses    id, user_id, month char(7), status, content, error, prompt_version,
+              created_at, started_at, completed_at        -- unique (user_id, month)
 ```
 
-Middleware checks `ai_enabled` and the month's accumulated total **per user** before every call, and cuts off on reaching `AI_MONTHLY_BUDGET_BRL`. No exceptions.
+Middleware checks `ai_enabled` and the month's accumulated total **per user** before every call, and cuts off on reaching `Ai:MonthlyBudgetBrl`. No exceptions. A call is recorded even when it fails: its input tokens were spent (009).
 
 With open registration, `ai_enabled` defaults to `false` — whoever creates an account and is not enabled generates no cost at all.
 
@@ -737,10 +744,14 @@ BRAPI_TOKEN=
 COINGECKO_DEMO_KEY=
 TWELVEDATA_KEY=
 
-# AI
-AI_PROVIDER=anthropic
-AI_API_KEY=
-AI_MONTHLY_BUDGET_BRL=15             # per user, hard ceiling
+# AI (009) — the Ai: configuration section; "__" is ":" in an environment variable
+Ai__Provider=anthropic               # anthropic | openai
+Ai__MonthlyBudgetBrl=15.00           # per user, hard ceiling
+Ai__Anthropic__ApiKey=
+Ai__OpenAi__ApiKey=
+Ai__UsdBrl=                          # fallback rate for pricing when the USDBRL benchmark is missing
+# Model ids and per-token prices are configuration too (Ai:Categorisation:Model,
+# Ai:Analysis:Model, Ai:Pricing:<model>:*); see specs/009-ai-analysis.md.
 
 # Backup
 AGE_PUBLIC_KEY=
@@ -802,9 +813,15 @@ Reverted from the previous plan, which prioritised delivery speed for a SaaS. Wi
 *Correction:* memory consumption was used as an argument in an earlier revision; with 12 GB on Oracle, it stopped being a factor.
 *Trade-off:* loses shared types. The TS client is hand-written; the integration tests declare the same shapes independently and fail when the endpoints drift. Generating it from OpenAPI was the original plan and may still happen, but the build machinery is not set up and nothing depends on it.
 
-### ADR-003 — In-process jobs on the existing Postgres, not BullMQ + Redis *(amended in 004)*
+### ADR-003 — In-process jobs on the existing Postgres, not BullMQ + Redis *(amended in 004 and 006; final form in 009)*
 BullMQ requires Redis, one more service to run and pay for. The job runner uses the existing Postgres instead.
 **Amendment.** The original text named pg-boss. pg-boss is a Node.js library and cannot run inside the .NET process that ADR-004 requires, so it was never a valid choice here. Background jobs will be Hangfire or a hosted `BackgroundService`, decided in 009 — the first feature that needs a scheduler. 004's import is synchronous, in the request, and needs no job at all.
+**Amendment (006).** Decided by 006, the first feature that needs a scheduler: a **hosted `BackgroundService` with Cronos** computing the next occurrence of a cron expression from configuration. No Hangfire: one nightly job does not justify its ten tables and a dashboard, and re-hosting under Hangfire later is trivial because the job is a method. Job state is the `sync_runs` table — the "jobs table with status" below.
+**Amendment (009) — final form.** Two kinds of job, one mechanism each, both in the API process:
+- **Scheduled** jobs use a hosted `BackgroundService` + Cronos (006: the nightly market-data sync and the snapshot rebuild after it).
+- **On-demand** jobs use a hosted `BackgroundService` consuming an in-process `Channel<T>`, with a database row as the durable state (009: the monthly AI analysis). The request writes a `Pending` row and enqueues it; the job moves the row through `Running` to `Completed` or `Failed`; on startup, any `Pending` row older than 5 minutes is re-enqueued. The channel is only a wake-up; the row is the state, so a restart loses nothing but a few minutes.
+
+Hangfire is not adopted. *Revisit only if* a job needs retries with backoff across process restarts.
 *Trade-off:* no Bull Board. A jobs table with status solves it.
 
 ### ADR-004 — Jobs in the same process as the API
@@ -857,10 +874,11 @@ Reason: the financial computations become testable in milliseconds, without brin
 *Adopted:* the dependency rule, value objects (`Money`, `Ticker`, `DateRange`), pure domain services.
 *Not adopted:* aggregates with strict boundaries, domain events, MediatR, CQRS with separate stores, bounded contexts — the domain is mostly data entry and transformation, with no invariants that justify the indirection.
 
-### ADR-015 — Ports only for genuinely pluggable dependencies
+### ADR-015 — Ports only for genuinely pluggable dependencies *(amended in 006)*
 `IMarketDataProvider` and `IAiProvider` declared in the core, implemented in infrastructure.
 Concrete justification: four market sources already mapped (brapi, BCB, CoinGecko/Binance, Twelve Data) and an AI provider subject to change.
 *Criterion for new ports:* is there more than one real or foreseen implementation? If not, call directly.
+**Amendment (006).** The market-data port is two ports, not one: `IPriceProvider` (provider symbol → daily closes) and `IBenchmarkProvider` (series code → daily values), both in `Application/MarketData/`, replacing `IMarketDataProvider`. A close and a benchmark value are different shapes with different keys, and each adapter implements the port that fits. `IPriceProvider` has three implementations today (brapi, CoinGecko, Twelve Data), resolved by `IPriceProviderRegistry.For(ProviderKind)`. `IBenchmarkProvider` has one today, BCB SGS; it passes the criterion above on a *foreseen* second source — a benchmark such as USDBRL or IVVB11 served by brapi or Twelve Data instead of, or alongside, BCB.
 
 ### ADR-016 — No Repository over EF Core
 `DbContext` is already a Unit of Work and `DbSet<T>` is already a repository. A repository layer would forward calls, lose `IQueryable` composition and add no testability that integration tests with Postgres in a container do not already deliver.

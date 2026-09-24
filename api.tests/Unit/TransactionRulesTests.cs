@@ -11,7 +11,8 @@ public sealed class TransactionRulesTests
     private static readonly DateOnly Today = new(2026, 9, 14);
 
     /// <summary>
-    /// Spec unit test 7, all four combinations. This is the rule that stops
+    /// Spec unit test 7, all four combinations. Also 005's unit test 4: Income and
+    /// Expense behave exactly as in 003 now that a third kind exists. This is the rule that stops
     /// "Salary: -3000" and "Rent: +1200" ever reaching the database.
     /// </summary>
     [Theory]
@@ -63,5 +64,26 @@ public sealed class TransactionRulesTests
         Assert.Equal(
             TransactionRules.DateField,
             TransactionRules.ValidateDate(lastAllowed.AddDays(1), Today)?.Field);
+    }
+
+    /// <summary>005 spec unit test 1. A transfer arriving in an account is positive.</summary>
+    [Fact]
+    public void Transfer_accepts_a_positive_amount() =>
+        Assert.Null(TransactionRules.ValidateSign(3000m, CategoryKind.Transfer));
+
+    /// <summary>005 spec unit test 2. A transfer leaving an account is negative.</summary>
+    [Fact]
+    public void Transfer_accepts_a_negative_amount() =>
+        Assert.Null(TransactionRules.ValidateSign(-3000m, CategoryKind.Transfer));
+
+    /// <summary>
+    /// 005 spec unit test 3. Zero is refused once, by rule 1, and rule 3 stays silent
+    /// so the same field is not reported twice (see DEFERRED.md, 005 checkpoint 1).
+    /// </summary>
+    [Fact]
+    public void Transfer_rejects_zero()
+    {
+        Assert.Equal(TransactionRules.AmountField, TransactionRules.ValidateAmount(0m)?.Field);
+        Assert.Null(TransactionRules.ValidateSign(0m, CategoryKind.Transfer));
     }
 }

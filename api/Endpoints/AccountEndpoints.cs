@@ -7,14 +7,23 @@ namespace Finance.Api.Endpoints;
 
 public static class AccountEndpoints
 {
-    private sealed record AccountRequest(string Name, AccountType Type, string? Currency);
+    /// <remarks>
+    /// <c>OpeningBalance</c> (005 amendment 3) is optional: omitted on create it is
+    /// zero, omitted on update it keeps the stored value, as <c>Currency</c> does.
+    /// </remarks>
+    private sealed record AccountRequest(
+        string Name,
+        AccountType Type,
+        string? Currency,
+        decimal? OpeningBalance);
 
     private sealed record AccountResponse(
         Guid Id,
         string Name,
         AccountType Type,
         string Currency,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        decimal OpeningBalance);
 
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder routes)
     {
@@ -30,7 +39,8 @@ public static class AccountEndpoints
                     account.Name,
                     account.Type,
                     account.Currency,
-                    account.CreatedAt))
+                    account.CreatedAt,
+                    account.OpeningBalance))
                 .ToListAsync(cancellationToken)));
 
         accounts.MapPost("/", async (
@@ -50,6 +60,7 @@ public static class AccountEndpoints
                 Name = request.Name.Trim(),
                 Type = request.Type,
                 Currency = request.Currency ?? Account.DefaultCurrency,
+                OpeningBalance = Round(request.OpeningBalance ?? 0m),
                 CreatedAt = DateTimeOffset.UtcNow,
             };
 
@@ -86,6 +97,9 @@ public static class AccountEndpoints
             account.Name = request.Name.Trim();
             account.Type = request.Type;
             account.Currency = request.Currency ?? account.Currency;
+            account.OpeningBalance = request.OpeningBalance is { } opening
+                ? Round(opening)
+                : account.OpeningBalance;
 
             if (!await TrySaveAsync(database, cancellationToken))
             {
@@ -154,5 +168,12 @@ public static class AccountEndpoints
     }
 
     private static AccountResponse Describe(Account account) =>
-        new(account.Id, account.Name, account.Type, account.Currency, account.CreatedAt);
+        new(account.Id, account.Name, account.Type, account.Currency, account.CreatedAt, account.OpeningBalance);
+
+    /// <summary>
+    /// Rounded the way <see cref="Money"/> rounds, so the response says what
+    /// <c>numeric(18,2)</c> will actually hold.
+    /// </summary>
+    private static decimal Round(decimal amount) =>
+        decimal.Round(amount, 2, MidpointRounding.ToEven);
 }

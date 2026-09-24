@@ -1,3 +1,5 @@
+import { Sparkles } from 'lucide-react';
+
 import type {
   Category,
   ImportBatchDetail,
@@ -17,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDate, stagedRowStatusLabels } from '@/lib/labels';
+import { categorySourceLabels, formatDate, stagedRowStatusLabels } from '@/lib/labels';
 
 import { selectClasses } from './FileStep';
 
@@ -27,6 +29,10 @@ const STATUSES: StagedRowStatus[] = ['Ready', 'Duplicate', 'Invalid'];
  * Step 3: every staged row with its status, its suggested category and, for a
  * duplicate, the checkbox that lets it in. Invalid rows show their reasons and
  * cannot be included; commit stays disabled while nothing would be written.
+ *
+ * "Sugerir com IA" (009) sends the rows still on the sign default; it stays on screen
+ * with AI off, disabled, with the reason as its description (spec: "disabled with a
+ * reason otherwise").
  */
 export default function PreviewStep({
   detail,
@@ -34,6 +40,9 @@ export default function PreviewStep({
   filter,
   busy,
   error,
+  notice,
+  aiEnabled,
+  onSuggest,
   onFilter,
   onPage,
   onPatchRow,
@@ -45,6 +54,10 @@ export default function PreviewStep({
   filter: StagedRowStatus | '';
   busy: boolean;
   error: React.ReactNode;
+  /** What the last suggestion did, announced politely. */
+  notice: string | null;
+  aiEnabled: boolean;
+  onSuggest: () => void;
   onFilter: (filter: StagedRowStatus | '') => void;
   onPage: (page: number) => void;
   onPatchRow: (row: StagedRow, patch: StagedRowPatch) => void;
@@ -84,6 +97,29 @@ export default function PreviewStep({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy || !aiEnabled}
+          aria-describedby={aiEnabled ? undefined : 'suggest-disabled-reason'}
+          onClick={onSuggest}
+        >
+          <Sparkles />
+          Sugerir com IA
+        </Button>
+        {!aiEnabled && (
+          <p id="suggest-disabled-reason" className="text-muted-foreground text-sm">
+            A IA está desligada na sua conta. Ligue-a em Configurações para receber sugestões.
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="text-muted-foreground text-sm">
+            {notice}
+          </p>
+        )}
       </div>
 
       {error && <Alert>{error}</Alert>}
@@ -170,7 +206,8 @@ export default function PreviewStep({
 
 /**
  * Only categories whose kind agrees with the row's sign are offered: the API
- * refuses the others (003, rule 3), so there is no point listing them.
+ * refuses the others (003, rule 3), so there is no point listing them. A Transfer
+ * category takes either sign (005), so it is offered on every row.
  */
 function CategoryCell({
   row,
@@ -192,20 +229,34 @@ function CategoryCell({
   const kind = row.amount < 0 ? 'Expense' : 'Income';
 
   return (
-    <select
-      aria-label={`Categoria da linha ${row.rowNumber}`}
-      className={selectClasses}
-      value={row.categoryId ?? ''}
-      disabled={busy}
-      onChange={(event) => onPatchRow(row, { categoryId: event.target.value })}
-    >
-      {categories
-        .filter((category) => category.kind === kind)
-        .map((category) => (
-          <option key={category.id} value={category.id}>
-            {category.name}
-          </option>
-        ))}
-    </select>
+    <div className="flex items-center gap-1.5">
+      <select
+        aria-label={`Categoria da linha ${row.rowNumber}`}
+        className={selectClasses}
+        value={row.categoryId ?? ''}
+        disabled={busy}
+        onChange={(event) => onPatchRow(row, { categoryId: event.target.value })}
+      >
+        {categories
+          .filter((category) => category.kind === kind || category.kind === 'Transfer')
+          .map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+      </select>
+      {row.categorySource === 'Ai' && (
+        <span
+          data-testid="ai-marker"
+          role="img"
+          aria-label={categorySourceLabels.Ai}
+          title={categorySourceLabels.Ai}
+          className="bg-secondary text-secondary-foreground inline-flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium"
+        >
+          <Sparkles aria-hidden className="size-3" />
+          IA
+        </span>
+      )}
+    </div>
   );
 }

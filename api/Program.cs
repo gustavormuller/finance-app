@@ -1,7 +1,13 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Finance.Api.Application;
+using Finance.Api.Application.Ai;
+using Finance.Api.Application.Dashboard;
+using Finance.Api.Application.Investments;
+using Finance.Api.Application.Returns;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
+using Finance.Api.Infrastructure.Ai;
+using Finance.Api.Infrastructure.MarketData;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 // The query filters read the caller's id from the request, so the context needs an
 // ICurrentUser in every scope, including the ones that serve no request at all.
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ActingUser>();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
 // The connection string is read from the built service provider rather than from
@@ -24,12 +31,35 @@ builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+// 010: behind Caddy, the browser's scheme and address come from trusted proxies only.
+builder.Services.AddFinanceForwardedHeaders();
+
 builder.Services.AddFinanceAuthentication();
 builder.Services.AddAuthorization();
 
 // 004's use cases. Scoped, like the context they take (ADR-016).
 builder.Services.AddScoped<ImportStaging>();
 builder.Services.AddScoped<ImportCommands>();
+
+// 005's dashboard reads: Dapper on the context's connection (ARCHITECTURE.md section 6).
+builder.Services.AddScoped<DashboardQueries>();
+
+// 006's market-data provider adapters, the MarketData settings, the sync and its
+// nightly job (MarketData:ScheduledSync switches the job off).
+builder.Services.AddMarketDataProviders();
+builder.Services.AddMarketDataSync();
+
+// 007's snapshot rebuild, run by every movement write, POST /rebuild and after the sync.
+builder.Services.AddScoped<SnapshotRebuild>();
+builder.Services.AddScoped<PositionQueries>();
+builder.Services.AddScoped<MovementCommands>();
+
+// 008's returns: the benchmarks they compare with, and the reads behind /api/returns.
+builder.Services.AddOptions<ReturnsOptions>().BindConfiguration(ReturnsOptions.Section);
+builder.Services.AddScoped<ReturnsQueries>();
+
+// 009's AI settings, the provider port, the budget and the gateway every call goes through.
+builder.Services.AddAi();
 
 var app = builder.Build();
 
@@ -57,6 +87,18 @@ Require(
     "the directory holding the Data Protection key ring; without one, every restart "
     + "invalidates every session");
 
+// The E2E run's network-free market-data providers never reach another environment.
+MarketDataSetup.RefuseFakeProvidersOutsideDevelopment(app.Configuration, app.Environment);
+
+// Likewise its canned AI provider.
+AiSetup.RefuseFakeProviderOutsideDevelopment(app.Configuration, app.Environment);
+
+// 009's models must each have a price, or a call would cost nothing against the budget.
+AiOptions.RefuseInvalid(app.Configuration);
+
+// 008's benchmark types must match the units 006 records for their series (spec test 21).
+ReturnsOptions.RefuseMismatchedBenchmarks(app.Configuration);
+
 var appOrigin = app.Configuration[ConfigurationKeys.AppOrigin]!;
 
 void Require(string key, string purpose)
@@ -71,15 +113,28 @@ void Require(string key, string purpose)
         + $"`dotnet user-secrets set \"{key}\" \"...\" --project api`.");
 }
 
-// The deploy model is `git pull && docker compose up -d --build` with no separate
-// migration step, so the application migrates itself on the way up. The
-// unreachable-database test switches this off: the process has to boot without a
-// database in order to be able to report that it has none.
-if (app.Configuration.GetValue("Database:MigrateOnStartup", defaultValue: true))
+// Production never migrates on the way up (010, decision 2; appsettings.Production.json):
+// deploy.sh runs the published app with the `migrate` argument as its own step, which
+// applies the migrations and exits before serving anything, so a failed migration
+// leaves the running containers alone. Development and the test hosts still migrate on
+// startup. The unreachable-database test switches that off: the process has to boot
+// without a database in order to be able to report that it has none.
+var migrateOnly = args.Contains("migrate", StringComparer.Ordinal);
+
+if (migrateOnly || app.Configuration.GetValue("Database:MigrateOnStartup", defaultValue: true))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }
+
+if (migrateOnly)
+{
+    return;
+}
+
+// First, so everything after it (the Google redirect_uri, the per-IP rate limit, the
+// logs) sees the browser's scheme and address rather than Caddy's.
+app.UseForwardedHeaders();
 
 app.UseRouting();
 
@@ -105,6 +160,11 @@ app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
 app.MapImportEndpoints();
 app.MapCsvTemplateEndpoints();
+app.MapDashboardEndpoints();
+app.MapMarketDataEndpoints();
+app.MapInvestmentEndpoints();
+app.MapReturnsEndpoints();
+app.MapAiEndpoints();
 
 app.Run();
 
