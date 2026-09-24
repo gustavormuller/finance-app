@@ -31,7 +31,7 @@
 | ORM | EF Core | good migrations, typed LINQ, global query filters |
 | Auth | ASP.NET Core Identity + Google OAuth | native to the framework, R$0, scales to SaaS |
 | Database | PostgreSQL 16 (container) | R$0, relational, good with time series |
-| Queue / jobs | Hangfire or a hosted `BackgroundService` (decided in 009) | runs in the API process on the existing Postgres, zero extra services |
+| Jobs | hosted `BackgroundService` + Cronos (decided in 006, ADR-003) | runs in the API process on the existing Postgres, zero extra services |
 | Frontend | Vite + React + TanStack Router | SPA, no SSR needed |
 | UI | shadcn/ui + Tailwind | ready-made components, no Figma |
 | Charts | Recharts | enough for dashboard and series |
@@ -331,7 +331,7 @@ normalized description is stored as a column rather than folded into a hash beca
 §3's history lookup needs the same key — one column serves both (004).
 
 Import runs synchronously in the request (004). A few hundred rows is milliseconds of
-work; the job infrastructure below arrives with 009, which actually needs it.
+work; the job infrastructure arrived with 006's nightly market-data sync (ADR-003).
 
 ### 3. Cascading categorization, AI last
 
@@ -457,11 +457,14 @@ movements       id, user_id, asset_id, date,
 ### Market data (shared, no user_id)
 
 ```
-prices          asset_key, date, close NUMERIC(18,8), currency   -- PK (asset_key, date)
-benchmarks      code, date, value NUMERIC(18,8)                  -- CDI, IPCA, USD, IVVB11
+market_assets   id, ticker, name, class, currency, provider, provider_symbol,
+                is_active, last_synced_at, created_at    -- unique (provider, provider_symbol)
+prices          market_asset_id, date, close NUMERIC(18,8)   -- PK (market_asset_id, date)
+benchmarks      code, date, value NUMERIC(18,8)              -- PK (code, date); CDI, SELIC, IPCA, USDBRL, IVVB11
+sync_runs       id, started_at, finished_at, trigger, status, summary JSONB
 ```
 
-`asset_key` is the market identifier (ticker + source), not `assets.id` — that way two people holding PETR4 share the same price series.
+*Corrected in 006:* `prices` is keyed by `market_asset_id`, an FK to the shared `market_assets` catalogue — not by an `asset_key` string, and not by `assets.id`. Two people holding PETR4 point at the same catalogue row and so share the same price series. The currency lives on the catalogue row; prices are stored in it. None of these four tables has a `user_id` or a query filter.
 
 **Never store a consolidated position as a column.** The position on any date is derived from the sum of `movements` up to that date. That is what makes it possible to recompute everything when an old entry is corrected — and it will be.
 
@@ -802,9 +805,10 @@ Reverted from the previous plan, which prioritised delivery speed for a SaaS. Wi
 *Correction:* memory consumption was used as an argument in an earlier revision; with 12 GB on Oracle, it stopped being a factor.
 *Trade-off:* loses shared types. The TS client is hand-written; the integration tests declare the same shapes independently and fail when the endpoints drift. Generating it from OpenAPI was the original plan and may still happen, but the build machinery is not set up and nothing depends on it.
 
-### ADR-003 — In-process jobs on the existing Postgres, not BullMQ + Redis *(amended in 004)*
+### ADR-003 — In-process jobs on the existing Postgres, not BullMQ + Redis *(amended in 004 and 006)*
 BullMQ requires Redis, one more service to run and pay for. The job runner uses the existing Postgres instead.
 **Amendment.** The original text named pg-boss. pg-boss is a Node.js library and cannot run inside the .NET process that ADR-004 requires, so it was never a valid choice here. Background jobs will be Hangfire or a hosted `BackgroundService`, decided in 009 — the first feature that needs a scheduler. 004's import is synchronous, in the request, and needs no job at all.
+**Amendment (006).** Decided by 006, the first feature that needs a scheduler: a **hosted `BackgroundService` with Cronos** computing the next occurrence of a cron expression from configuration. No Hangfire: one nightly job does not justify its ten tables and a dashboard, and re-hosting under Hangfire later is trivial because the job is a method. Job state is the `sync_runs` table — the "jobs table with status" below.
 *Trade-off:* no Bull Board. A jobs table with status solves it.
 
 ### ADR-004 — Jobs in the same process as the API
