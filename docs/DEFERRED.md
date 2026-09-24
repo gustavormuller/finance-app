@@ -202,3 +202,101 @@ Every entry: spec · checkpoint · what · why deferred · what was done instead
   declared query filter, with `Account` as the control. The declared-type half of test 9
   scans `Domain`, `Application` and `Infrastructure.MarketData`, so a CP2 provider DTO with
   a `double` fails when written. No provider fixtures touched in CP1.
+
+## 006 · checkpoint 2
+
+- **006 · CP2 · ADR-015 amended (human decision).** Two ports, `IPriceProvider` and
+  `IBenchmarkProvider`, replace `IMarketDataProvider` in ADR-015 and in the §7 example.
+  `IBenchmarkProvider` has one implementation (BCB SGS) and rests on a foreseen second
+  source (USDBRL or IVVB11 from brapi or Twelve Data). Its own docs commit, 92c9508.
+- **006 · CP2 · no fixture is captured; all five are hand-written.** On 2026-09-24 the
+  environment's egress policy refused `api.bcb.gov.br`, `www3.bcb.gov.br`, `brapi.dev`,
+  `api.coingecko.com` and `api.twelvedata.com` (proxy CONNECT 403), and there were no keys.
+  The files in `api.tests/Fixtures/MarketData/` follow each provider's documented response
+  shape. Their values are illustrative, not market data, and the folder's README says so
+  file by file. **For the human:** capture one real response per provider under the same
+  file names, then update the README. If a real shape differs, the tests that break
+  point at the adapter to fix. Decision 9 ("captured once") is not met until then.
+- **006 · CP2 · SGS codes unverified.** `www3.bcb.gov.br/sgspub` was unreachable, so the
+  codes are the spec's: CDI 12 and SELIC 11 in percent per day, IPCA 433 in percent per
+  month, USDBRL 1 (sell rate, BRL per USD) as a level. **Pending human verification**
+  (manual step 1) before the first real sync. The units sit beside the codes in
+  `appsettings.json` as a `BenchmarkUnit` enum, not as a comment:
+  `{ "Code": 12, "Unit": "PercentPerDay" }`. That gives 008 a typed value, and a typo
+  fails binding. `Level` covers index points, exchange rates and prices; for these the
+  return is a ratio.
+- **006 · CP2 · provider behaviour from documentation, not observation.** Each of these is
+  unverified against the live API:
+  - BCB: a `404` is read as "no values in the range", for example a weekend or a month IPCA
+    has not published. Otherwise every weekend sync would fail. BCB caps daily-series
+    queries at a 10-year window, which the 5-year backfill stays inside.
+  - brapi: an unknown ticker is a `404` with `{"error":true,...}`, read as an empty series
+    (test 4). brapi takes a named range, not dates, so the adapter asks for the smallest
+    one that reaches `from` and trims the result. Timestamps become days at a fixed UTC-3,
+    which avoids needing a tz database in the container; Brazil has had no DST since 2019.
+    A null close is skipped. **Plan limits:** brapi's free plan may not serve 5-year
+    ranges or tickers beyond its demo set, so the backfill needs a paid token.
+  - CoinGecko: `market_chart?days=N&interval=daily`. Points are at 00:00 UTC, and each
+    one is dated with its own UTC day, as test 5 asks. That point is in effect the close
+    of the previous day; 008 should know. The trailing point is "now", so a day keeps its
+    first point. The public and demo plans serve 365 days, so `MaxHistoryDays: 365` caps
+    the request. A 5-year crypto backfill is therefore one year, and manual step 4's
+    "~1800 rows for BTC" needs a paid plan and a raised cap. `VsCurrency` is configuration
+    (`usd`), because the port passes no currency. **For CP4:** registering a CoinGecko
+    asset should require its `Currency` to match.
+  - Twelve Data: error bodies may come with HTTP 200 or 400. A 429 is a rate limit. A 404,
+    or a 400 "No data is available", is an empty series. Any other code throws an
+    `HttpRequestException` with that code, because a bad key is not a malformed body.
+    `end_date` is sent as `to + 1` and the result trimmed, so it works whether the API
+    reads the bound as inclusive or exclusive. `outputsize=5000` is sent because the
+    default is 30.
+- **006 · CP2 · keys travel in headers, never in URLs.** The brapi token is a bearer
+  header. The CoinGecko demo key is `x-cg-demo-api-key`. Twelve Data uses
+  `Authorization: apikey`. `HttpClient` logging records URLs, so a key in a query string
+  would end up in logs. No key is committed, and a test asserts that `appsettings.json`
+  keeps them empty. A missing key is not a boot error, since brapi and CoinGecko answer
+  some calls without one. It shows up as a failed provider in the sync run.
+- **006 · CP2 · exception names.** The spec's `ProviderRateLimited` and
+  `ProviderResponseInvalid` are `ProviderRateLimitedException` (with `Retry-After`) and
+  `ProviderResponseInvalidException`, under an abstract `MarketDataProviderException`
+  carrying the provider name. Their messages are English diagnostics for the logs. **For
+  CP3/CP5:** error text that reaches the `/market-data` screen through `SyncRun.Summary`
+  must be pt-BR. Map it from the exception type; do not show the message.
+- **006 · CP2 · what counts as "malformed" (test 8).** JSON that does not parse, a missing
+  property, a value of the wrong kind, and a date or number that does not parse all become
+  `ProviderResponseInvalidException`. Transport failures such as a 5xx or a timeout stay
+  `HttpRequestException` or `TaskCanceledException`, left for CP3's resilience handler to
+  retry. The adapters also return only days inside `[from, to]`, oldest first.
+- **006 · CP2 · test 9, parsing half.** Every number goes from JSON text to `decimal`
+  through `JsonElement.GetDecimal` or `decimal.Parse(..., InvariantCulture)`, never
+  through `double`. The CP1 declared-type scan covers `Infrastructure.MarketData` and
+  passes. A CoinGecko test also feeds a 26-significant-digit price and asserts it arrives
+  exact, which a double could not carry.
+- **006 · CP2 · test 2 without named cultures.** The test host runs .NET in
+  globalization-invariant mode, so `CultureInfo.GetCultureInfo("pt-BR")` throws. The test
+  instead clones the invariant culture into hostile ones: month-first dates and a decimal
+  comma.
+- **006 · CP2 · wiring.** `AddMarketDataProviders()` in `Infrastructure/MarketData/`
+  binds `MarketData`, registers `TimeProvider.System` with `TryAdd`, gives each adapter a
+  typed client, and registers the three price providers as `IPriceProvider`, from which
+  the registry is built. The registry is transient, like the typed clients. Two providers
+  for one kind are refused when it is built. BCB is registered as `IBenchmarkProvider`.
+  It is wired in `Program.cs` but nothing calls it yet. The adapters build absolute URIs
+  from `MarketData:*:BaseUrl` rather than setting `BaseAddress`, because BCB's base is a
+  prefix the code is appended to. The spec lists only the BCB base URL; the other three
+  are configuration too.
+- **006 · CP2 · diff sizes.** Commit 9948bf0 is ~240 lines without fixture JSON: the
+  harness, the README and BCB's tests together. The other commits are under ~200 lines.
+- **006 · CP2 · handoff to CP3.**
+  - The `IHttpClientBuilder` from `AddPriceProvider<T>` (and BCB's `AddHttpClient`) is
+    where to attach `AddResilienceHandler` per provider (tests 23, 24). The package is
+    `Microsoft.Extensions.Http.Resilience`, not yet referenced. Do not retry
+    `ProviderRateLimitedException` blindly; it carries `RetryAfter`.
+  - The sync should pass `to` = yesterday, or else trim today. Otherwise a manual daytime
+    sync stores an intraday price as today's close, and because the next `from` is the
+    day after the latest stored price, that price is never corrected.
+  - IVVB11 as a benchmark comes from brapi's `IPriceProvider` (spec, Configuration), not
+    through `IBenchmarkProvider`. The sync must copy it into `Benchmarks` under code
+    `IVVB11`, with unit `Level`.
+  - Benchmark codes to sync are the keys of `MarketData:Bcb:Series`. An unconfigured code
+    throws `InvalidOperationException` before any request.

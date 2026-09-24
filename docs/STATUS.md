@@ -18,3 +18,4 @@ web unit 43 passed, E2E 13 passed.
 | 005 | CP3 web dashboard + Transfer/openingBalance in UI | 1ae3b22 | OK — .NET 397, web 67, E2E 13 |
 | 005 | CP4 E2E + handoff | 7f4468d | OK — .NET 397, web 67, E2E 16; 005 complete in code, manual steps 1–5 pending human |
 | 006 | CP1 data model + migration | 0ed7f0c | OK — .NET 410, web 67, E2E 16. Paused before CP2: spec's two ports vs ADR-015 needs a human decision |
+| 006 | CP2 ports, registry, settings, four providers | 542089d | OK — .NET 486, web 67, E2E 16. ADR-015 amended; all fixtures hand-written (network blocked) and SGS codes unverified, both pending human (DEFERRED) |
