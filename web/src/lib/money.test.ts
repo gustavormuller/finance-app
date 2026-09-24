@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { businessDaysSince, formatMoney, formatPercent, formatQuantity, formatUnitPrice, isStalePrice } from './money';
 
 /** Intl separates the symbol with a no-break space; the assertions read better with a plain one. */
-const plain = (text: string) => text.replace(/ /g, ' ');
+const plain = (text: string) => text.replace(/\u00a0/g, ' ');
 
 describe('money formatting', () => {
   it('writes BRL the pt-BR way, and a native currency with its own symbol', () => {
