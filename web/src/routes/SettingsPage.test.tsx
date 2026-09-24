@@ -119,4 +119,35 @@ describe('SettingsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Informe se a IA deve ficar ligada ou desligada.');
     expect(toggle).toBeChecked();
   });
+
+  /** Found in a real browser: a switch that only moves after the round trip reads as broken. */
+  it('moves the switch at once, while the PATCH is in flight', async () => {
+    let release: () => void = () => {};
+    const answered = new Promise<void>((resolve) => (release = resolve));
+    const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: false };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = new URL(input.toString(), 'http://localhost').pathname;
+        const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+
+        if (path === '/api/auth/me' && init?.method === 'PATCH') {
+          await answered;
+          return json({ ...me, aiEnabled: true });
+        }
+
+        return json(path === '/api/ai/usage' ? usage : me);
+      }),
+    );
+    renderSettings();
+
+    const toggle = await screen.findByRole('switch', { name: 'Usar IA nesta conta' });
+    await userEvent.setup().click(toggle);
+
+    expect(toggle).toBeChecked();
+    release();
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).toBeChecked();
+  });
 });
