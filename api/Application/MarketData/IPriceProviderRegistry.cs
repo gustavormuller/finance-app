@@ -13,9 +13,25 @@ public interface IPriceProviderRegistry
 }
 
 /// <summary>Built from every registered <see cref="IPriceProvider"/>; two for one kind is a startup error.</summary>
-public sealed class PriceProviderRegistry(IEnumerable<IPriceProvider> providers) : IPriceProviderRegistry
+public sealed class PriceProviderRegistry : IPriceProviderRegistry
 {
-    private readonly IReadOnlyList<IPriceProvider> providers = [.. providers];
+    private readonly Dictionary<ProviderKind, IPriceProvider> byKind = [];
 
-    public IPriceProvider For(ProviderKind kind) => throw new NotImplementedException();
+    public PriceProviderRegistry(IEnumerable<IPriceProvider> providers)
+    {
+        foreach (var provider in providers)
+        {
+            if (!byKind.TryAdd(provider.Kind, provider))
+            {
+                throw new InvalidOperationException(
+                    $"Two price providers are registered for {provider.Kind}: "
+                    + $"{byKind[provider.Kind].GetType().Name} and {provider.GetType().Name}.");
+            }
+        }
+    }
+
+    public IPriceProvider For(ProviderKind kind) =>
+        byKind.TryGetValue(kind, out var provider)
+            ? provider
+            : throw new InvalidOperationException($"No price provider is registered for {kind}.");
 }
