@@ -30,6 +30,16 @@ public sealed record ReturnsView(
     IReadOnlyDictionary<string, BenchmarkView?> Benchmarks,
     IReadOnlyList<IReadOnlyDictionary<string, object>> Series);
 
+/// <summary>One asset's returns: <see cref="ReturnsView"/> and its FX split, <c>null</c> for a BRL asset.</summary>
+public sealed record AssetReturnsView(
+    PeriodView? Period,
+    TwrView? Twr,
+    decimal? Xirr,
+    decimal? TimingEffect,
+    FxView? Fx,
+    IReadOnlyDictionary<string, BenchmarkView?> Benchmarks,
+    IReadOnlyList<IReadOnlyDictionary<string, object>> Series);
+
 /// <summary>
 /// 008's reads: the current user's movements and daily rows, through the domain's TWR,
 /// XIRR and timing effect (spec "API surface"). Everything read here but the benchmarks
@@ -52,9 +62,23 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
     public async Task<ReturnsView> PortfolioAsync(ReturnsQuery query, CancellationToken cancellationToken) =>
         View(await MeasureAsync(null, query, cancellationToken));
 
+    /// <summary>One asset's returns, or <c>null</c> when it is not the current user's.</summary>
+    public async Task<AssetReturnsView?> AssetAsync(Guid assetId, ReturnsQuery query, CancellationToken cancellationToken)
+    {
+        if (!await db.Assets.AnyAsync(asset => asset.Id == assetId, cancellationToken))
+        {
+            return null;
+        }
+
+        var measured = await MeasureAsync(assetId, query, cancellationToken);
+        var view = View(measured);
+        var fx = measured?.Fx is { } split ? new FxView(Round(split.Native), Round(split.Fx), Round(split.Total)) : null;
+        return new AssetReturnsView(view.Period, view.Twr, view.Xirr, view.TimingEffect, fx, view.Benchmarks, view.Series);
+    }
+
     private ReturnsView View(Measured? measured)
     {
-        var benchmarks = options.Value.Benchmarks.Keys.ToDictionary(code => code, _ => (BenchmarkView?)null);
+        var benchmarks = options.Value.Benchmarks.Keys.Order(StringComparer.Ordinal).ToDictionary(code => code, _ => (BenchmarkView?)null);
         if (measured is null)
         {
             return new ReturnsView(null, null, null, null, benchmarks, []);
@@ -62,6 +86,13 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
 
         var twr = measured.Twr;
         var baseDay = twr.Index[0].Date;
+        var days = measured.Range.To.DayNumber - baseDay.DayNumber;
+        foreach (var (code, accumulated) in measured.Benchmarks)
+        {
+            var growth = accumulated[^1].Value / 100m;
+            benchmarks[code] = new BenchmarkView(Round(growth - 1m), Round(TimeWeightedReturn.Annualise(growth, days)));
+        }
+
         var portfolio = twr.Index.ToDictionary(point => point.Date, point => point.Value);
         var grid = Enumerable.Range(0, measured.Range.To.DayNumber - baseDay.DayNumber + 1).Select(baseDay.AddDays).ToList();
 
@@ -73,12 +104,18 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
             index = portfolio.GetValueOrDefault(grid[position], index);
             if (kept.Contains(position))
             {
-                series.Add(new Dictionary<string, object> { ["date"] = grid[position], ["portfolio"] = Round(index, IndexPlaces) });
+                var point = new Dictionary<string, object> { ["date"] = grid[position], ["portfolio"] = Round(index, IndexPlaces) };
+                foreach (var (code, benchmark) in measured.Benchmarks)
+                {
+                    point[code] = Round(benchmark[position].Value, IndexPlaces);
+                }
+
+                series.Add(point);
             }
         }
 
         return new ReturnsView(
-            new PeriodView(measured.Range.From, measured.Range.To, measured.Range.To.DayNumber - baseDay.DayNumber),
+            new PeriodView(measured.Range.From, measured.Range.To, days),
             new TwrView(Round(twr.Total), Round(twr.Annualised)),
             Round(measured.Xirr),
             Round(TimingEffect.Of(measured.Xirr, twr.Annualised)),
@@ -141,7 +178,54 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
                 asset.Currency, movements[asset.Id], fxRates, open, new DailyPoint(range.To, held[^1].ValueBrl));
         }).ToList();
 
-        return new Measured(range, twr, MoneyWeightedReturn.Compute(flows));
+        var fx = assetId is null ? null : FxDecomposition.Split(
+            valued[0].Currency, rows[valued[0].Id].ToList(), movements[valued[0].Id], fxRates);
+        var benchmarks = await BenchmarksAsync(twr.Index[0].Date, range.To, cancellationToken);
+        return new Measured(range, twr, MoneyWeightedReturn.Compute(flows), benchmarks, fx);
+    }
+
+    /// <summary>
+    /// Each configured benchmark's index from <paramref name="baseDay"/> to <paramref name="end"/>,
+    /// one point per day, ordered by code. One that cannot anchor is left out, so it is
+    /// <c>null</c> in the response and absent from the chart (spec test 31).
+    /// </summary>
+    private async Task<List<(string Code, IReadOnlyList<DailyPoint> Index)>> BenchmarksAsync(
+        DateOnly baseDay, DateOnly end, CancellationToken cancellationToken)
+    {
+        var configured = options.Value.Benchmarks
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => (Code: pair.Key, pair.Value, Source: string.IsNullOrWhiteSpace(pair.Value.Source) ? pair.Key : pair.Value.Source))
+            .ToList();
+        var sources = configured.Select(benchmark => benchmark.Source).Distinct().ToList();
+        var points = (await db.Benchmarks.AsNoTracking()
+                .Where(value => sources.Contains(value.Code) && value.Date > baseDay && value.Date <= end)
+                .ToListAsync(cancellationToken))
+            .ToLookup(value => value.Code, value => new DailyPoint(value.Date, value.Value));
+
+        var indices = new List<(string, IReadOnlyList<DailyPoint>)>();
+        foreach (var (code, benchmark, source) in configured)
+        {
+            var values = points[source].ToList();
+            if (benchmark.Type == BenchmarkType.Level)
+            {
+                // A level divides by its last value on or before the base day.
+                var anchor = await db.Benchmarks.AsNoTracking()
+                    .Where(value => value.Code == source && value.Date <= baseDay)
+                    .OrderByDescending(value => value.Date).FirstOrDefaultAsync(cancellationToken);
+                if (anchor is not null)
+                {
+                    values.Add(new DailyPoint(anchor.Date, anchor.Value));
+                }
+            }
+
+            // The spread is configured in percent a year (6), the accumulator takes a rate (0.06).
+            if (BenchmarkAccumulator.Accumulate(values, benchmark.Type, baseDay, end, new Rate(benchmark.Spread / 100m)) is { } index)
+            {
+                indices.Add((code, index));
+            }
+        }
+
+        return indices;
     }
 
     /// <summary>USDBRL from the latest rate on or before <paramref name="first"/> to <paramref name="last"/>: 007's FX rule.</summary>
@@ -159,5 +243,10 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
 
     private static decimal Round(Rate rate) => Round(rate.Value);
 
-    private sealed record Measured(PeriodRange Range, TwrResult Twr, Rate? Xirr);
+    private sealed record Measured(
+        PeriodRange Range,
+        TwrResult Twr,
+        Rate? Xirr,
+        IReadOnlyList<(string Code, IReadOnlyList<DailyPoint> Index)> Benchmarks,
+        FxSplit? Fx);
 }

@@ -62,8 +62,11 @@ public static class TimeWeightedReturn
         return new TwrResult(new Rate(growth - 1m), Annualise(growth, span), span, index);
     }
 
-    /// <summary><c>growth^(365 / days) - 1</c>; <c>null</c> when it cannot be represented.</summary>
-    private static Rate? Annualise(decimal growth, int days)
+    /// <summary>
+    /// <c>growth^(365 / days) - 1</c>; <c>null</c> when it cannot be represented. Also what a
+    /// benchmark's index annualises with, so both sides of the comparison share the guards.
+    /// </summary>
+    public static Rate? Annualise(decimal growth, int days)
     {
         if (days == 0 || growth < 0m)
         {

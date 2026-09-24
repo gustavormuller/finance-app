@@ -40,6 +40,24 @@ public static class ReturnsEndpoints
             return query is null ? problem! : Results.Ok(await queries.PortfolioAsync(query, cancellationToken));
         });
 
+        // Somebody else's asset is filtered out, so it is a 404 like one that does not exist.
+        returns.MapGet("/assets/{id:guid}", async (
+            Guid id,
+            ReturnsQueries queries,
+            CancellationToken cancellationToken,
+            string? period = null,
+            string? from = null,
+            string? to = null) =>
+        {
+            var (query, problem) = Parse(period, from, to);
+            if (query is null)
+            {
+                return problem!;
+            }
+
+            return await queries.AssetAsync(id, query, cancellationToken) is { } view ? Results.Ok(view) : Results.NotFound();
+        });
+
         return routes;
     }
 
