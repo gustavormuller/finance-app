@@ -40,9 +40,18 @@ export default function MonthlyChart({ series }: { series: MonthTotals[] }) {
               cursor={{ fill: 'var(--muted)' }}
               labelFormatter={(month) => formatMonth(String(month))}
               formatter={(value) => money(Number(value))}
+              // Bar order: income first, as drawn.
+              itemSorter={(item) => (item.dataKey === 'income' ? 0 : 1)}
+              separator=": "
+              itemStyle={{ color: 'var(--foreground)' }}
               contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8 }}
             />
-            <Legend iconType="circle" />
+            {/* Bar order, not alphabetical; the text in ink, the swatch carries the colour. */}
+            <Legend
+              iconType="circle"
+              itemSorter={null}
+              formatter={(name) => <span className="text-foreground">{name}</span>}
+            />
             <Bar dataKey="income" name="Receitas" fill="var(--chart-income)" radius={[4, 4, 0, 0]} />
             <Bar dataKey="expense" name="Despesas" fill="var(--chart-expense)" radius={[4, 4, 0, 0]} />
           </BarChart>
