@@ -84,19 +84,19 @@ internal static class Problems
     {
         AiDisabledException => Results.Problem(
             title: "IA desligada",
-            detail: "A IA está desligada na sua conta. Ligue-a nas configurações para usar este recurso.",
+            detail: AiFailureText.Disabled,
             statusCode: StatusCodes.Status403Forbidden),
         AiBudgetExceededException => Results.Problem(
             title: "Limite de IA atingido",
-            detail: "Você atingiu o limite mensal de gastos com IA. O limite renova no próximo mês.",
+            detail: AiFailureText.BudgetExceeded,
             statusCode: StatusCodes.Status402PaymentRequired),
         AiProviderTimeoutException => Results.Problem(
             title: "A IA demorou demais",
-            detail: "O serviço de IA não respondeu a tempo. Tente novamente em instantes.",
+            detail: AiFailureText.Timeout,
             statusCode: StatusCodes.Status504GatewayTimeout),
         AiProviderException => Results.Problem(
             title: "Falha no serviço de IA",
-            detail: "O serviço de IA não conseguiu responder agora. Tente novamente mais tarde.",
+            detail: AiFailureText.ProviderFailed,
             statusCode: StatusCodes.Status502BadGateway),
         _ => throw new ArgumentException("Not an AI failure.", nameof(exception), exception),
     };
