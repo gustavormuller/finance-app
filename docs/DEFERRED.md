@@ -415,3 +415,83 @@ Every entry: spec · checkpoint · what · why deferred · what was done instead
   - For CP5's E2E (test 26): the E2E API is a real process. "Fake providers in the test
     host" needs either a Development-only switch that registers fakes, or the providers'
     `BaseUrl`s pointed at a local stub. Keep `ScheduledSync` off there.
+
+## 006 · checkpoint 4
+
+- **006 · CP4 · no ADR conflict, no migration.** The endpoints read and write the CP1
+  tables as they are. `Endpoints/MarketDataEndpoints.cs` takes `AppDbContext` directly,
+  like the account routes (ADR-016).
+- **006 · CP4 · `202 {syncRunId}`: the sync is split, the run is in the background.**
+  `MarketDataSync.StartAsync` writes the `Running` row; `ExecuteAsync(syncRunId)` loads it
+  in another scope and performs the run; `RunAsync` is both, and the job still calls it.
+  `Infrastructure/Jobs/ManualMarketDataSync` (singleton) writes the row inside the request,
+  then starts the run with `Task.Run` under `ExecutionContext.SuppressFlow()`, in a new
+  scope, on `IHostApplicationLifetime.ApplicationStopping` rather than the request's token.
+  A shutdown mid-run marks it `Failed`, as CP3's cancellation path does. The run is not
+  awaited at shutdown; a process killed outright leaves a `Running` row, as before.
+- **006 · CP4 · the 10-minute limit.** Counted from the latest `SyncRun.StartedAt` of
+  **any** trigger, in the database, so it survives a restart. The spec says "429 if one ran
+  in the last 10 minutes" and decision 7 "one run per 10 minutes globally", so a nightly
+  run inside the window refuses a manual one too. The answer is pt-BR problem details
+  (title "Muitas solicitações") with a `Retry-After` in seconds: what is left of the window,
+  or one minute when the gate is held by a run that started longer ago. A refused request
+  writes no row. ASP.NET's rate limiter was not used: it is in memory and per process.
+- **006 · CP4 · the gate.** `MarketDataSyncGate`, a singleton `SemaphoreSlim(1, 1)`. The
+  manual trigger takes it without waiting before the database check, and a busy gate is a
+  `429`, so two simultaneous POSTs cannot both pass. It is held until the background run
+  ends. The nightly job waits for it (`WaitAsync`) and then runs: a scheduled run is never
+  skipped because a manual one was in progress, and the rerun is idempotent and cheap.
+  In-process is enough for one API process (ADR-004); a second instance would need a
+  PostgreSQL advisory lock. The gate is deliberately not `IDisposable`, so a background run
+  can release it after the container is disposed.
+- **006 · CP4 · registering an asset.** The spec's body has no `name`, but the column is
+  required: `name` is optional and defaults to the ticker. The ticker is trimmed and
+  upper-cased; `providerSymbol` is trimmed but keeps its case (CoinGecko ids are
+  lower-case), so `petr4` and `PETR4` at brapi would be two rows. `currency` must be `BRL`
+  or `USD` (upper-cased), and a CoinGecko asset's must equal `MarketData:CoinGecko:VsCurrency`
+  (CP2's note), a 400 on `currency`. `class` and `provider` are checked with
+  `Enum.IsDefined`. Class and provider are not cross-checked (a `Crypto` at brapi is
+  accepted). New assets are active. A duplicate `(Provider, ProviderSymbol)` is a 409 caught
+  from the unique index, not pre-checked (`Problems.IsDuplicate`). The register route is
+  open to any signed-in user, as the spec says; the catalogue is shared, so one user's typo
+  is everyone's row, and nothing deletes or deactivates an asset yet.
+- **006 · CP4 · reads.** `GET assets?q=` matches ticker or name, case-insensitive
+  (`ILIKE`, with `%`, `_` and `\` escaped), ordered by ticker, at most 50; without `q`,
+  the first 50. `prices` and `benchmarks/{code}` take optional inclusive `from`/`to`,
+  oldest first. An unknown asset id is a 404; an unknown benchmark code is an empty list,
+  like a configured one not yet synced. The code is upper-cased. A malformed date is the
+  framework's binding 400, as on the transactions route. `sync-runs` is the last 20 by
+  `StartedAt` descending, with `summary` parsed by `SyncSummaryJson.Read` into an object.
+  Enums cross the wire as names (`Manual`, `PartialFailure`).
+- **006 · CP4 · tests.** `MarketDataApi` boots `IdentityApiFactory` on a database of its
+  own (the host migrates it) with the CP3 fakes as `IPriceProviderRegistry` and
+  `IBenchmarkProvider`; the factory gained an optional `services` hook for that. Tests 20
+  and 21 poll `sync-runs` until the run leaves `Running`. Beyond 19–22: a recent scheduled
+  run also yields 429 and an 11-minute-old one does not, a held gate yields 429 and writes
+  no row, validation, the CoinGecko currency rule, ranged reads, 401 without a session.
+  .NET tests 521 → 535. Not tested: the job actually waiting on the gate (its loop is
+  tested through delegates, and `RunOnceAsync` is the only code that takes it).
+- **006 · CP4 · BOMs.** `api/Program.cs` and `IdentityApiFactory.cs` were touched and
+  carry em dashes, so they now have a UTF-8 BOM (005 · CP2's observed debt, in part).
+- **006 · CP4 · diff sizes.** The first test commit (`7582841`) is 225 lines: the host
+  helper and the seven catalogue tests. The others are under ~200.
+- **006 · CP4 · handoff to CP5** (web `/market-data`, tests 25 and 26).
+  - Routes and shapes: `GET /api/market-data/sync-runs` → `[{ id, startedAt, finishedAt,
+    trigger, status, summary: { [provider]: { rowsWritten, itemsSynced, itemsFailed,
+    error, failures: [{ item, error }] } } }]`; `POST /api/market-data/sync` → `202 {
+    syncRunId }` or `429` problem details whose `detail` is pt-BR and fit to show as is;
+    `GET /api/market-data/assets?q=` and `POST /api/market-data/assets { ticker, name?,
+    class, provider, providerSymbol, currency }` → `201` asset, `400` with `errors[field]`,
+    `409` with `detail`. Enum names (`StockBr`, `CoinGecko`, `Scheduled`, `Running`, …)
+    need pt-BR labels in `web/src/lib/labels.ts`. `error` texts are already pt-BR.
+  - The run is asynchronous: after a 202 the screen should poll `sync-runs` (or refetch on
+    an interval while the newest is `Running`).
+  - Test 26 needs fake providers in the real E2E API process with `ScheduledSync` off
+    (`verify-e2e.sh` already sets `MarketData__ScheduledSync=false`). Options: a
+    Development-only switch (for example `MarketData:FakeProviders=true`) that registers
+    the fakes as `IPriceProviderRegistry`/`IBenchmarkProvider`, or the providers'
+    `BaseUrl`s pointed at a local stub. The fakes today live in `api.tests`, so the switch
+    needs its own copy under `api/`, guarded so production cannot enable it.
+  - The E2E database is shared across the E2E run and the 10-minute limit is global, so
+    only one E2E test can trigger a sync per run, unless the suite truncates `SyncRuns`
+    first or the switch also shortens the window.
