@@ -100,3 +100,52 @@ Every entry: spec · checkpoint · what · why deferred · what was done instead
   non-ASCII (em dashes) with no UTF-8 BOM, against the CLAUDE.md rule. All occurrences are in
   comments, so nothing compiles wrong; adding the BOMs is a one-line chore for a later
   checkpoint.
+
+## 005 · checkpoint 3
+
+- **005 · CP3 · where the old landing's contents went.** `HomePage.tsx` is deleted. The
+  signed-in name (`data-testid="current-user"`) and the Sair button move to the end of the
+  navigation row in `ProtectedLayout.tsx`, so they are on every protected page. The existing
+  E2E suite (`auth.spec.ts` asserts both on `/`) passes unchanged. On a phone the nav row
+  scrolls horizontally as before, so Sair sits at the end of that scroll.
+- **005 · CP3 · month selector.** Previous/next buttons; forward stops at the local current
+  month. The selected month drives both "Resumo do mês" and the category breakdown (spec §UI
+  says "this month" for both; following the selector is more useful and costs nothing). Kept
+  in component state, not the URL: nothing links to a dashboard month yet.
+- **005 · CP3 · the monthly series has no `month` parameter.** The API ends it at the UTC
+  month. The web asks for 13 months and keeps the 12 up to the local month
+  (`lib/months.ts` `lastMonths`), which covers Brasília's evening at a month's turn. A
+  browser east of UTC would still see the series end one month early; not handled.
+- **005 · CP3 · category breakdown is HTML, not Recharts.** A ranked list with name, share,
+  amount and a bar is readable as markup to a screen reader and trivially testable; Recharts
+  is used where the spec names it (the 12-month grouped bars). Bar length is the row's
+  `share` relative to the largest share, so no money arithmetic happens client-side.
+- **005 · CP3 · money on the client.** Values stay JS numbers, as elsewhere in the web
+  (`api/finance.ts` comment). The only operations are `Math.abs` for bar heights and
+  formatting; `share` (a ratio) is multiplied for the percentage and bar width.
+- **005 · CP3 · chart colours.** Blue/orange (`--chart-income`/`--chart-expense` in
+  `index.css`, light and dark), not green/red: green/red failed the colour-vision check
+  (ΔE 5 deutan). The monthly chart also renders a visually hidden table of its values.
+- **005 · CP3 · credit card style.** `text-destructive` on the `Amount` when the account is
+  a `CreditCard` **and** its balance is negative; a card in credit keeps `Amount`'s normal
+  style. Non-BRL rows say "USD, fora do total".
+- **005 · CP3 · empty state** follows test 23 literally: `balances` empty and every month
+  zero. An account with no transactions shows the dashboard (its opening balance is news).
+- **005 · CP3 · Transfer in the transaction form.** A Saída/Entrada radio pair appears only
+  for a Transfer category, default Saída; editing opens on the stored sign. The typed sign is
+  still ignored. The category dropdown always has three optgroups, Transferência last.
+- **005 · CP3 · Transfer on the categories page** is listed under its own "Transferências"
+  heading; before, a seeded Transferência would have been invisible there.
+- **005 · CP3 · `openingBalance` input.** Typed as shown: pt-BR (`-1.234,56`), or a plain
+  `1234.56` when there is no comma; U+2212 accepted; empty is 0; anything else is refused in
+  the browser ("Informe um número."). Always sent, on update too (the form shows the stored
+  value). The accounts table gained a "Saldo inicial" column (hidden on phones).
+- **005 · CP3 · field errors on the account form.** A 400's `errors[field]` now render under
+  the field, fixing handoff 004's English-title debt for this page only. The transactions and
+  categories pages still show `ApiError.message`; left for a later chore.
+- **005 · CP3 · freshness.** Transaction, account and import writes do not invalidate
+  `['dashboard', …]`; the dashboard refetches on mount (no stale time), which is enough since
+  every write happens on another page. The recent list shares the `['transactions']` prefix.
+- **005 · CP3 · diff size.** `build: add recharts` is 369 lines, almost all
+  `package-lock.json`. The sections 1–2 commit is 263 lines, of which 90 are the deleted
+  `HomePage.tsx`.
