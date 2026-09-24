@@ -39,6 +39,7 @@ public static class MarketDataSetup
     {
         services.AddScoped<MarketDataStore>();
         services.AddScoped<MarketDataSync>();
+        services.AddSingleton<MarketDataSyncGate>();
         services.AddHostedService<MarketDataSyncJob>();
         return services;
     }
