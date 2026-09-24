@@ -149,3 +149,56 @@ Every entry: spec · checkpoint · what · why deferred · what was done instead
 - **005 · CP3 · diff size.** `build: add recharts` is 369 lines, almost all
   `package-lock.json`. The sections 1–2 commit is 263 lines, of which 90 are the deleted
   `HomePage.tsx`.
+
+## 006 · checkpoint 1
+
+- **006 · CP1 · five checkpoints, not four.** The spec has a web screen and an E2E test
+  (25, 26) besides the API; putting them in the endpoint checkpoint would pass ~200 lines
+  twice over. Plan in STATUS.md: data model → providers → sync/resilience/scheduling →
+  endpoints → web + E2E + handoff.
+- **006 · CP1 · `MarketAsset` and `SyncRun` have no `UserId` — CLAUDE.md names only
+  `prices` and `benchmarks` as exceptions.** Spec decision 3 makes all four types shared
+  and says to test it, and the run prompt repeats it. `MarketAsset` is the catalogue the
+  `prices` rows hang off; `SyncRun` is the state of a shared job (ADR-003's "jobs table with
+  status"). Followed the spec. **For the human:** CLAUDE.md's exception list could name
+  `market_assets` and `sync_runs` too; not edited here.
+- **006 · CP1 · ADR-015 names one port, `IMarketDataProvider`; the spec declares two**
+  (`IPriceProvider`, `IBenchmarkProvider`). The spec authorises amending ADR-003 and the
+  `prices` table only. The substance of ADR-015 holds (market ports in the core,
+  adapters in infrastructure), so this was not treated as a contradiction to stop on, and
+  ADR-015 and the §7 example are left as written. Note for CP2: by ADR-015's own criterion
+  ("more than one real or foreseen implementation"), `IBenchmarkProvider` has one, BCB
+  (IVVB11 comes through brapi's price provider). **For the human:** confirm, or amend ADR-015
+  to name the two ports.
+- **006 · CP1 · ARCHITECTURE.md edits beyond the two mandated.** The stack table's jobs row
+  and §2's "the job infrastructure below arrives with 009" restated ADR-003's old "decided
+  in 009"; both now point at 006. The `prices` block also lists `market_assets` and
+  `sync_runs`, and drops `prices.currency` (it lives on the catalogue row, spec data model).
+- **006 · CP1 · the upsert lives in CP1**, in `Application/MarketData/MarketDataStore.cs`, so
+  test 18 has something to test before the sync exists. One `INSERT … SELECT … FROM
+  unnest(dates, values) … ON CONFLICT DO UPDATE` per batch through `ExecuteSqlAsync`
+  (parameters, not Dapper, not change tracking): five years of closes in one round trip.
+  Returns rows inserted or overwritten, which the sync can report as "rows written". A day
+  repeated in one batch keeps its last value (PostgreSQL refuses to update a row twice in
+  one statement; CoinGecko's final point is "now"). Not yet registered in DI; CP3 does that.
+- **006 · CP1 · `numeric(18,8)` limits.** More than eight decimals are rounded by
+  PostgreSQL (half away from zero); a value of 10^10 or more fails the statement. The
+  sync's per-asset catch (CP3) is where such a failure would land.
+- **006 · CP1 · `DailyClose` and `DailyValue` in their own files**, not in
+  `IPriceProvider.cs` as the spec sketches, because the store needs them before the ports
+  exist. `DailyValue` is not defined in the spec; it mirrors `DailyClose`.
+- **006 · CP1 · choices the spec leaves open.** `Prices → MarketAssets` is `ON DELETE
+  RESTRICT` (nothing deletes an asset yet; an accidental delete should not take five years
+  of closes). `SyncRun.Summary` is a `string` mapped to `jsonb`, starting as `{}`; its shape
+  is the sync's (CP3), and `Domain/` stays serializer-free. No database defaults on
+  `IsActive` or `Summary`. `SyncRuns` has an index on `StartedAt DESC` (the last-20 list and
+  the 26-hour startup check); `MarketAssets.Ticker` has none (a small catalogue).
+  `ProviderKind` has no BCB member: BCB serves benchmarks only. The class enum is
+  `MarketAssetClass`, not `AssetClass`, to leave that name to 007.
+- **006 · CP1 · tests.** Written before the mapping, so they use `Set<T>()`: declaring DbSets
+  first would have left the model with pending changes and failed every migrating test.
+  Test 17 reads as a second random user id and as no user (market data has no FK to users,
+  so no sign-in is needed), and also checks the model: no `IUserOwned`, no `UserId`, no
+  declared query filter, with `Account` as the control. The declared-type half of test 9
+  scans `Domain`, `Application` and `Infrastructure.MarketData`, so a CP2 provider DTO with
+  a `double` fails when written. No provider fixtures touched in CP1.

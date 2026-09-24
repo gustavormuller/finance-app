@@ -6,6 +6,7 @@ web unit 43 passed, E2E 13 passed.
 ## Checkpoint plans
 
 - 005 checkpoints: CP1 domain + data model + migration (tests 1–4, 19; Transfer kind, rule 3, suggester, OpeningBalance, seeding) · CP2 Dapper aggregations + endpoints (tests 5–18) · CP3 web dashboard + Transfer in UI (tests 20–23) · CP4 E2E (24–26) · handoff.
+- 006 checkpoints: CP1 data model + AddMarketData migration + upsert store + ADR-003/`prices` amendments (tests 17, 18, database half of 19, declared-type half of 9) · CP2 ports, provider registry, options with SGS codes and units, four provider adapters against fixtures (tests 1–9) · CP3 MarketDataSync, per-provider resilience, BackgroundService + Cronos (tests 10–16, 23, 24) · CP4 market-data endpoints + manual-sync rate limit (tests 19–22) · CP5 web `/market-data` + E2E + handoff (tests 25, 26).
 
 ## Log
 
