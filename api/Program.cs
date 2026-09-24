@@ -49,6 +49,10 @@ builder.Services.AddScoped<SnapshotRebuild>();
 builder.Services.AddScoped<PositionQueries>();
 builder.Services.AddScoped<MovementCommands>();
 
+// 008's returns: the benchmarks they compare with, and the reads behind /api/returns.
+builder.Services.AddOptions<ReturnsOptions>().BindConfiguration(ReturnsOptions.Section);
+builder.Services.AddScoped<ReturnsQueries>();
+
 var app = builder.Build();
 
 // Everything the process cannot run without, checked once, at boot, with a message
