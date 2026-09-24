@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using Finance.Api.Application;
+using Finance.Api.Application.Ai;
 using Finance.Api.Application.Dashboard;
 using Finance.Api.Application.Investments;
 using Finance.Api.Application.Returns;
@@ -81,6 +82,9 @@ Require(
 
 // The E2E run's network-free market-data providers never reach another environment.
 MarketDataSetup.RefuseFakeProvidersOutsideDevelopment(app.Configuration, app.Environment);
+
+// 009's models must each have a price, or a call would cost nothing against the budget.
+AiOptions.RefuseInvalid(app.Configuration);
 
 // 008's benchmark types must match the units 006 records for their series (spec test 21).
 ReturnsOptions.RefuseMismatchedBenchmarks(app.Configuration);

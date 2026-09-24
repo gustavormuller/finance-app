@@ -37,10 +37,57 @@ public sealed class AiOptions
     public bool FakeProvider { get; set; }
 
     /// <summary>Empty when the configuration is sound; otherwise English diagnostics for the operator.</summary>
-    public static IReadOnlyList<string> Problems(AiOptions options) => throw new NotImplementedException();
+    public static IReadOnlyList<string> Problems(AiOptions options)
+    {
+        var problems = new List<string>();
+        if (!Providers.Contains(options.Provider, StringComparer.OrdinalIgnoreCase))
+        {
+            problems.Add($"{Section}:Provider is '{options.Provider}'; it must be one of {string.Join(", ", Providers)}.");
+        }
 
-    /// <summary>Fails the boot on any of <see cref="Problems"/>.</summary>
-    public static void RefuseInvalid(IConfiguration configuration) => throw new NotImplementedException();
+        if (options.MonthlyBudgetBrl < 0m)
+        {
+            problems.Add($"{Section}:MonthlyBudgetBrl is negative; it is each user's monthly ceiling in BRL.");
+        }
+
+        if (options.UsdBrl <= 0m)
+        {
+            problems.Add($"{Section}:UsdBrl must be positive; it prices calls when no USDBRL benchmark has been synced.");
+        }
+
+        foreach (var (key, task) in new[] { ("Categorisation", options.Categorisation), ("Analysis", options.Analysis) })
+        {
+            if (string.IsNullOrWhiteSpace(task.Model))
+            {
+                problems.Add($"{Section}:{key}:Model is empty.");
+            }
+            else if (!options.Pricing.TryGetValue(task.Model, out var price))
+            {
+                problems.Add($"{Section}:Pricing:{task.Model} is missing; {Section}:{key}:Model names it, and a call "
+                    + "with no price would cost nothing against the budget. (A model id with ':' cannot be a key.)");
+            }
+            else if (price.InputPerMTokUsd <= 0m || price.OutputPerMTokUsd <= 0m)
+            {
+                problems.Add($"{Section}:Pricing:{task.Model} needs positive InputPerMTokUsd and OutputPerMTokUsd.");
+            }
+        }
+
+        return problems.Distinct().ToList();
+    }
+
+    /// <summary>Fails the boot on any of <see cref="Problems"/>, so no call is ever priced at zero.</summary>
+    public static void RefuseInvalid(IConfiguration configuration)
+    {
+        var options = configuration.GetSection(Section).Get<AiOptions>() ?? new AiOptions();
+
+        var problems = Problems(options);
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(" ", problems));
+        }
+    }
+
+    private static readonly string[] Providers = ["anthropic", "openai"];
 }
 
 /// <summary>One use of the AI: the model it calls.</summary>
