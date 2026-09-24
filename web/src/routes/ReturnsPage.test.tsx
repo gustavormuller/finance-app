@@ -398,7 +398,9 @@ describe('AssetReturnsPage', () => {
   });
 
   it('says so when the asset is not found', async () => {
-    stubReturns(() => ({ body: halfYear }), [], () => ({ status: 404 }));
+    // The API's bare 404 has an empty body, which the client reads as `{}`; the stub
+    // would otherwise send `null`.
+    stubReturns(() => ({ body: halfYear }), [], () => ({ status: 404, body: {} }));
     renderAt('/investments/a-gone/returns');
 
     expect(await screen.findByText('Ativo não encontrado.')).toBeInTheDocument();
