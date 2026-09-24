@@ -396,8 +396,9 @@ The dependency arrows point inward: input adapters (Endpoints, Jobs) and output 
 
 ```csharp
 // Application/ or Domain/
-public interface IMarketDataProvider { Task<IReadOnlyList<Price>> GetDailyAsync(...); }
-public interface IAiProvider         { Task<string> AnalyzeAsync(...); }
+public interface IPriceProvider     { Task<IReadOnlyList<DailyClose>> GetDailyClosesAsync(...); }
+public interface IBenchmarkProvider { Task<IReadOnlyList<DailyValue>> GetSeriesAsync(...); }
+public interface IAiProvider        { Task<string> AnalyzeAsync(...); }
 ```
 
 Concrete justification, not dogma: there are already four market sources (brapi, BCB, CoinGecko/Binance, Twelve Data) and the AI provider may change. This is exactly the case ports-and-adapters was invented for.
@@ -861,10 +862,11 @@ Reason: the financial computations become testable in milliseconds, without brin
 *Adopted:* the dependency rule, value objects (`Money`, `Ticker`, `DateRange`), pure domain services.
 *Not adopted:* aggregates with strict boundaries, domain events, MediatR, CQRS with separate stores, bounded contexts — the domain is mostly data entry and transformation, with no invariants that justify the indirection.
 
-### ADR-015 — Ports only for genuinely pluggable dependencies
+### ADR-015 — Ports only for genuinely pluggable dependencies *(amended in 006)*
 `IMarketDataProvider` and `IAiProvider` declared in the core, implemented in infrastructure.
 Concrete justification: four market sources already mapped (brapi, BCB, CoinGecko/Binance, Twelve Data) and an AI provider subject to change.
 *Criterion for new ports:* is there more than one real or foreseen implementation? If not, call directly.
+**Amendment (006).** The market-data port is two ports, not one: `IPriceProvider` (provider symbol → daily closes) and `IBenchmarkProvider` (series code → daily values), both in `Application/MarketData/`, replacing `IMarketDataProvider`. A close and a benchmark value are different shapes with different keys, and each adapter implements the port that fits. `IPriceProvider` has three implementations today (brapi, CoinGecko, Twelve Data), resolved by `IPriceProviderRegistry.For(ProviderKind)`. `IBenchmarkProvider` has one today, BCB SGS; it passes the criterion above on a *foreseen* second source — a benchmark such as USDBRL or IVVB11 served by brapi or Twelve Data instead of, or alongside, BCB.
 
 ### ADR-016 — No Repository over EF Core
 `DbContext` is already a Unit of Work and `DbSet<T>` is already a repository. A repository layer would forward calls, lose `IQueryable` composition and add no testability that integration tests with Postgres in a container do not already deliver.
