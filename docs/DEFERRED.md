@@ -2864,3 +2864,113 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
 - **009 · CP5a · counts.** .NET went from 919 to 943 (+24): 3 builder, 2 input queries, 9
   prompt, 9 job and 1 fake. All ran. Web and E2E were not rerun at 5a (there is no web
   change).
+
+## 009 · checkpoint 5b
+
+- **009 · CP5b · the ADR check found no conflict.** The endpoints (`Endpoints/AiEndpoints.cs`)
+  stay thin over `Application/Ai/AnalysisCommands`, and the reads go straight to
+  `AppDbContext` through the query filter (ADR-016, ADR-007). ADR-008 and ADR-010 are checked
+  at `POST`, before any row is written, and again by the gateway in the job. There is no
+  migration: `dotnet ef migrations has-pending-model-changes` reports none.
+- **009 · CP5b · `POST /api/ai/analyses { month }`.**
+  - **400** comes first, with a problem naming `month`. The month is missing or not
+    `YYYY-MM`: "Informe o mês no formato AAAA-MM." Or it is after the current month (UTC-3,
+    as the usage rows): "Não é possível analisar um mês que ainda não começou." **The
+    current month is allowed**, although it is partial.
+  - **403** (AI off) and **402** (budget) come next, through `Problems.Ai`, before any row
+    or call. The budget is the **current** month's spend, since the call happens now,
+    whatever month is analysed.
+  - Then **202 `{ analysisId }`**, with `Location: /api/ai/analyses/{id}`.
+  - **409 while the month's row is `Pending` or `Running`** is not in the spec: "A análise
+    deste mês ainda está sendo gerada. Aguarde ela terminar para gerar outra." A second
+    click would otherwise pay twice for one month. A concurrent first request that loses the
+    unique index is a 409 too.
+  - **Regenerating (test 23)** resets the settled row in place. It keeps the row's id, sets
+    `Pending`, a new `CreatedAt` and the current prompt version, and clears `Content`,
+    `Error`, `StartedAt` and `CompletedAt`. **The old content is gone as soon as regenerate
+    is pressed**, not when the new one completes. **Pending human.**
+  - There is no rate limit. The budget bounds it (ADR-008), as with suggest.
+  - Spec-silent: the 400 is checked before the 403, where suggest checks the 403 first. No
+    id is involved here, so nothing leaks either way.
+- **009 · CP5b · the reads.**
+  - `GET /api/ai/analyses/{id}` answers 200, or **404 for another user's id** (filter,
+    test 14).
+  - `GET /api/ai/analyses?month=` answers the user's analyses, newest month first. `month`
+    is optional, and filters to that month (zero or one row). **Each item carries its
+    `content`**, the same shape as by id.
+  - `GET /api/ai/usage?month=` answers `{ month, spentBrl, budgetBrl, calls }`. `month` is
+    in the answer as well as the spec's three fields. It defaults to the current UTC-3
+    month.
+    - `calls` counts every usage row of the month, failed or not, categorisation and
+      analysis alike.
+    - `spentBrl` is `BudgetGuard.SpentAsync`, the figure the cut-off uses.
+    - **It answers with AI off,** so `/settings` can show the spend beside the toggle.
+      Test 15's "403 on both endpoints" is read as suggest and `POST` analyses.
+  - A malformed `month` in either query is a 400 naming `month`.
+- **009 · CP5b · for the human: invented pt-BR copy.** These are the two 400 texts and the
+  409 text above.
+- **009 · CP5b · tests** (`AiAnalysisEndpointTests`, 14 cases, on the fake or a scripted
+  provider):
+  - Test 21: 202, `Location`, and `Completed` with the fake's content. The `Pending` row is
+    observed deterministically, held behind a running one: the job has one consumer.
+  - Test 22: `Failed` with `AiFailureText.ProviderFailed` and the call counted.
+  - Test 23: the replace, with one row remaining.
+  - Test 15's analysis half, and 16's: a 403 or 402 with no row, no call and no new usage.
+  - Tests 13 and 14: another user's list is empty, their usage is 0, and the id is a 404.
+  - Also: usage sums and counts, the list filter, the 409, and the 400s.
+
+  With 5a's tests, every analysis test in the spec (11–15 and 21–24) is present. No test
+  calls a real AI API. The two job-driven classes ran green three times in a row.
+- **009 · CP5b · commit sizes.** 8284dff (the endpoint tests) is 291 lines. c54d9ef (the
+  endpoints) is 188.
+- **009 · CP5b · counts.** .NET went from 943 to 957 (+14), so CP5 as a whole went from 919 to
+  957. Web stayed at 145 and E2E at 22. `verify.sh` and `verify-e2e.sh` were both green on
+  the first run. The flaky 006 test did not fail this time. The E2E API ran with the sweep
+  on, on its own database, and logged no error from the job.
+- **009 · CP5b · handoff to CP6** (web: the `/settings` toggle, disclosure and spend; "Sugerir
+  com IA"; the "Análise do mês" card; tests 25–27). The wire shapes:
+  - **`POST /api/ai/analyses`**. The body is `{ "month": "YYYY-MM" }`, sent with the Origin
+    header like every write. The answers:
+    - `202 { "analysisId": "<uuid>" }`, with `Location: /api/ai/analyses/<uuid>`.
+    - `400`: a validation problem, `errors.month[0]` in pt-BR.
+    - `403` or `402`: a problem whose `title` and `detail` are pt-BR.
+    - `409`: a problem, the month already in progress.
+    - `401` when signed out.
+
+    Render any problem's `detail` verbatim.
+  - **`GET /api/ai/analyses/{id}`**. It answers `200` with:
+    ```
+    { "id": "<uuid>", "month": "YYYY-MM",
+      "status": "Pending" | "Running" | "Completed" | "Failed",
+      "content": string | null,   // markdown from the provider, only when Completed: untrusted, escape it (test 27)
+      "error": string | null,     // pt-BR, only when Failed: render verbatim
+      "promptVersion": string,
+      "createdAt": ISO, "startedAt": ISO | null, "completedAt": ISO | null }
+    ```
+    It answers `404` for an unknown or another user's id.
+  - **`GET /api/ai/analyses?month=YYYY-MM`** answers `200 [ …same shape… ]`, newest first. A
+    month gives zero or one item. A bad month is a `400`.
+  - **`GET /api/ai/usage?month=YYYY-MM`** answers
+    `200 { "month": "YYYY-MM", "spentBrl": number, "budgetBrl": number, "calls": number }`.
+    `month` is optional and defaults to the current month. `spentBrl` has up to 4 places, so
+    round for display. It answers even with AI off.
+  - **The card** reads the dashboard's month and calls `GET /api/ai/analyses?month=`:
+    - With no item, it offers "Gerar análise". The button is disabled, with a reason, when
+      `me.aiEnabled` is false.
+    - For `Pending` or `Running`, it shows a spinner and polls `GET /{id}` every 3 s. It
+      stops on `Completed` or `Failed`.
+    - For `Completed`, it renders `content` as escaped markdown.
+    - For `Failed`, it shows `error`.
+    - "Regenerar" is the same `POST` with the same month. It answers `202` with the **same
+      id**, and the row goes back to `Pending` with its content cleared.
+    - A future month is refused with a `400`. Hide the button for one.
+  - **Labels.** The status values are identifiers. Map them in `labels.ts` if they are shown.
+  - **E2E 29 on the fake.** The content starts with `## Resumo`, holds all five headings and
+    quotes the month and its expense from the input.
+  - **The disclosure (decision 10)** must say that categorisation sends normalized
+    descriptions, each row's debit or credit and the category names (CP4). The analysis
+    sends account names, types and balances, category names and totals for three months,
+    the top 20 expense merchants as normalized descriptions (a PIX to a person names them),
+    and the portfolio's three totals. Neither sends a raw description, a date or an income
+    description, and categorisation sends no amounts. The provider is the configured one
+    (Anthropic by default).
