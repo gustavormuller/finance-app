@@ -24,7 +24,7 @@ public static class DecimalMath
 
     /// <summary>
     /// e raised to <paramref name="x"/>. Throws <see cref="OverflowException"/> past
-    /// <see cref="decimal.MaxValue"/>; an argument below −66.5 underflows to zero.
+    /// <see cref="decimal.MaxValue"/>; an argument below -66.5 underflows to zero.
     /// </summary>
     public static decimal Exp(decimal x)
     {
@@ -112,7 +112,7 @@ public static class DecimalMath
     /// <summary>
     /// <paramref name="value"/> raised to <paramref name="exponent"/>. A whole exponent
     /// is repeated multiplication, exact where the type can hold the result; any other is
-    /// <c>exp(exponent × ln value)</c> and needs a value that is not negative.
+    /// <c>exp(exponent * ln value)</c> and needs a value that is not negative.
     /// </summary>
     public static decimal Pow(decimal value, decimal exponent)
     {

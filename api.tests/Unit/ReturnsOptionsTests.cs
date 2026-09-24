@@ -1,4 +1,4 @@
-using Finance.Api.Application.MarketData;
+﻿using Finance.Api.Application.MarketData;
 using Finance.Api.Application.Returns;
 using Finance.Api.Domain.Returns;
 using Microsoft.Extensions.Configuration;
