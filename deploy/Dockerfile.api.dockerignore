@@ -1,0 +1,11 @@
+# Only what the API build reads. BuildKit uses this file for Dockerfile.api in place
+# of a .dockerignore at the context root.
+*
+!global.json
+!Directory.Build.props
+!.editorconfig
+!api/
+api/bin/
+api/obj/
+api/.keys/
+api/appsettings.Local.json

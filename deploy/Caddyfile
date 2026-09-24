@@ -1,0 +1,27 @@
+{
+	# cloudflared, on the compose network, forwards Cloudflare's X-Forwarded-Proto
+	# (https) and X-Forwarded-For. Caddy passes them on only from a trusted peer;
+	# otherwise it overwrites the scheme with its own plain http, and the API builds an
+	# http:// Google redirect_uri. Nothing outside the Docker network reaches Caddy.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# TLS ends at the Cloudflare edge; Caddy serves plain HTTP on the private network.
+# No timeouts are set: Caddy's proxy has none by default, so a slow "Sugerir com IA"
+# (several 30 s batches) is bounded by Cloudflare's 100 s, not here.
+:80 {
+	encode gzip
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+	handle /health {
+		reverse_proxy api:8080
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

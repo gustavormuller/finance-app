@@ -41,3 +41,6 @@ Thumbs.db
 .claude/settings.local.json
 
 .keys/
+
+# Deploy: the Vite build Caddy serves (deploy.sh writes it)
+deploy/webdist/
