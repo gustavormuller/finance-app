@@ -136,6 +136,7 @@ app.MapCsvTemplateEndpoints();
 app.MapDashboardEndpoints();
 app.MapMarketDataEndpoints();
 app.MapInvestmentEndpoints();
+app.MapReturnsEndpoints();
 
 app.Run();
 
