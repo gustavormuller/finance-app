@@ -1,9 +1,13 @@
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
+import type { BreakdownKind } from '@/api/finance';
 import Alert from '@/components/Alert';
 import Balances from '@/components/dashboard/Balances';
+import CategoryBreakdown from '@/components/dashboard/CategoryBreakdown';
+import MonthlyChart from '@/components/dashboard/MonthlyChart';
 import MonthTotals from '@/components/dashboard/MonthTotals';
+import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import { useMonthly, useSummary } from '@/components/dashboard/queries';
 import { currentMonth } from '@/lib/months';
 
@@ -16,6 +20,7 @@ export default function DashboardPage() {
   // Read once per visit: a page left open across midnight on the 1st keeps its month.
   const [today] = useState(currentMonth);
   const [month, setMonth] = useState(today);
+  const [kind, setKind] = useState<BreakdownKind>('Expense');
 
   const summary = useSummary(month);
   const monthly = useMonthly(today);
@@ -69,6 +74,9 @@ export default function DashboardPage() {
       <div className="grid gap-10">
         <Balances summary={summary.data} />
         <MonthTotals month={month} latest={today} totals={summary.data.month} onMonth={setMonth} />
+        <MonthlyChart series={monthly.data} />
+        <CategoryBreakdown month={month} kind={kind} onKind={setKind} />
+        <RecentTransactions />
       </div>
     </Page>
   );
