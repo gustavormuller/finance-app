@@ -4,7 +4,8 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { api, type Position } from '@/api/finance';
 import Alert from '@/components/Alert';
 import Movements from '@/components/investments/Movements';
-import { INVESTMENTS, usePositions } from '@/components/investments/queries';
+import { INVESTMENTS, useDaily, usePositions } from '@/components/investments/queries';
+import ValueChart from '@/components/investments/ValueChart';
 import { Button } from '@/components/ui/button';
 import { formatDate, marketAssetClassLabels } from '@/lib/labels';
 import { formatMoney, formatPercent, formatQuantity, formatSignedMoney, formatUnitPrice } from '@/lib/money';
@@ -59,11 +60,23 @@ export default function AssetPage() {
       {position && (
         <>
           <Summary position={position} />
+          <History assetId={assetId} />
           <Movements assetId={assetId} currency={position.currency} />
         </>
       )}
     </section>
   );
+}
+
+/** The daily series; refreshed with the rest of `['investments']` after every write. */
+function History({ assetId }: { assetId: string }) {
+  const daily = useDaily(assetId);
+
+  if (daily.isError) {
+    return <Alert>Não foi possível carregar o histórico de valor.</Alert>;
+  }
+
+  return daily.data ? <ValueChart rows={daily.data} /> : null;
 }
 
 function Summary({ position }: { position: Position }) {
