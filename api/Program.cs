@@ -67,6 +67,9 @@ Require(
     "the directory holding the Data Protection key ring; without one, every restart "
     + "invalidates every session");
 
+// The E2E run's network-free market-data providers never reach another environment.
+MarketDataSetup.RefuseFakeProvidersOutsideDevelopment(app.Configuration, app.Environment);
+
 var appOrigin = app.Configuration[ConfigurationKeys.AppOrigin]!;
 
 void Require(string key, string purpose)

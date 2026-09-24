@@ -18,6 +18,13 @@ public sealed class MarketDataOptions
     /// </summary>
     public bool ScheduledSync { get; set; }
 
+    /// <summary>
+    /// E2E only: fixed, network-free providers in place of the real ones, and no
+    /// ten-minute window between manual syncs, because the E2E database is shared and
+    /// kept between runs. Refused at boot outside Development.
+    /// </summary>
+    public bool FakeProviders { get; set; }
+
     /// <summary>How far back the first sync of an asset or series reaches.</summary>
     public int BackfillYears { get; set; }
 

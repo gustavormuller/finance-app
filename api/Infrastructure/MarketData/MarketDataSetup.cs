@@ -23,13 +23,35 @@ public static class MarketDataSetup
         services.AddPriceProvider<BrapiProvider>();
         services.AddPriceProvider<CoinGeckoProvider>();
         services.AddPriceProvider<TwelveDataProvider>();
-        services.AddTransient<IPriceProviderRegistry, PriceProviderRegistry>();
+        services.AddTransient<IPriceProviderRegistry>(provider => FakesOn(provider)
+            ? FakeMarketDataProviders.Registry
+            : new PriceProviderRegistry(provider.GetServices<IPriceProvider>()));
 
         services.AddHttpClient<BcbSgsProvider>().WithResilience();
-        services.AddTransient<IBenchmarkProvider>(provider => provider.GetRequiredService<BcbSgsProvider>());
+        services.AddTransient<IBenchmarkProvider>(provider => FakesOn(provider)
+            ? FakeMarketDataProviders.Benchmarks
+            : provider.GetRequiredService<BcbSgsProvider>());
 
         return services;
     }
+
+    /// <summary>
+    /// Fails the boot when <c>MarketData:FakeProviders</c> is on outside Development: the
+    /// fakes would write made-up closes into the shared catalogue's series.
+    /// </summary>
+    public static void RefuseFakeProvidersOutsideDevelopment(IConfiguration configuration, IHostEnvironment environment)
+    {
+        if (configuration.GetValue<bool>($"{MarketDataOptions.Section}:{nameof(MarketDataOptions.FakeProviders)}")
+            && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                "MarketData:FakeProviders is on in the " + environment.EnvironmentName + " environment. "
+                + "It exists for the E2E run and is refused outside Development.");
+        }
+    }
+
+    private static bool FakesOn(IServiceProvider provider) =>
+        provider.GetRequiredService<IOptions<MarketDataOptions>>().Value.FakeProviders;
 
     /// <summary>
     /// The sync, its nightly host and its manual trigger. The sync is scoped, like the

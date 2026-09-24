@@ -1,6 +1,7 @@
 using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.MarketData;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Finance.Api.Infrastructure.Jobs;
 
@@ -25,9 +26,17 @@ public sealed class ManualMarketDataSync(
     MarketDataSyncGate gate,
     TimeProvider clock,
     IHostApplicationLifetime lifetime,
+    IOptions<MarketDataOptions> options,
     ILogger<ManualMarketDataSync> logger)
 {
     public static readonly TimeSpan MinimumInterval = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// <see cref="MinimumInterval"/>, or zero under <c>MarketData:FakeProviders</c> (E2E,
+    /// Development only), where the database is shared and kept between runs. The gate
+    /// still keeps runs from overlapping.
+    /// </summary>
+    private TimeSpan Window => options.Value.FakeProviders ? TimeSpan.Zero : MinimumInterval;
 
     /// <summary>What a refusal suggests when the latest run started long ago but is still going.</summary>
     private static readonly TimeSpan BusyRetry = TimeSpan.FromMinutes(1);
@@ -45,7 +54,7 @@ public sealed class ManualMarketDataSync(
         try
         {
             var latest = await LatestStartAsync(db, cancellationToken);
-            if (latest is { } started && clock.GetUtcNow() - started < MinimumInterval)
+            if (latest is { } started && clock.GetUtcNow() - started < Window)
             {
                 gate.Release();
                 return Refused(latest);
@@ -90,7 +99,7 @@ public sealed class ManualMarketDataSync(
 
     private ManualSyncStart Refused(DateTimeOffset? latest)
     {
-        var retry = latest is { } started ? started + MinimumInterval - clock.GetUtcNow() : TimeSpan.Zero;
+        var retry = latest is { } started ? started + Window - clock.GetUtcNow() : TimeSpan.Zero;
         return new ManualSyncStart(null, retry > TimeSpan.Zero ? retry : BusyRetry);
     }
 
