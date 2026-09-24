@@ -12,9 +12,10 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- 006 provider fixtures, read by the provider tests from the output directory. -->
+  <!-- 006 provider fixtures and 011 spreadsheets, read by the tests from the output directory. -->
   <ItemGroup>
     <None Include="Fixtures/**/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/**/*.xls*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

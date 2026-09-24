@@ -75,17 +75,27 @@ public static class CsvStatementParser
         return best;
     }
 
-    public static CsvTable Parse(string text, char delimiter, bool hasHeader)
-    {
-        var records = ReadAll(text, delimiter);
+    public static CsvTable Parse(string text, char delimiter, bool hasHeader) =>
+        FromRows(ReadAll(text, delimiter), hasHeader);
 
+    /// <summary>
+    /// The table election on rows that are already split into fields — a CSV's, or a
+    /// spreadsheet's (spec 011, decision 4). Blank rows must already be left out.
+    /// </summary>
+    /// <param name="padShortRows">
+    /// A spreadsheet's: its rows come with trailing empty cells dropped, so a title above
+    /// the table is narrow, as in a CSV; below the table's start a short row is a row
+    /// whose last cells are empty, not a ragged record.
+    /// </param>
+    public static CsvTable FromRows(IReadOnlyList<(int RowNumber, string[] Fields)> records, bool hasHeader, bool padShortRows = false)
+    {
         if (records.Count == 0)
         {
             return CsvTable.Empty;
         }
 
         var columnCount = ModalFieldCount(records);
-        var tableStart = records.FindIndex(record => Fits(record.Fields, columnCount));
+        var tableStart = records.ToList().FindIndex(record => Fits(record.Fields, columnCount));
 
         if (tableStart < 0)
         {
@@ -99,7 +109,9 @@ public static class CsvStatementParser
             .Skip(firstData)
             .Select(record => Fits(record.Fields, columnCount)
                 ? new CsvRecord(record.RowNumber, Fit(record.Fields, columnCount), null)
-                : new CsvRecord(record.RowNumber, record.Fields, RowIssues.RaggedRow(record.Fields.Length, columnCount)))
+                : padShortRows && record.Fields.Length < columnCount
+                    ? new CsvRecord(record.RowNumber, [.. record.Fields, .. Enumerable.Repeat("", columnCount - record.Fields.Length)], null)
+                    : new CsvRecord(record.RowNumber, record.Fields, RowIssues.RaggedRow(record.Fields.Length, columnCount)))
             .ToList();
 
         return new CsvTable(headers, data, columnCount, tableStart);
@@ -148,7 +160,7 @@ public static class CsvStatementParser
     /// wider exists: a title line above a table is not a vote for one-column files.
     /// Ties go to the wider table.
     /// </summary>
-    private static int ModalFieldCount(List<(int RowNumber, string[] Fields)> records)
+    private static int ModalFieldCount(IReadOnlyList<(int RowNumber, string[] Fields)> records)
     {
         var spans = records
             .Select(record => (Min: TrimmedWidth(record.Fields), Max: record.Fields.Length))

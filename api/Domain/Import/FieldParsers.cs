@@ -72,6 +72,21 @@ public static class AmountParser
     }
 
     /// <summary>
+    /// The inverse of <see cref="TryParse"/>: every digit of <paramref name="amount"/>,
+    /// the culture's decimal separator and no grouping, so it parses back to exactly
+    /// the same value. How a spreadsheet's number cell enters the CSV path (spec 011).
+    /// </summary>
+    public static string Format(decimal amount, string culture)
+    {
+        if (!Formats.TryGetValue(culture, out var format))
+        {
+            throw new ArgumentException($"'{culture}' is not a supported culture.", nameof(culture));
+        }
+
+        return amount.ToString("0.############################", format);
+    }
+
+    /// <summary>
     /// <see cref="decimal.TryParse(string, NumberStyles, IFormatProvider, out decimal)"/>
     /// skips a group separator wherever it appears in the integer part, so under
     /// <c>pt-BR</c> an American <c>-58.00</c> would become <c>-5800</c>. A separator is
