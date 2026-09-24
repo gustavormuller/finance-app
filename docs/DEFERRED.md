@@ -1025,3 +1025,179 @@ rebuild after the sync (tests 18, 25–27).
     at once is: register or add PETR4, run a manual sync, then post a buy dated today or
     yesterday. A buy posted before any close gets rows after the next sync or a `POST
     /rebuild`.
+
+## 007 · checkpoint 4
+
+- **007 · CP4 · no ADR conflict, no API change, no migration.** The screens read the CP3
+  routes as they are. The client is hand-written in `web/src/api/finance.ts` (ADR-002's
+  trade-off). No figure is totalled in the browser. The one calculation in the browser is
+  the form's preview, which is exact (see below).
+- **007 · CP4 · navigation.** The spec says "Route `/investments`, in the nav", so it is
+  linked as "Investimentos", between Importar and Contas. The detail page is
+  `/investments/$assetId`. Both are under the protected layout.
+- **007 · CP4 · for the human: positions at zero are hidden by default.** The spec does not
+  say whether to hide them. E2E 33 ("delete the buy → position disappears") holds only if
+  they are hidden. This covers both kinds of zero: an asset with no movement yet, and a
+  position sold down to zero.
+  - A checkbox, "Mostrar ativos sem posição (N)", shows them. It appears only when N > 0.
+  - Adding an asset opens its detail page straight away, so a new asset with nothing
+    recorded is always reachable.
+  - "Nenhum ativo na carteira ainda." (nothing held) is a different message from
+    "Nenhuma posição em aberto." (everything closed).
+  - Hiding by `quantity === 0` is the only test available: the position shape does not say
+    whether an asset has movements.
+- **007 · CP4 · for the human: stale price.** The spec says "older than 3 business days".
+  I read that as more than 3 weekdays in `(priceDate, today]`, where today is the
+  browser's local date (`lib/money.ts`, `isStalePrice`).
+  - Holidays are not known, so they count as business days. After a long holiday (for
+    example Carnival Monday and Tuesday), a Friday close is flagged on Thursday although
+    it is only 2 trading days old.
+  - The flag is "Cotação desatualizada", with a `title` that explains it. It is shown
+    only where there is a price.
+- **007 · CP4 · the total row is `GET /summary`**, not a sum of the rows. It has no
+  percentage, because that would be arithmetic on money in the browser and the spec does
+  not ask for one.
+- **007 · CP4 · money formats (`lib/money.ts`).**
+  - Every BRL figure is `Intl` pt-BR currency, e.g. `R$ 3.510,00`.
+  - Gains and losses carry a sign: `+R$ 297,66`, `-R$ 12,00`, `+9,27%`.
+  - Price and average cost are shown in the asset's own currency (USD as `US$`), with at
+    least 2 and at most 8 decimal places. Value, result and income are shown in BRL.
+  - Quantities have up to 8 decimal places.
+- **007 · CP4 · the live total is exact.** CLAUDE.md says money is never `float`. The
+  browser has no `decimal`, so `lib/decimal.ts` reads the typed figures into a `bigint` at
+  8 places. It multiplies at 16 places and rounds once to the cent, half to even, as
+  `Money` does.
+  - Buy: `q × p + fees`, labelled "Custo total".
+  - Sell: `q × p − fees` (decision 5), "Valor líquido da venda".
+  - Dividend and Jcp: `amount − fees` (CP2's rule), "Valor líquido recebido".
+  - Split: no total.
+  - The input accepts a comma or a dot as the decimal separator. When a comma is present,
+    dots are read as thousands separators.
+- **007 · CP4 · for the human: precision on the wire.** The form sends JSON numbers, which
+  are float64. They are exact up to 15 significant digits; the columns hold 18. A value
+  such as `1234567890,12345678` would be rounded in the browser before the API sees it.
+  Fixing it means sending strings, which needs `AllowReadingFromString` on the API's JSON
+  options. I did not do that here. The same limit already applies to 003's amounts.
+- **007 · CP4 · fields shown by kind.** Dividend and Jcp show "Valor recebido" instead of
+  quantity and price (spec). **Split shows only the quantity.** Its price is 0 by decision
+  3, and the calculator ignores its fees (CP2). The spec names only the Dividend/Jcp rule,
+  so this one is mine. Hidden fields are sent as 0, which the API stores anyway. `currency`
+  is omitted, so the API uses the asset's.
+- **007 · CP4 · the form does no validation of its own.** The API's messages are the spec's
+  table:
+  - A 400 is shown under the field it names.
+  - A message for a field the form does not render (`currency`) goes in an alert inside
+    the form.
+  - An unreadable number is sent as 0, so the user sees the API's "Quantidade deve ser
+    positiva" rather than "not a number". That is the one mismatch, and it is acceptable.
+  - A 409 on a movement delete (it would uncover a later sell) is shown as sent, in an
+    alert. Deleting has no confirmation step, the same as the transactions list.
+- **007 · CP4 · add asset.**
+  - The search runs on submit. Results are listed only after a search, not the first 50
+    as `/market-data` lists them.
+  - "Adicionar" posts `{ marketAssetId }`. "Cadastrar novo ativo" opens 006's
+    registration fields and posts that body to `POST /api/investments/assets`.
+  - A 400 on a registration is shown under its field. A 409 ("já possui", or 006's
+    duplicate symbol) is shown verbatim.
+  - There is no "already held" marker, because the position shape carries no
+    `marketAssetId`. The 409 says so instead.
+  - There is no nickname input. The API accepts one, and the screens show it in place of
+    the name when it is set.
+  - 006's registration fields were extracted into
+    `components/market-data/RegistrationFields.tsx` and `registration.ts` (refactor
+    `41febf5`, with the 006 tests unchanged and green), plus a shared
+    `components/FormField.tsx`. Nothing was copied.
+- **007 · CP4 · asset detail.**
+  - The asset comes from the positions list: the API has no `GET /assets/{id}`, and the
+    list has every figure the page shows. An id that is not the user's shows "Ativo não
+    encontrado.".
+  - The summary shows quantity, average cost, price and date, value, result, realised
+    result and dividends ("Proventos").
+  - "Remover ativo" is always offered. The API's 409 (the asset has movements) is shown
+    verbatim.
+  - The chart is one series of `ValueBrl` from `GET daily` with no range (every row, about
+    1,500 a year). It is 2 px, with no legend, a crosshair tooltip, and a visually hidden
+    table of month-end values. It reuses the dashboard's blue `--chart-income` token; a
+    neutral `--chart-series` token would read better, but that is cosmetic.
+  - All 007 queries sit under `['investments']`, and one invalidation after each write
+    refreshes the positions, summary, movements and series.
+- **007 · CP4 · invented pt-BR copy, for review.**
+  - Section and field names: "Investimentos", "Adicionar ativo", "Buscar no catálogo",
+    "Cadastrar novo ativo", "Cadastrar e adicionar", "Nova movimentação", "Registrar
+    movimentação", "Salvar movimentação", "Valor recebido", "Taxas", "Preço unitário",
+    "Remover ativo", "Proventos", "Resultado realizado", "Valor ao longo do tempo".
+  - Messages and flags: "Cotação desatualizada", "Sem cotação", "Mostrar ativos sem
+    posição (N)", "Nenhum ativo na carteira ainda.", "Nenhuma posição em aberto.",
+    "Nenhuma movimentação registrada.", "Sem histórico de valor ainda.", "Nenhum ativo
+    corresponde a esta busca. Cadastre-o abaixo.", "Ativo não encontrado.".
+  - Kind labels: Compra, Venda, Dividendo, JCP, Desdobramento.
+- **007 · CP4 · tests.**
+  - Web test 28 and 29 are `components/investments/MovementForm.test.tsx`.
+  - Web test 30 is `routes/InvestmentsPage.test.tsx` ("flags a price older than three
+    business days"), plus the rule itself in `lib/money.test.ts`. The date is frozen with
+    `vi.useFakeTimers({ toFake: ['Date'] })`.
+  - The page tests run through the real route tree: the nav link, zero positions hidden,
+    add asset and navigation, and `AssetPage.test.tsx` (add, edit, delete, 400 and 409,
+    chart, removal).
+  - Every test commit failed before its feat commit.
+  - Two test files had a literal no-break space in a regex, which lint rejected. It was
+    fixed in the next feat commit.
+  - Counts: .NET 611, web 76 → 115, E2E 18.
+- **007 · CP4 · diff sizes.**
+  - `268f3cc` (the detail tests) is 207 lines.
+  - Two feat commits went over and were split before handoff (`f1b219b`/`241a401` and
+    `354073c`/`9836b9d`), and so was the detail page (`46c0833`/`500f2a4`).
+  - Every other commit is under 200.
+- **007 · CP4 · the E2E path was tried once.** A throwaway Playwright spec (deleted, not
+  committed) ran 31–33's path against the real API under `verify-e2e.sh`, and passed
+  (19/19 that run):
+  1. Register PETR4 inline.
+  2. Manual sync.
+  3. Buy 100 @ 9,50 with fees 4,90: the preview reads R$ 954,90, and the position is
+     R$ 1.000,00 at the fake close of 10.
+  4. A dividend of 12.
+  5. Delete the dividend, then the buy.
+  6. `/investments` shows "Nenhuma posição em aberto." and no row.
+- **007 · CP4 · handoff to CP5** (E2E 31–33, then the 007 handoff).
+  - **The path that works** (see the probe above):
+    - `devLogin`, then `/investments`, then "Cadastrar novo ativo". In the form named
+      "Cadastrar e adicionar ativo", fill Ticker `PETR4`, `getByLabel('Provedor', { exact:
+      true })` Brapi, and "Símbolo no provedor" `PETR4`. Class and currency default to
+      StockBr and BRL. Click "Cadastrar e adicionar"; the heading `PETR4` appears.
+    - PETR4 is in the shared catalogue after the first run. The registration reuses the
+      Brapi/PETR4 entry and does not answer 409, so reruns are safe. Each test brings its
+      own user.
+    - **Sync before the buy.** The fake close (10) is dated yesterday (UTC). A buy posted
+      before any close has no rows until the next sync. I posted the sync from the page
+      (`fetch('/api/market-data/sync', …)`) and polled `/api/market-data/sync-runs` until
+      the run left `Running`.
+  - **Sync gate: race with test 26.** Under `fullyParallel`, a sync started by the
+    investments spec can overlap `market-data.spec.ts`'s test 26. The gate refuses a
+    second run while one is going (429), and test 26 asserts a 202. Serialise them (for
+    example one `test.describe.configure({ mode: 'serial' })` file, or retry on 429 in the
+    new spec only), or seed a close another way. I did not hit the race in two runs, but
+    it is real.
+  - **Locators:**
+    - `position-<assetId>` for a row on the list.
+    - `asset-summary` for the detail figures ("Quantidade", "Proventos").
+    - `movement-<id>` for a movement row, with "Editar" and "Excluir".
+    - `movement-total` for the preview.
+    - The movement form is `getByRole('form', { name: 'Movimentação' })`, with fields
+      "Tipo", "Data", "Quantidade", "Preço unitário", "Valor recebido", "Taxas" and
+      "Observações (opcional)".
+  - **32:** Proventos goes from R$ 0,00 to the amount, and Quantidade stays 100.
+  - **33:** I deleted the dividend first. Deleting only the buy, with a dividend left,
+    should also hide the row: quantity 0, and the rules allow income on a zero position.
+    That is untested, so check it.
+  - Then write `docs/handoffs/007.md` in the shape of `006.md`, and add the `## 007 ·
+    handoff` entry and the STATUS rows. Carry the "for the human" items from CP1–CP4:
+    - ARCHITECTURE's stale Investments block.
+    - Rounding against a broker (manual step 2).
+    - USD realised and dividends at each event's FX.
+    - The 409 on a delete that uncovers a sell.
+    - The rebuild after manual syncs and from before yesterday.
+    - Zero positions hidden.
+    - The stale-price reading.
+    - The Split fields.
+    - float64 on the wire.
+    - All invented pt-BR copy.
