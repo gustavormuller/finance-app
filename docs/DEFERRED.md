@@ -3091,3 +3091,95 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
     `R$ 1290.46` for `extrato.ofx`, when the fixture's dates fall in the current month. Allow a few seconds: the card polls every 3 s.
   - The throwaway spec above did both flows in about 3 s on the fake, and needs no timing
     change. The `Regenerar` button, in the same card, is a cheap extra.
+
+## 009 · checkpoint 7
+
+- **009 · CP7 · no ADR conflict, no API change, no migration.** One web fix, found by the
+  E2E. No test calls a real AI API: the E2E API runs on `Ai:FakeProvider` (Development only).
+- **009 · CP7 · tests 28 and 29, `web/e2e/ai.spec.ts`,** in the `chromium` project. Neither
+  syncs market data, so the `market-data` → `investments` → `returns` chain is unchanged.
+  - **Each test signs in as a new user** and turns AI on through the real switch on
+    `/settings`, reached by the nav link. Nothing is shared between tests or runs, so there
+    is no state to put back and no marker is needed. AI stays on for that throwaway user.
+  - **Test 28:** it uploads `extrato.ofx` and checks that row 1 is on "Outros" with no AI
+    marker. Then it presses "Sugerir com IA". It expects "3 categorias sugeridas pela IA.",
+    three markers, row 1 on "Alimentação" and the credit on "Salário". `/settings` then
+    shows "1 chamada".
+  - **Test 29:** it commits `extrato.ofx` and **pages the dashboard back to September
+    2026**, the fixture's month. The number of clicks comes from the browser's own clock, the
+    one the selector opens on. It presses "Gerar análise" and waits up to 15 s for the
+    content. It expects the five headings, "Análise de teste de 2026-09" and "R$ 1290.46"
+    (55,90 + 1.234,56). "Regenerar" is enabled.
+  - **Date independence, checked.** A throwaway copy (not committed) ran with the browser
+    clock fixed at 15 March 2027. It went six months back and passed. The fixture month is in
+    the past, so the server never refuses it as a future month. Before September 2026 the
+    test fails on purpose.
+  - **Not asserted:** `analysis-progress`. On the fake the row settles in milliseconds, so
+    the spinner may never render.
+  - **Not added:** the `GARBAGE` case. Integration test 20 covers it.
+- **009 · CP7 · test-first.** Test 29 passed on the first run. **Test 28 failed:** the
+  switch's `check()` reported "Clicking the checkbox did not change its state". The page
+  snapshot a moment later showed it on. That is a real bug, below. The tests were committed
+  red (62a2873).
+- **009 · CP7 · the switch went back to off for one tick after a click (fixed).** CP6 made it
+  show `toggle.variables` while `toggle.isPending`. TanStack Query delivers the pending state
+  on its next tick. In between, the controlled checkbox re-rendered from `me`, unchecked.
+  CP6's unit test used `userEvent`, whose awaits let that tick pass, so it was green.
+  - A new unit test in `SettingsPage.test.tsx` asserts the switch is checked synchronously
+    after `fireEvent.click`. It failed, then passed with the fix.
+  - The fix (0b50936): the state being saved is the page's own `useState`, set in the change
+    handler and cleared `onSettled`. A refusal still puts the switch back (CP6's test).
+- **009 · CP7 · runs.**
+  - `verify.sh`: the flaky 006 test
+    (`MarketDataFakeProvidersTests…can_run_again_at_once`, 429) failed once, 956/957. The
+    rerun was green with no change.
+  - `verify-e2e.sh`: green twice back to back after the fix, 24/24 each, against the kept
+    database.
+- **009 · CP7 · counts.** .NET stayed at 957. Web went from 172 to 173. E2E went from 22 to 24.
+- **009 · CP7 · commit sizes.** Each is under ~200 lines. The largest is 62a2873 (the tests),
+  at 142. The handoff document (089b39c) is one file, left whole, as 007's and 008's were.
+
+## 009 · handoff
+
+Full handoff: `docs/handoffs/009.md`. **009 is complete in code (tests 1–29 present); these
+need a human.** Nothing has called a real AI API yet.
+
+- **Provider keys:** `Ai__Anthropic__ApiKey`, and OpenAI's only if switching. No OpenAI
+  model or price is configured (CP2, CP3).
+- **Fixture capture:** the six files in `api.tests/Fixtures/Ai/` against the real APIs. The
+  OpenAI error `type`s in the tests are my reading of the docs (CP3).
+- **Model ids and prices:** `claude-haiku-4-5` (USD 1 / 5) and `claude-opus-5` (USD 5 / 25),
+  confirmed by you in CP3. Check them against the console when capturing.
+- **`Ai:UsdBrl` 5.40** is an assumed fallback rate (CP2).
+- **pt-BR copy review:** the problem texts (CP4b), the job's errors (CP5a), the 400s and 409
+  (CP5b), and the screens and labels (CP6).
+- **The disclosure review:** read `/settings` as a family member (manual step 2). It is
+  hand-written against CP4a's and CP5a's requests.
+- **The prompts:** review `Prompts/monthly-analysis.md` (v1) and `AiCategorisation.System`
+  like code.
+- **Manual steps 1–7** with a real key and a budget of R$ 1,00. **Step 4 decides:** no
+  number may be invented. Step 3 also checks suggest's timeouts through Caddy (CP4a).
+- **ADR-003's wording (flag, not edited).** The ADR says the sweep re-enqueues on startup.
+  It runs **at startup and every 5 minutes**, and it fails a stale `Running` row instead of
+  re-running it (CP5a). Amend the sentence, or say to cut the sweep back.
+- **ARCHITECTURE.md is stale (flag, not edited, from CP1):** the scheduled monthly analysis
+  (stack table, §5 jobs, AI module, Phase 5), the categorisation cache by normalized
+  description, `categorize-batch` as a job, principle 6, `Domain/Analysis/`, and the
+  environment block (no `BaseUrl` or timeouts).
+- **Decisions to confirm or overturn** (all spec-silent, listed in the handoff):
+  - Gates and money: the UTC-3 month, the 4-characters-a-token estimate, the gateway's own
+    `ai_enabled` check, and no rate limits (CP2, CP4b, CP5b).
+  - Providers: no retries, failure on truncation, the 120 s analysis timeout, and 4xx
+    billed 0 (CP3).
+  - Categorisation: GUID ids against short aliases, batches of 40 in sequence, Transfer on
+    either sign, `suggested` counts, and 502 (CP4a, CP4b).
+  - Analysis: the input's shape with current balances, PIX names, `MaxTokens` 8000, one
+    consumer, the 409, regenerate clearing at once, and the current month allowed (CP5a,
+    CP5b).
+  - Web: polling the list, disabled buttons with no link, "Regenerar" on `Failed`, the
+    provider named as either, and the spend's month (CP6).
+- **Starting spec 010.** Read `specs/010-deploy.md`, `docs/handoffs/009.md` ("Starting spec
+  010") and the 009 entries above. The baseline is .NET 957, web 173, E2E 24.
+  - The production `.env` needs the AI key, and no fake switch.
+  - The prompt is embedded, so publish carries it.
+  - Check suggest's multi-batch requests against Caddy's and Cloudflare's timeouts.
