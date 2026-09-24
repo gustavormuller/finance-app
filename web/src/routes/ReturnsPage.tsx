@@ -2,6 +2,8 @@ import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import type { ReturnsQuery } from '@/api/finance';
+import { usePositions } from '@/components/investments/queries';
+import AssetReturnsTable from '@/components/returns/AssetReturnsTable';
 import { usePortfolioReturns } from '@/components/returns/queries';
 import ReturnsReport from '@/components/returns/ReturnsReport';
 
@@ -12,6 +14,7 @@ import ReturnsReport from '@/components/returns/ReturnsReport';
 export default function ReturnsPage() {
   const [query, setQuery] = useState<ReturnsQuery>({ period: 'inception' });
   const returns = usePortfolioReturns(query);
+  const positions = usePositions();
 
   return (
     <section className="mx-auto grid max-w-5xl gap-8 px-4 py-8">
@@ -23,6 +26,8 @@ export default function ReturnsPage() {
       </div>
 
       <ReturnsReport query={query} onQuery={setQuery} returns={returns} />
+
+      {returns.data?.twr && positions.data && <AssetReturnsTable positions={positions.data} query={query} />}
     </section>
   );
 }
