@@ -16,15 +16,31 @@ public static class AiSetup
         services.AddScoped<AiPricing>();
         services.AddScoped<AiGateway>();
 
-        // A delegate, so resolving it is what fails, not the boot: no real adapter until CP3.
-        services.AddTransient<IAiProvider>(provider => throw new InvalidOperationException(
-            $"Ai:Provider '{provider.GetRequiredService<IOptions<AiOptions>>().Value.Provider}' has no adapter yet."));
+        // A delegate, so that without the switch resolving it is what fails, not the boot:
+        // the real adapters arrive in CP3.
+        services.AddTransient<IAiProvider>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<AiOptions>>().Value;
+            return options.FakeProvider
+                ? new FakeAiProvider()
+                : throw new InvalidOperationException($"Ai:Provider '{options.Provider}' has no adapter yet.");
+        });
 
         return services;
     }
 
     /// <summary>Fails the boot when <c>Ai:FakeProvider</c> is on outside Development.</summary>
+    /// <remarks>
+    /// Its usage rows are priced like real ones, but they say <c>fake</c>, and no real user
+    /// should ever get its canned text for their money.
+    /// </remarks>
     public static void RefuseFakeProviderOutsideDevelopment(IConfiguration configuration, IHostEnvironment environment)
     {
+        if (configuration.GetValue<bool>($"{AiOptions.Section}:{nameof(AiOptions.FakeProvider)}") && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                "Ai:FakeProvider is on in the " + environment.EnvironmentName + " environment. "
+                + "It exists for the E2E run and is refused outside Development.");
+        }
     }
 }

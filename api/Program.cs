@@ -87,6 +87,9 @@ Require(
 // The E2E run's network-free market-data providers never reach another environment.
 MarketDataSetup.RefuseFakeProvidersOutsideDevelopment(app.Configuration, app.Environment);
 
+// Likewise its canned AI provider.
+AiSetup.RefuseFakeProviderOutsideDevelopment(app.Configuration, app.Environment);
+
 // 009's models must each have a price, or a call would cost nothing against the budget.
 AiOptions.RefuseInvalid(app.Configuration);
 
