@@ -53,7 +53,8 @@ public static class ImportEndpoints
         Guid? CategoryId,
         StagedRowStatus Status,
         bool Included,
-        IReadOnlyList<string> Issues);
+        IReadOnlyList<string> Issues,
+        CategorySource CategorySource);
 
     private sealed record RowCounts(int Ready, int Duplicates, int Invalid, int Included);
 
@@ -389,6 +390,7 @@ public static class ImportEndpoints
             }
 
             row.CategoryId = categoryId;
+            row.CategorySource = CategorySource.User;
         }
 
         if (patch.Include is { } include)
@@ -470,5 +472,6 @@ public static class ImportEndpoints
         row.CategoryId,
         row.Status,
         row.Included,
-        row.Issues is null ? [] : JsonSerializer.Deserialize<List<string>>(row.Issues) ?? []);
+        row.Issues is null ? [] : JsonSerializer.Deserialize<List<string>>(row.Issues) ?? [],
+        row.CategorySource);
 }
