@@ -112,6 +112,12 @@ internal sealed class IdentityApiFactory(
     {
         builder.UseEnvironment(environment);
 
+        // No file watchers on appsettings and user secrets. Each watching host holds
+        // inotify instances, the suite boots hundreds of hosts, and Linux caps a user
+        // at 128 instances by default: past that, hosts fail to start with an
+        // IOException that looks like a flaky test. Nothing here edits config on disk.
+        builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
+
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
