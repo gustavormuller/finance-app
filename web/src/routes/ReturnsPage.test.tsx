@@ -10,7 +10,7 @@ import { stubFetch, type SeenRequest } from '@/test-utils';
 
 const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: false };
 
-const plain = (element: HTMLElement) => (element.textContent ?? '').replace(/ /g, ' ');
+const plain = (element: HTMLElement) => (element.textContent ?? '').replace(/\u00a0/g, ' ');
 
 /** Six months: the period's TWR, with XIRR and the timing effect a year's rate. */
 const halfYear: Returns = {
@@ -175,7 +175,7 @@ describe('ReturnsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'No ano' }));
 
-    expect(await screen.findByText(/\+33,10% no período/)).toBeInTheDocument();
+    await vi.waitFor(() => expect(plain(screen.getByTestId('headline-twr'))).toContain('+33,10% no período'));
     expect(returnsCalls(seen)).toEqual(['/api/returns/portfolio?period=inception', '/api/returns/portfolio?period=ytd']);
     expect(screen.getByRole('button', { name: 'No ano' })).toHaveAttribute('aria-pressed', 'true');
 
