@@ -142,6 +142,15 @@ describe('ReturnsPage', () => {
     expect(plain(twr)).not.toContain('10,43%');
     expect(plain(screen.getByTestId('headline-xirr'))).toContain('+8,31% a.a.');
     expect(plain(screen.getByTestId('returns-period'))).toContain('01/03/2026 a 31/08/2026');
+    expect(plain(screen.getByTestId('returns-period'))).toContain('184 dias');
+  });
+
+  /** Found by E2E 36's first real-browser run: a one-day period read "1 dias". */
+  it('writes a one-day period in the singular', async () => {
+    stubReturns(() => ({ body: { ...halfYear, period: { from: '2026-08-30', to: '2026-08-31', days: 1 } } }));
+    renderAt('/investments/returns');
+
+    expect(plain(await screen.findByTestId('returns-period'))).toBe('30/08/2026 a 31/08/2026 · 1 dia');
   });
 
   it('adds the annualised TWR past a year', async () => {
