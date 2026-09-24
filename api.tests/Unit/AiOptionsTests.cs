@@ -94,12 +94,50 @@ public sealed class AiOptionsTests
         Assert.Empty(AiOptions.Problems(options));
     }
 
+    [Fact]
+    public void Appsettings_binds_both_base_urls_and_a_30_second_categorisation_timeout()
+    {
+        var options = Bind();
+
+        Assert.Equal(
+            ("https://api.anthropic.com/", "https://api.openai.com/"),
+            (options.Anthropic.BaseUrl, options.OpenAi.BaseUrl));
+        Assert.Equal(30, options.Categorisation.TimeoutSeconds); // decision 4
+        Assert.True(options.Analysis.TimeoutSeconds >= options.Categorisation.TimeoutSeconds);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void A_timeout_that_is_not_positive_is_a_problem(int seconds)
+    {
+        var options = Sound();
+        options.Analysis.TimeoutSeconds = seconds;
+
+        Assert.Contains("Ai:Analysis:TimeoutSeconds", Assert.Single(AiOptions.Problems(options)));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("api.anthropic.com")]
+    [InlineData("ftp://api.anthropic.com/")]
+    [InlineData("https://api.anthropic.com/v1")]
+    public void A_base_url_that_is_not_absolute_http_ending_in_a_slash_is_a_problem(string url)
+    {
+        var options = Sound();
+        options.Anthropic.BaseUrl = url;
+
+        Assert.Contains("Ai:Anthropic:BaseUrl", Assert.Single(AiOptions.Problems(options)));
+    }
+
     internal static AiOptions Sound() => new()
     {
         Provider = "anthropic",
         MonthlyBudgetBrl = 15m,
-        Categorisation = { Model = "cheap" },
-        Analysis = { Model = "better" },
+        Categorisation = { Model = "cheap", TimeoutSeconds = 30 },
+        Analysis = { Model = "better", TimeoutSeconds = 120 },
+        Anthropic = { BaseUrl = "https://api.anthropic.com/" },
+        OpenAi = { BaseUrl = "https://api.openai.com/" },
         Pricing =
         {
             ["cheap"] = new AiModelPrice { InputPerMTokUsd = 1m, OutputPerMTokUsd = 5m },

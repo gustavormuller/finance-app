@@ -94,6 +94,8 @@ public sealed class AiOptions
 public sealed class AiTaskOptions
 {
     public string Model { get; set; } = "";
+
+    public int TimeoutSeconds { get; set; }
 }
 
 /// <summary>A model's list prices, in USD per million tokens. Money: <c>decimal</c>.</summary>
@@ -108,4 +110,6 @@ public sealed class AiModelPrice
 public sealed class AiKeyOptions
 {
     public string ApiKey { get; set; } = "";
+
+    public string BaseUrl { get; set; } = "";
 }
