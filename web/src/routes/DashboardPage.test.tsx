@@ -65,6 +65,8 @@ function stubApi(overrides: { summary?: DashboardSummary; monthly?: MonthTotals[
         return { body: url.searchParams.get('kind') === 'Income' ? incomes : expenses };
       case '/api/transactions':
         return { body: { items: [], page: 1, pageSize: 10, total: 0 } };
+      case '/api/ai/analyses':
+        return { body: [] };
       default:
         return undefined;
     }
@@ -172,5 +174,22 @@ describe('DashboardPage', () => {
 
     expect(await screen.findByTestId('total-balance')).toHaveTextContent('1.000,00');
     expect(screen.queryByTestId('dashboard-empty')).not.toBeInTheDocument();
+  });
+
+  /** 009: the "Análise do mês" card follows the month selector. */
+  it('shows the analysis card for the selected month', async () => {
+    const seen = stubApi();
+    renderDashboard();
+
+    const card = await screen.findByTestId('analysis-card');
+    expect(await within(card).findByText(/Nenhuma análise de setembro de 2026 ainda/)).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Mês anterior' }));
+
+    expect(await within(screen.getByTestId('analysis-card')).findByText(/Nenhuma análise de agosto de 2026 ainda/)).toBeInTheDocument();
+    expect(requestsTo(seen, '/api/ai/analyses').map((url) => url.searchParams.get('month'))).toEqual([
+      '2026-09',
+      '2026-08',
+    ]);
   });
 });
