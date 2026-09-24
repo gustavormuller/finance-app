@@ -46,11 +46,12 @@ public sealed class TwelveDataProviderTests
     }
 
     [Theory]
-    [InlineData("""{"code":404,"message":"**symbol** not found: XXXX. Please specify it correctly.","status":"error"}""")]
-    [InlineData("""{"code":400,"message":"No data is available on the specified dates. Try setting different start/end dates.","status":"error"}""")]
-    public async Task Unknown_symbol_or_no_data_in_the_range_is_empty(string body)
+    [InlineData(HttpStatusCode.OK, """{"code":404,"message":"**symbol** not found: XXXX. Please specify it correctly.","status":"error"}""")]
+    [InlineData(HttpStatusCode.OK, """{"code":400,"message":"No data is available on the specified dates. Try setting different start/end dates.","status":"error"}""")]
+    [InlineData(HttpStatusCode.BadRequest, """{"code":400,"message":"No data is available on the specified dates. Try setting different start/end dates.","status":"error"}""")]
+    public async Task Unknown_symbol_or_no_data_in_the_range_is_empty(HttpStatusCode status, string body)
     {
-        var handler = new FakeHttpHandler(HttpStatusCode.OK, body);
+        var handler = new FakeHttpHandler(status, body);
 
         Assert.Empty(await Provider(handler).GetDailyClosesAsync("XXXX", From, To, CancellationToken.None));
     }
