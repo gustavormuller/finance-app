@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import type { BreakdownKind } from '@/api/finance';
+import AnalysisCard from '@/components/ai/AnalysisCard';
 import Alert from '@/components/Alert';
 import Balances from '@/components/dashboard/Balances';
 import CategoryBreakdown from '@/components/dashboard/CategoryBreakdown';
@@ -76,6 +77,8 @@ export default function DashboardPage() {
         <MonthTotals month={month} latest={today} totals={summary.data.month} onMonth={setMonth} />
         <MonthlyChart series={monthly.data} />
         <CategoryBreakdown month={month} kind={kind} onKind={setKind} />
+        {/* Keyed by month, so a refusal shown for one month is not carried to the next. */}
+        <AnalysisCard key={month} month={month} />
         <RecentTransactions />
       </div>
     </Page>
