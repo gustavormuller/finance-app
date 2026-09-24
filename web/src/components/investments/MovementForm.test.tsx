@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Movement } from '@/api/finance';
 import MovementForm from './MovementForm';
 
-const plain = (text: string | null) => (text ?? '').replace(/ /g, ' ');
+const plain = (text: string | null) => (text ?? '').replace(/\u00a0/g, ' ');
 
 function renderForm(props: Partial<React.ComponentProps<typeof MovementForm>> = {}) {
   const onSubmit = vi.fn();
