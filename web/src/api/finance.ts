@@ -19,6 +19,8 @@ export interface Account {
   type: AccountType;
   currency: string;
   createdAt: string;
+  /** The balance before every recorded transaction (005). A number for the reason `Transaction.amount` is. */
+  openingBalance: number;
 }
 
 export interface Category {
@@ -71,6 +73,8 @@ export interface AccountInput {
   name: string;
   type: AccountType;
   currency: string;
+  /** Omitted on create means 0; omitted on update keeps the stored value. */
+  openingBalance?: number;
 }
 
 export interface CategoryInput {

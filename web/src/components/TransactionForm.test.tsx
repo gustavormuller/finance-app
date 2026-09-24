@@ -13,6 +13,7 @@ const accounts: Account[] = [
     type: 'Checking',
     currency: 'BRL',
     createdAt: '2026-09-01T00:00:00Z',
+    openingBalance: 0,
   },
 ];
 
