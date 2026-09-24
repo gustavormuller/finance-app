@@ -1438,3 +1438,112 @@ Full handoff: `docs/handoffs/007.md`. **007 is complete in code; these steps nee
     identity checked to 1e-10. BRL gives `null`.
   - Money flows are `CashFlow`, so `Money` rounds them to 2 places. Values are raw
     `decimal`.
+
+## 008 · checkpoint 2
+
+- **008 · CP2 · no ADR conflict; nothing to stop on.** Everything is in `Domain/Returns/`:
+  static pure functions and records, with no EF, no `HttpClient`, no clock and no endpoint
+  (ADR-014, ADR-017). There is no migration. `Domain/Returns/` reads `Domain/Investments/`'s
+  `PortfolioDaily` and `Movement` as plain inputs. That is within `Domain/`, so it is not a
+  layer crossing. CP1's type scans pass over the new files, and every value is `decimal`.
+- **008 · CP2 · what was built.**
+  - `ReturnDay(Date, Value, Income, Flow)`: one day's `V_d`, `D_d` and `F_d` in one
+    currency.
+  - `TimeWeightedReturn.Compute(days)` returns `TwrResult(Total, Annualised, Days, Index)`.
+  - `ReturnSeries.InBrl` and `InNative` build one asset's days from its rows and movements.
+  - `PortfolioAggregation.Sum` sums the assets' days by date.
+  - `FxDecomposition.Split` returns `FxSplit(Native, Fx, Total)`.
+  - The TWR takes `ReturnDay`s, not `PortfolioDaily`, because the FX split needs the same
+    chain over native values and native flows.
+- **008 · CP2 · TWR** (spec silent on each of these; each is pinned by a test):
+  - **Base day.** The first day is the base day. Its own return is never computed, so a
+    flow or income on it does not count. This matches CP1's "period starts from `from - 1`".
+  - `1 + r_d` is one quotient, `(V + D - F) / V_prev`. It is not `r_d` computed and then
+    `1` added back, so no rounding enters through the `- 1`. Test 2's two scenarios come
+    out exactly equal, not just within a tolerance.
+  - **Day handling.** A day whose previous value is 0 holds the index (test 6). Days are
+    sorted, need not be consecutive, and each links to the day before it. Two days on one
+    date are an `ArgumentException`: sum them first.
+  - **Results.** No days gives `null`. One day gives a total of 0, an index of `[100]` and a
+    `null` annualised rate. `Days` counts calendar days from the base day to the last day.
+- **008 · CP2 · annualised TWR for a year or less: computed.** The spec says "annualise when
+  the period exceeds one year … report both" and says nothing about shorter periods.
+  - Following CP1's recorded default, `Annualised` is always `(1 + total)^(365/days) - 1`,
+    computed with `DecimalMath.Pow`. That keeps `timingEffect = xirr - twr.annualised`
+    like for like, because XIRR is always annualised.
+  - **Guards.**
+    - An `OverflowException` from `Exp` is caught and gives `null` (100% in one day is
+      `2^365`).
+    - A negative growth gives `null`. It cannot come from real rows, only from a flow that
+      has no value to match it.
+    - A total loss gives `-1`.
+  - **For the human (CP5):** annualising a short period magnifies it. For example, 1% over
+    10 days is about 44% a year. Whether the screen shows the annualised figure for YTD, 12m
+    or short custom ranges is CP5's choice. The API carries both figures either way.
+- **008 · CP2 · flows and values** (these follow the CP1 defaults):
+  - **Flows.**
+    - A buy is `qty x price + fees` in.
+    - A sell is `qty x price - fees` out.
+    - A dividend or JCP is `amount - fees` as income.
+    - A split is nothing.
+    - Each amount is rounded to cents as `Money`, since it is cash. BRL values are
+      `ValueBrl`, already at 2 places. Native values are `Quantity x Price`, unrounded.
+  - **FX.** A USD flow converts at 007's rule, at the rate for its **own** date, even when
+    the flow is moved (below). That is the BRL the investor actually paid, the same as
+    `CostBasisBrl`. A USD flow with no rate at all is an `InvalidOperationException`.
+  - **Moved and dropped movements.**
+    - A movement dated on or before the asset's first row lands on the first row.
+    - For an asset on its own, that row is the base day, so the flow does not count.
+    - In a portfolio that started earlier, the flow offsets the value the asset brings in.
+      A test shows the portfolio does not drop on the buy day.
+    - A movement after the last row is left out.
+- **008 · CP2 · aggregation.** The portfolio's days are the union of the assets' dates, with
+  value, income and flow summed. An asset with no day on a date contributes 0.
+  `SnapshotBuilder`'s rows run on every calendar day, so the only gap is before an asset
+  starts. That includes a USD asset before its first FX rate, which the early-flow move
+  covers.
+  - Test 26 is checked to `1e-20`: `1.025 x 361/410` is not exactly representable.
+  - The TWR of a portfolio is value-weighted: `-9.75%`, not the `+0.5%` average of the
+    two assets' TWRs.
+- **008 · CP2 · FX split.** `Split` returns `null` for BRL (test 24) and for an asset with no
+  rows. `r_fx = (1 + total)/(1 + native) - 1`, and the identity is asserted to `1e-10`,
+  including a case with a mid-period buy at its own rate and uneven prices.
+  - When the native return is `-100%`, both sides of the identity are 0 whatever `r_fx` is.
+    It is reported as 0 rather than dividing by zero (spec silent).
+- **008 · CP2 · counts.** .NET 667 → 701 (+34: 15 TWR, 10 series, 4 aggregation, 5 FX). Web
+  115. E2E 21.
+- **008 · CP2 · test-first.** Each of the four test commits failed to compile before its feat
+  commit. After the feat, every test in its file passed on the first run.
+- **008 · CP2 · diff sizes.** Every commit is under ~200 lines. The largest is `49cb05e`, the
+  TWR tests, at 166 lines.
+- **008 · CP2 · handoff to CP3** (`MoneyWeightedReturn`, Newton then bisection, and the
+  timing effect; tests 9–16).
+  - **Open human decision: tests 15 and 16.** As written, XIRR is out of range (CP1 entry
+    above). Scenario 3's four-day XIRR root is `1 + r ≈ 5.9e-87`, and the mirror's is about
+    `2.7e79`. Both are outside decision 5's bracket `[-0.99, 10]` and the `decimal` range,
+    so the solver returns `null`.
+    - **CP3's default is option (a):** keep the same moves and returns but spread them over
+      a year, for example on days 0, 91, 182 and 365. XIRR is then finite and has the sign
+      the spec asks for.
+    - TWR stays exactly `0` for scenario 3, because the chain does not depend on the
+      spacing. `TimeWeightedReturnTests` has the four-day version.
+    - Flag the respaced fixture in the test and in DEFERRED as pending the human.
+  - **Timing effect.** `timingEffect = xirr - twr.Annualised`. Either side can be `null`:
+    XIRR because of its flows, TWR because of a zero-day period or overflow. Either one
+    makes the effect `null`.
+  - **XIRR flows** (decision 4) come from the movements at their **real** dates, not the
+    moved ones. XIRR has no daily value to mismatch.
+    - They use the same cash rules as `ReturnSeries`: fees in on buys, fees out of sells,
+      income net of fees, USD at the flow's own rate.
+    - `ReturnSeries.RateOn` is private today. Make it `internal` or extract it, rather than
+      write the rule a third time.
+  - **Exp overflow.** Guard `NPV(-0.99)` on a long history, as CP1 noted. Discount to the
+    last flow's date, so the exponents are negative and underflow to 0. Test it.
+- **008 · CP2 · notes for CP4.**
+  - Load `PortfolioDaily` for `[from - 1, to]` and pass each asset's **whole** movement
+    history to `ReturnSeries.InBrl`. Earlier movements land on the base day and do not
+    count.
+  - Pass USDBRL's benchmark points as the `fxRates`.
+  - Portfolio: `PortfolioAggregation.Sum`, then `TimeWeightedReturn.Compute`. Its `Index`
+    has one point per day, ready to sample alongside `BenchmarkAccumulator`'s.
+  - Per asset: `FxDecomposition.Split`, whose `Total` equals the asset's BRL TWR.
