@@ -30,6 +30,7 @@ public sealed class AnthropicAiProvider(HttpClient http, IOptions<AiOptions> opt
     public async Task<AiCompletion> CompleteAsync(AiRequest request, CancellationToken ct)
     {
         var settings = options.Value.Anthropic;
+        AiHttp.RequireKey(settings.ApiKey, Name, "Ai:Anthropic:ApiKey");
 
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(settings.BaseUrl), "v1/messages"))
         {
@@ -44,15 +45,27 @@ public sealed class AnthropicAiProvider(HttpClient http, IOptions<AiOptions> opt
         message.Headers.Add("x-api-key", settings.ApiKey);
         message.Headers.Add("anthropic-version", ApiVersion);
 
-        using var response = await http.SendAsync(message, ct);
-        response.EnsureSuccessStatusCode();
+        using var response = await AiHttp.SendAsync(http, message, Name, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw await AiHttp.FailureAsync(response, Name, request, settings.ApiKey, ct);
+        }
 
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-        var root = document.RootElement;
+        var (text, stopReason, input, output) = await AiHttp.ReadAsync(response, Name, Read, ct);
+
+        return stopReason switch
+        {
+            "end_turn" or "stop_sequence" when text.Length > 0 => new AiCompletion(text, input, output),
+            "end_turn" or "stop_sequence" => throw new AiProviderException($"{Name} answered {stopReason} with no text.", input, output),
+            "max_tokens" => throw new AiProviderException(
+                $"{Name} stopped at max_tokens ({request.MaxTokens}); the answer is truncated.", input, output),
+            _ => throw new AiProviderException($"{Name} stopped with stop_reason '{stopReason}'.", input, output),
+        };
+    }
+
+    private static (string Text, string? StopReason, int Input, int Output) Read(JsonElement root)
+    {
         var usage = root.GetProperty("usage");
-        var (input, output) = (usage.GetProperty("input_tokens").GetInt32(), usage.GetProperty("output_tokens").GetInt32());
-        var stopReason = root.GetProperty("stop_reason").GetString();
-
         var text = new StringBuilder();
         foreach (var block in root.GetProperty("content").EnumerateArray())
         {
@@ -62,13 +75,7 @@ public sealed class AnthropicAiProvider(HttpClient http, IOptions<AiOptions> opt
             }
         }
 
-        return stopReason switch
-        {
-            "end_turn" or "stop_sequence" when text.Length > 0 => new AiCompletion(text.ToString(), input, output),
-            "end_turn" or "stop_sequence" => throw new AiProviderException($"{Name} answered {stopReason} with no text.", input, output),
-            "max_tokens" => throw new AiProviderException(
-                $"{Name} stopped at max_tokens ({request.MaxTokens}); the answer is truncated.", input, output),
-            _ => throw new AiProviderException($"{Name} stopped with stop_reason '{stopReason}'.", input, output),
-        };
+        return (text.ToString(), root.GetProperty("stop_reason").GetString(),
+            usage.GetProperty("input_tokens").GetInt32(), usage.GetProperty("output_tokens").GetInt32());
     }
 }
