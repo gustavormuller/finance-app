@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text.Encodings.Web;
+using System.Text.Json;
 using Finance.Api.Domain.Transactions;
 
 namespace Finance.Api.Domain.Import;
@@ -19,14 +20,51 @@ public static class AiCategorisation
     public const int BatchSize = 40;
 
     /// <summary>The instructions sent as the system prompt. Not shown to anyone, so English.</summary>
-    public const string System = "";
+    public const string System =
+        "You categorise bank statement lines for a personal finance app in Brazil. " +
+        "The user message is a JSON document with \"categories\" (id, name, kind) and \"rows\" " +
+        "(rowId, description, kind). Pick, for each row, the one category that best fits its description. " +
+        "A row's kind is the kind its category must have; a Transfer category, money moving between " +
+        "the user's own accounts, fits either kind. Leave a row out when no category fits better than a " +
+        "generic one. Answer with one JSON object mapping each rowId to a category id, for example " +
+        "{\"<rowId>\": \"<category id>\"}, and nothing else: no prose, no code fence.";
 
-    /// <summary>The answer's ceiling for <paramref name="rowCount"/> rows.</summary>
-    public static int MaxTokensFor(int rowCount) => throw new NotImplementedException();
+    /// <summary>
+    /// The answer's ceiling for <paramref name="rowCount"/> rows: about 64 tokens a pair (two
+    /// GUIDs and their punctuation) and 256 for the frame. An answer cut at the ceiling fails
+    /// in the adapter, so the ceiling errs high; only the tokens used are billed.
+    /// </summary>
+    public static int MaxTokensFor(int rowCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(rowCount, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(rowCount, BatchSize);
+        return FrameTokens + (TokensPerRow * rowCount);
+    }
 
-    /// <summary>The user message: the rows and the categories, as one JSON document.</summary>
+    /// <summary>
+    /// The user message: the rows and the categories, as one JSON document. A row goes with
+    /// its normalized description and the kind its sign allows, never its amount.
+    /// </summary>
     public static string BuildRequest(IReadOnlyCollection<AiCategorisationRow> rows, IReadOnlyCollection<AiCategoryOption> categories) =>
-        throw new NotImplementedException();
+        JsonSerializer.Serialize(
+            new
+            {
+                categories = categories.Select(category => new { id = category.Id, name = category.Name, kind = category.Kind.ToString() }),
+                rows = rows.Select(row => new
+                {
+                    rowId = row.RowId,
+                    description = row.Description,
+                    kind = (row.Amount < 0m ? CategoryKind.Expense : CategoryKind.Income).ToString(),
+                }),
+            },
+            Unescaped);
+
+    private const int FrameTokens = 256;
+
+    private const int TokensPerRow = 64;
+
+    // Accents as they are: fewer tokens than \u escapes. The text goes to the model, never into HTML.
+    private static readonly JsonSerializerOptions Unescaped = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     /// <summary>
     /// The model's answer, read as untrusted text: a <c>{ rowId: categoryId }</c> object,
