@@ -50,7 +50,7 @@ export default function ReturnsReport({
         ) : (
           <>
             <p data-testid="returns-period" className="text-muted-foreground -mt-4 text-sm">
-              {formatDate(data.period.from)} a {formatDate(data.period.to)} · {data.period.days} dias
+              {formatDate(data.period.from)} a {formatDate(data.period.to)} · {data.period.days} {data.period.days === 1 ? 'dia' : 'dias'}
             </p>
             <Headline period={data.period} twr={data.twr} xirr={data.xirr} timingEffect={data.timingEffect} />
             {extra}
