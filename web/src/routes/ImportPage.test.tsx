@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Category, ImportBatch, ImportBatchDetail, StagedRow } from '@/api/finance';
+import type { Account, Category, ImportBatch, ImportBatchDetail, StagedRow } from '@/api/finance';
 import { renderWithClient, stubFetch, type SeenRequest } from '@/test-utils';
 
 import ImportPage from './ImportPage';
@@ -131,5 +131,93 @@ describe('ImportPage, "Sugerir com IA"', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(text);
     expect(within(screen.getByTestId('staged-row-Ready')).queryByTestId('ai-marker')).not.toBeInTheDocument();
+  });
+});
+
+describe('ImportPage, spreadsheets (011)', () => {
+  const account: Account = {
+    id: 'acc-1',
+    name: 'Banco do Brasil',
+    type: 'Checking',
+    currency: 'BRL',
+    createdAt: '',
+    openingBalance: 0,
+  };
+
+  const sheetPreview = (amount: string) => ({
+    headers: ['Data', 'Lançamento', 'Valor (R$)'],
+    sampleRows: [['03/08/2026', 'Compra com Cartão', amount]],
+    delimiter: null,
+    skippedRows: 2,
+    rowCount: 2,
+  });
+
+  function stubSheetApi() {
+    return stubFetch((request: SeenRequest) => {
+      const path = new URL(request.url, 'http://localhost').pathname;
+
+      switch (path) {
+        case '/api/auth/me':
+          return { body: { id: 'u1', email: 'ada@example.com', displayName: 'Ada', aiEnabled: false } };
+        case '/api/accounts':
+          return { body: [account] };
+        case '/api/categories':
+          return { body: categories };
+        case '/api/csv-templates':
+          return { body: [] };
+        case '/api/imports':
+          return { body: [] };
+        case '/api/imports/preview-csv': {
+          const culture = previewField('culture');
+          return { body: sheetPreview(culture === 'en-US' ? '-187.43' : '-187,43') };
+        }
+        default:
+          return undefined;
+      }
+    });
+  }
+
+  /** The multipart field of the latest preview request; the stub only records JSON bodies. */
+  function previewField(name: string): string | null {
+    const calls = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/api/imports/preview-csv'));
+    const body = calls.at(-1)?.[1]?.body;
+
+    return body instanceof FormData ? (body.get(name) as string | null) : null;
+  }
+
+  async function chooseSpreadsheet() {
+    const user = userEvent.setup();
+    renderWithClient(<ImportPage />);
+
+    await screen.findByRole('option', { name: 'Banco do Brasil' });
+    await user.selectOptions(screen.getByLabelText('Conta'), 'acc-1');
+    await user.upload(screen.getByLabelText('Arquivo'), new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'extrato.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+    await screen.findByLabelText('Formato dos números');
+
+    return user;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Spec 011 web test 16. */
+  it('sends an .xlsx to the mapping step, without a delimiter field', async () => {
+    stubSheetApi();
+    await chooseSpreadsheet();
+
+    expect(screen.queryByLabelText('Delimitador')).not.toBeInTheDocument();
+    expect(screen.getByText(/Células de data e número da planilha/)).toBeInTheDocument();
+    expect(screen.getByText('-187,43')).toBeInTheDocument();
+  });
+
+  /** Spec 011 web test 17. */
+  it('asks for the preview again when the number format changes', async () => {
+    stubSheetApi();
+    const user = await chooseSpreadsheet();
+
+    await user.selectOptions(screen.getByLabelText('Formato dos números'), 'en-US');
+
+    await waitFor(() => expect(previewField('culture')).toBe('en-US'));
+    expect(await screen.findByText('-187.43')).toBeInTheDocument();
   });
 });
