@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Finance.Api.Application.MarketData;
 using Finance.Api.Infrastructure.Jobs;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -65,6 +65,7 @@ public static class MarketDataSetup
         services.AddScoped<MarketDataSync>();
         services.AddSingleton<MarketDataSyncGate>();
         services.AddSingleton<ManualMarketDataSync>();
+        services.AddSingleton<SnapshotRebuildAfterSync>();
         services.AddHostedService<MarketDataSyncJob>();
         return services;
     }
