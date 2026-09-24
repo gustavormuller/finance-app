@@ -1675,3 +1675,172 @@ Full handoff: `docs/handoffs/007.md`. **007 is complete in code; these steps nee
     it, or keep it as documentation; CP4 should not start reading it.
   - **Test 32.** Hand-compute the expected TWR, XIRR and benchmark returns outside the code
     (Python `decimal` or Calc) and write them in.
+
+## 008 · checkpoint 4
+
+- **008 · CP4 · no ADR conflict; nothing to stop on.** `ReturnsQueries` in
+  `Application/Returns/` uses `AppDbContext` directly (ADR-016). There is no Repository and
+  no MediatR, and the global query filters stay on. `Assets`, `Movements` and
+  `PortfolioDaily` are read through their filters (ADR-007). `Benchmarks` is shared and
+  unfiltered. The endpoint file only parses and maps. All the maths is CP1–CP3's domain
+  code, unchanged except that `TimeWeightedReturn.Annualise` is now public (see below).
+  **No migration.** CP1's no-`double` scans cover the new files, and the source scan now
+  also reads `Endpoints/ReturnsEndpoints.cs`.
+- **008 · CP4 · what was built.**
+  - `GET /api/returns/portfolio` and `GET /api/returns/assets/{id}`, both
+    `?period=inception|ytd|12m|custom&from&to`.
+  - `ReturnsQueries` (`PortfolioAsync`, `AssetAsync`), with the response records
+    `ReturnsView`, `AssetReturnsView`, `PeriodView`, `TwrView`, `BenchmarkView` and `FxView`.
+  - `ReturnsPeriods.Resolve` (pure, and given today) and `SeriesSampling.Positions` (pure).
+  - `TimeWeightedReturn.Annualise` went from private to public, so a benchmark's return is
+    annualised by the same guarded function as the portfolio's (`null` past the `decimal`
+    range). It is not duplicated.
+- **008 · CP4 · the query** (spec silent on the details; each point is pinned by a test):
+  - `period` is `inception`, `ytd`, `12m` or `custom`, in any case.
+    - It is `inception` when absent.
+    - `from`/`to` alone mean `custom`.
+    - `from`/`to` beside another period are a 400 on `period`, not silently ignored.
+  - Dates are `yyyy-MM-dd`.
+    - A malformed date is a 400 naming `from` or `to`.
+    - `from` after `to` is a 400 on `from`.
+    - Every problem is reported at once, as 005 does.
+  - **Invented pt-BR copy, for a native review** (`Endpoints/ReturnsEndpoints.cs`):
+    - "O período deve ser desde o início (inception), no ano (ytd), 12 meses (12m) ou
+      personalizado (custom)."
+    - "As datas de início e fim valem apenas para o período personalizado (custom)."
+    - "A data inicial/final deve estar no formato AAAA-MM-DD, por exemplo 2026-01-31."
+    - "A data inicial deve ser anterior ou igual à data final."
+  - Someone else's asset, or one that does not exist, is a 404 (filtered, like 007's
+    routes). Both routes need a session (401).
+- **008 · CP4 · periods and clamping** (decision 9; tests 28, 29):
+  - "Today" is the UTC date from the injected `TimeProvider`, the same day
+    `SnapshotRebuild` counts to. No clock goes into the domain.
+  - **Inception** runs from the first movement. **YTD** runs from 1 January of today's year.
+    **12m** runs from today minus a year plus a day, so the base day is exactly a year ago:
+    365 days, and `annualised == total`. **Custom** defaults to inception and today.
+  - The start is clamped up to the first movement (test 29). The end is clamped to today
+    and to the **last daily row**, so the closing value is always a real one. If the
+    nightly rebuild has not run yet today, the period ends yesterday.
+  - A period that ends before the first movement is empty (below).
+- **008 · CP4 · one base day for the TWR, the benchmarks and the chart.** It is the first
+  daily row in `[from - 1, to]`.
+  - That is `from - 1` whenever something was held then (YTD, 12m, custom), so the first
+    day's return counts (CP1 decision).
+  - **At inception it is the first contribution's day.** There is no value on `from - 1`,
+    and ARCHITECTURE puts "base 100 on the date of the first contribution". This refines
+    CP1's "benchmark indices start at `from - 1`". With `from - 1`, CDI would accrue a day
+    the portfolio cannot, which is a one-day bias against the portfolio.
+  - `period.days` is `to` minus that base day, and it equals the TWR's `Days`. Every
+    benchmark annualises over the same days.
+- **008 · CP4 · XIRR opens on `from - 1`**, per asset, as the CP3 handoff says. At
+  inception that value is 0, so the first buy counts at its real cash.
+  - An asset with **no row on `from - 1`** because its first close came later opens at zero
+    instead. All its movements up to `to` then count at their real dates. This mirrors
+    TWR's rule of moving an early flow onto the first row.
+  - The closing value is each asset's last row on or before `to`, dated `to`.
+  - The portfolio's flows are the assets' lists put together.
+- **008 · CP4 · assets with no row in the period are left out of both returns.** Their
+  value is unknown, for example an asset bought today before its first close. Counting its
+  buy with no value would put a false loss in the XIRR. Spec silent. **For the human:**
+  confirm.
+- **008 · CP4 · the empty response** (test 27) is a 200 with `period`, `twr`, `xirr` and
+  `timingEffect` all `null`, every benchmark code `null`, and `series: []`. It is returned
+  when the user has no movements, no daily rows, or nothing valued in the period. It is not
+  a 404: the page has an empty state to render, not an error.
+- **008 · CP4 · FX.** USDBRL points from the latest on or before the earliest movement of the
+  period's non-BRL assets, up to `to`. They feed `ReturnSeries.InBrl`,
+  `MoneyWeightedReturn.FlowsInBrl` and `FxDecomposition.Split`, which is 007's rule through
+  the shared `MovementCash`. The asset test shows `fx.fx` equal to the USDBRL benchmark's
+  return over the same days, as it should be.
+- **008 · CP4 · benchmarks** (test 31):
+  - **Codes, not labels, as the CP3 handoff decided.** The keys are `CDI`, `IPCA6`,
+    `IVVB11`, `SELIC` and `USDBRL`. The pt-BR names are CP5's, in `web/src/lib/labels.ts`.
+  - **`Returns:Benchmarks:*:Label` is now unread.** It was left in `appsettings.json` as it
+    is. **For the human:** remove it, or keep it as documentation.
+  - They are **ordered by code**, both in `benchmarks` and in each series point after
+    `date` and `portfolio`. Configuration binding keeps no file order (the first run of
+    test 32 showed it), so no order but an explicit one is stable.
+  - Rate rows are read in `(base, to]`. A `Level` also reads its last value on or before
+    the base day, as its anchor. `Spread` is percent (`6`) and is passed as
+    `new Rate(6 / 100m)`. Test 32 checks IPCA + 6% against the hand value, so the `/100` is
+    covered.
+  - A benchmark that cannot anchor is `null` in `benchmarks` and absent from every series
+    point. The others are unaffected. That covers a rate with no row in the period, and a
+    level first recorded after the base day.
+- **008 · CP4 · sampling** (test 30):
+  - The stride is `ceil((n - 1) / 259)` whole days, from the base day, and the last day is
+    always kept. So at most 260 points on a regular grid.
+  - That is daily up to 260 days, and **weekly up to 1 814 days (4.97 years)**. An exact
+    5-year range (1 826 days) gets an 8-day stride, 230 points.
+  - The spec says "weekly over 5 years" and "at most 260". Strictly weekly over 5 years is
+    262 points, so the cap wins. **For the human:** say if the cap should be 262 instead.
+  - The portfolio and every benchmark are sampled on the same days.
+- **008 · CP4 · numbers on the wire.** Rates are rounded to 10 places and index values to 6,
+  half to even, as `decimal`. The rounding is for display and payload size, and XIRR is
+  only good to about 1e-8 anyway. JavaScript still parses these as float64 (007 · CP4).
+- **008 · CP4 · test host clock.** `InvestmentsApi.StartAsync(..., clock)` replaces **only**
+  `ReturnsQueries`' `TimeProvider`. Replacing the host's clock made the cookie handler
+  issue the session cookie on the fake date (2026-06-30). By real time that cookie had
+  already expired, so the client dropped it and every call was a 401.
+- **008 · CP4 · test 32's expected values.** Each was computed outside the code base in
+  Python `decimal` at 50 digits. Each XIRR was also computed in LibreOffice Calc's `XIRR()`:
+  `3.34541053669079` for test 32 and `0.475054807440193` for the USD asset, and both agree.
+  The first USD fixture (29 days, +21%) annualised above 10. It was out of XIRR's bracket, so
+  it was lengthened to 179 days.
+- **008 · CP4 · counts.** .NET 730 → 759 (+29):
+  - 15 unit tests (periods, clamping, sampling);
+  - 10 portfolio-endpoint tests (27–30, five 400s, 401);
+  - 2 benchmark tests (31, 32);
+  - 2 asset-route tests.
+
+  Web 115. E2E 21. Both verify scripts are green.
+- **008 · CP4 · test-first.** Each feat commit was preceded by tests that failed:
+  - 15/15 period and sampling tests did not compile;
+  - 10/10 endpoint tests failed with no route;
+  - 4 of the benchmark and asset tests failed, the benchmark ones at their first benchmark
+    line, with TWR, XIRR and the timing effect already matching the hand values.
+
+  Two test corrections landed on their own, before the feats that needed them:
+  - `2777c71`: the fixed clock applies to the returns only;
+  - `5eb985a`: benchmark keys in code order.
+
+  The session test's asset-route half was moved into the asset-route test commit before
+  anything was pushed.
+- **008 · CP4 · diff sizes.** Every commit is under ~200 lines. The largest is `54fff6e`
+  (`ReturnsQueries`) at 167. The first draft of the 27–30 tests was 242 lines, so it was
+  split into fixtures (`ed8c53e`, 87) and tests (`dd3a46d`, 154).
+- **008 · CP4 · handoff to CP5** (web `/investments/returns`; tests 33–35).
+  - **The shape.** Both routes return `{ period: { from, to, days }, twr: { total,
+    annualised }, xirr, timingEffect, benchmarks: { CODE: { total, annualised } | null },
+    series: [{ date, portfolio, CODE... }] }`. The asset route adds `fx: { native, fx,
+    total } | null` after `timingEffect`.
+    - Everything but `benchmarks` and `series` is `null` when nothing was held (the empty
+      state).
+    - A `null` benchmark has no key in `series`. So toggles should be built from
+      `benchmarks`' non-null entries.
+    - Rates are fractions (`0.1234`), not percents.
+  - **Labels.** Add `CDI`, `SELIC`, `IPCA6`, `USDBRL` and `IVVB11` to `labels.ts`. The
+    spec's names are "CDI", "SELIC", "IPCA + 6%", "Dólar" and "S&P 500 (IVVB11)".
+  - **Period selector.** `inception` (the default), `ytd`, `12m`, or `custom` with
+    `from`/`to`. A 400 carries pt-BR messages keyed by `period`, `from` or `to`. Show them
+    beside the date inputs.
+  - **Annualised TWR for short periods: not shown, pending human.** The API always sends
+    `twr.annualised`, and the spec says to annualise only "when the period exceeds one
+    year". XIRR is always annual, and `timingEffect = xirr - twr.annualised`.
+    - **Default for CP5:** when `period.days <= 365`, the headline shows `twr.total`
+      labelled as the period's return. It does not show `twr.annualised`. XIRR and the
+      timing effect are labelled "a.a.". The benchmark table shows totals only.
+    - When `period.days > 365`, show both TWR figures, as the spec says.
+    - Annualising a short period magnifies it (1% over 10 days is about 44% a year). So
+      for short periods the timing effect, being a difference of two annual rates, is
+      large and noisy. **For the human:** confirm, or say to show annualised always, or to
+      hide the timing effect below some number of days.
+  - **Per-asset table.** There is no list route. The table needs one
+    `/api/returns/assets/{id}` call per asset, with the ids from `/api/investments/assets`.
+    That is fine for a handful of assets. If it is slow, a list route is a small API
+    change (spec silent).
+  - **Chart.** `series` has ≤ 260 points, and the base day is always the first, with every
+    series at 100. Dates are `yyyy-MM-dd`.
+  - **For CP6 (E2E 36).** Under `FakeProviders` every close is 10 and every benchmark is
+    0.05, both dated yesterday. So a real TWR is 0 unless the fakes get a shape (007
+    handoff).
