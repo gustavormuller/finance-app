@@ -3,6 +3,7 @@ using Finance.Api.Application;
 using Finance.Api.Domain;
 using Finance.Api.Domain.Identity;
 using Finance.Api.Domain.Import;
+using Finance.Api.Domain.MarketData;
 using Finance.Api.Domain.Transactions;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -51,6 +52,14 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
 
     public DbSet<CsvTemplate> CsvTemplates => Set<CsvTemplate>();
 
+    public DbSet<MarketAsset> MarketAssets => Set<MarketAsset>();
+
+    public DbSet<Price> Prices => Set<Price>();
+
+    public DbSet<Benchmark> Benchmarks => Set<Benchmark>();
+
+    public DbSet<SyncRun> SyncRuns => Set<SyncRun>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -73,6 +82,7 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
 
         modelBuilder.ConfigureTransactions();
         modelBuilder.ConfigureImport();
+        modelBuilder.ConfigureMarketData();
 
         // ADR-007, the part that matters: one loop, not one line per entity. A new
         // user-owned entity is isolated because it implements IUserOwned, not because
