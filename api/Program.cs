@@ -44,6 +44,7 @@ builder.Services.AddMarketDataSync();
 
 // 007's snapshot rebuild, run by every movement write, POST /rebuild and after the sync.
 builder.Services.AddScoped<SnapshotRebuild>();
+builder.Services.AddScoped<PositionQueries>();
 
 var app = builder.Build();
 
@@ -124,6 +125,7 @@ app.MapImportEndpoints();
 app.MapCsvTemplateEndpoints();
 app.MapDashboardEndpoints();
 app.MapMarketDataEndpoints();
+app.MapInvestmentEndpoints();
 
 app.Run();
 
