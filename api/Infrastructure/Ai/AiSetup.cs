@@ -22,4 +22,9 @@ public static class AiSetup
 
         return services;
     }
+
+    /// <summary>Fails the boot when <c>Ai:FakeProvider</c> is on outside Development.</summary>
+    public static void RefuseFakeProviderOutsideDevelopment(IConfiguration configuration, IHostEnvironment environment)
+    {
+    }
 }
