@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { movementTotal, parseDecimal, toApiNumber } from './decimal';
+import { movementTotal, parseDecimal, pointsDifference, rateUnits, toApiNumber } from './decimal';
 
 describe('parseDecimal', () => {
   it('reads a comma or a dot as the decimal separator, and dots as grouping beside a comma', () => {
@@ -55,5 +55,36 @@ describe('movementTotal', () => {
     expect(movementTotal('Split', { quantity: '100', unitPrice: '', amount: '', fees: '' })).toBeNull();
     expect(movementTotal('Buy', { quantity: 'x', unitPrice: '10', amount: '', fees: '' })).toBeNull();
     expect(movementTotal('Buy', { quantity: '', unitPrice: '10', amount: '', fees: '' })).toBeNull();
+  });
+});
+
+describe('rateUnits', () => {
+  it('recovers the ten places the returns API writes, exactly', () => {
+    expect(rateUnits(0.001500750125)).toBe(15_007_501n);
+    expect(rateUnits(3.3454105367)).toBe(33_454_105_367n);
+    expect(rateUnits(-0.0927)).toBe(-927_000_000n);
+  });
+
+  it('reads a rate float64 prints in exponent form', () => {
+    expect(String(1.5e-7)).toBe('1.5e-7');
+    expect(rateUnits(1.5e-7)).toBe(1_500n);
+    expect(rateUnits(-1e-10)).toBe(-1n);
+  });
+});
+
+describe('pointsDifference', () => {
+  it('subtracts two rates exactly, in hundredths of a percentage point', () => {
+    // In float64, 0.3 - 0.1 is 0.19999999999999998.
+    expect(pointsDifference(0.3, 0.1)).toBe(2_000n);
+    // 0.15007...% - 9.27% = -9.1199249875 p.p.
+    expect(pointsDifference(0.001500750125, 0.0927)).toBe(-912n);
+    expect(pointsDifference(0.0927, 0.0927)).toBe(0n);
+  });
+
+  it('rounds half to even, as the API does', () => {
+    expect(pointsDifference(0.0000005, 0)).toBe(0n);
+    expect(pointsDifference(0.0000015, 0)).toBe(2n);
+    expect(pointsDifference(0, 0.0000015)).toBe(-2n);
+    expect(pointsDifference(0.0000025, 0)).toBe(2n);
   });
 });
