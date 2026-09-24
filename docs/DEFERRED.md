@@ -2974,3 +2974,120 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
     and the portfolio's three totals. Neither sends a raw description, a date or an income
     description, and categorisation sends no amounts. The provider is the configured one
     (Anthropic by default).
+
+## 009 · checkpoint 6
+
+- **009 · CP6 · the ADR check found no conflict.** This is web only, with no API change and no
+  migration. There is **no new dependency**: the markdown is rendered by a small renderer of
+  our own (below). The session stays in its cookie (ADR-009), and nothing is kept in browser
+  storage. The labels for `CategorySource` and `AnalysisStatus` are in `labels.ts`.
+- **009 · CP6 · the markdown (test 27), `components/ai/Markdown.tsx`.** It builds React
+  elements and never builds HTML: no `dangerouslySetInnerHTML`, and no HTML is parsed. Every
+  piece of the source is a text child, and React escapes text, so a `<script>` shows as
+  characters. It understands only what the prompt asks for: `#` headings, paragraphs, `-`/`*`
+  and `1.` lists, `**bold**`, `*italic*` and `` `code` ``. Links, images, tables and HTML stay
+  literal text, so no URL from the provider becomes an `href` or a `src`. Headings go down two
+  levels (`##` is an `h4`) and sit under the card's `h3`.
+- **009 · CP6 · the card polls the list, not the id (spec-silent; the CP5b handoff said by
+  id).** It reads `GET /api/ai/analyses?month=` and polls that same read every 3 s while the
+  row is `Pending` or `Running`. The interval comes from each answer, so it stops by itself on
+  `Completed` or `Failed`. The read has the same shape as by id, and it still finds the row
+  after a regenerate or a POST from another tab. A 409 on POST refetches too, so the card picks
+  up a generation it had not seen.
+- **009 · CP6 · the card (spec-silent choices, pending human).**
+  - It sits after the category breakdown and before the recent transactions. It follows the
+    month selector and is keyed by the month, so an error shown for one month is not carried
+    to the next. It is not shown in the empty dashboard state.
+  - **With AI off, "Gerar análise" and "Regenerar" stay visible, disabled, with the reason**,
+    as the spec asks of the preview's button. An analysis already made stays readable.
+  - "Regenerar" is offered on `Failed` as well as `Completed`. There is no confirmation,
+    although the old content is cleared as soon as it is pressed (CP5b).
+  - Every settled analysis carries the line "Texto gerado por IA a partir dos seus totais.
+    Confira os números antes de tomar uma decisão."
+  - A future month is never reached: the selector stops at the local month. A browser east of
+    UTC-3 can be a month ahead of the server around the turn of a month. The POST's 400 is
+    then shown verbatim.
+- **009 · CP6 · "Sugerir com IA" (test 25; spec-silent choices, pending human).**
+  - It sits above the rows, beside the notices. With AI off it stays, disabled, with the
+    reason as its accessible description. The reason names Configurações with no link, as
+    does the card's. That keeps both components free of the router, and their unit tests
+    render them alone. **Pending human** if a link is wanted.
+  - It is enabled whatever the rows hold. The page shows one page of rows, so it cannot know
+    whether any row is still on `Default`. The server answers `0` and the notice says so.
+  - After a 200 the rows are refetched. The answer only carries counts. A notice says what
+    changed. While the call runs (up to 30 s per batch) it says "Pedindo sugestões à IA…".
+  - The marker is a small "IA" badge beside the category. Its accessible name and title are
+    "Sugerida pela IA". Picking a category by hand shows as `User` at once (optimistic), so
+    the badge goes.
+- **009 · CP6 · `/settings` (spec-silent choices, pending human).**
+  - It is in the nav, last, as "Configurações". The switch is a native checkbox with
+    `role="switch"`. The PATCH answer replaces the cached `me`, so the preview and the card
+    see the new flag at once. A refusal is shown and the switch keeps its state.
+  - **The provider is named as "a Anthropic (Claude) ou a OpenAI (ChatGPT)"**, because the
+    API does not expose `Ai:Provider`. **Pending human:** expose it, or name one in the copy.
+  - The disclosure follows CP4a and CP5a to the field. It is hand-written copy, not derived:
+    **a change to either request must change it too.**
+  - The spend uses the API's default month (UTC-3, the budget's), not the local month. It is
+    rounded to the cent for display. It is shown with AI off too.
+- **009 · CP6 · for the human: invented pt-BR copy.**
+  - Settings: "Configurações", "Inteligência artificial", "Usar IA nesta conta", "Liga
+    "Sugerir com IA" na importação e a "Análise do mês" no painel.", "Ligada" / "Desligada",
+    "Gasto com IA neste mês", "R$ x de R$ y em <mês> · n chamadas", "Ao atingir o limite, a IA
+    fica indisponível até o mês seguinte. Chamadas que falham também contam, porque o provedor
+    cobra pelo que recebeu.", "Não foi possível carregar o gasto com IA."
+  - The disclosure, in `SettingsPage.tsx`, whole. **Read it as a family member would** (manual
+    step 2).
+  - Preview: "Sugerir com IA", "A IA está desligada na sua conta. Ligue-a em Configurações para
+    receber sugestões.", "Pedindo sugestões à IA…", "1 categoria sugerida pela IA." / "n
+    categorias sugeridas pela IA.", "A IA não sugeriu nenhuma categoria.", " 1 linha continuou
+    na categoria padrão." / " n linhas continuaram na categoria padrão.", "Nenhuma linha na
+    categoria padrão para a IA sugerir.", and the "IA" badge.
+  - Card: "Análise do mês", "Nenhuma análise de <mês> ainda. A IA lê os totais do mês e escreve
+    um resumo com sugestões.", "Gerar análise", "Regenerar", "<status>… a análise de <mês>
+    aparece aqui assim que ficar pronta.", "A IA está desligada na sua conta. Ligue-a em
+    Configurações para gerar a análise.", "Não foi possível carregar a análise do mês.", and
+    the line under the content.
+  - Labels: `CategorySource` ("Sem categoria", "Pelo histórico", "Categoria padrão",
+    "Sugerida pela IA", "Escolhida por você") and `AnalysisStatus` ("Na fila", "Gerando",
+    "Concluída", "Falhou").
+- **009 · CP6 · pre-existing, for the human.** A failure without a problem body, such as a
+  proxy's own 504 on a slow suggest, shows the client's English fallback "Request failed
+  (504)" (`request()` in `web/src/api/finance.ts`, since 003). That is on-screen English.
+  I did not change it here.
+- **009 · CP6 · a real-browser run** (Chromium, a throwaway spec, not committed) went through
+  the toggle, "Sugerir com IA" on `extrato.ofx` and "Gerar análise" on the fake. It found one
+  bug: the switch only moved after the PATCH answered, so Playwright's `check()` failed and a
+  person saw no feedback. It was fixed test-first (9ec5e0c, 7974424). The switch now shows the
+  state it is saving and goes back on a refusal. Screens checked at 1280 and 375 px.
+- **009 · CP6 · tests.** Test 25 is in `PreviewStep.test.tsx`, with the marker, and in
+  `ImportPage.test.tsx`: the POST, the refetch, and 403/402/504/502 verbatim. Test 26 is in
+  `AnalysisCard.test.tsx`: fake timers count the reads at exact instants, and `vi.waitFor`
+  waits for what is on screen, because a response body is read on the real event loop. Test
+  27 is in `Markdown.test.tsx` and again on the card. Also covered: generate, regenerate,
+  Failed, AI off, 409 picking up the running row, `/settings` (6 cases) and the dashboard
+  following the month.
+- **009 · CP6 · commit sizes.** One commit goes over about 200 lines: 9a88957 (the preview,
+  the client calls and the labels) is 215. The rest are between 5 and 194.
+- **009 · CP6 · counts.** Web went from 145 to 172 (+27). .NET stayed at 957 and E2E at 22.
+- **009 · CP6 · handoff to CP7** (E2E 28–29 on the fake, in the `chromium` project; no new
+  project is needed, because neither test triggers a sync). New users have AI **off**, so each
+  test turns it on first:
+  - **Turning AI on:** `page.goto('/settings')`, then
+    `getByRole('switch', { name: 'Usar IA nesta conta' }).check()`. Wait for
+    `getByTestId('ai-state')` to read `Ligada`. The nav link is
+    `getByRole('link', { name: 'Configurações' })`.
+  - **Test 28:** upload `fixtures/extrato.ofx` as `import.spec.ts`'s `uploadOfx` does. Then
+    click `getByTestId('import-step').getByRole('button', { name: 'Sugerir com IA' })`, which
+    is disabled until AI is on. The rows change in place: expect
+    `getByTestId('ai-marker')` to have count 3. The fake gives debits "Alimentação" and the
+    credit "Salário", so `getByRole('combobox', { name: 'Categoria da linha 1' })` has
+    Alimentação selected. `getByRole('status')` reads "3 categorias sugeridas pela IA." A row
+    with `GARBAGE` in its description gives `suggested: 0`.
+  - **Test 29:** after committing, go to `/`. Click
+    `getByTestId('analysis-card').getByRole('button', { name: 'Gerar análise' })`. While the
+    row is pending, `getByTestId('analysis-progress')` shows. Then
+    `getByTestId('analysis-content')` holds the heading `Resumo` and the other four
+    headings. The fake quotes the month as `YYYY-MM` and the month's expense as
+    `R$ 1290.46` for `extrato.ofx`, when the fixture's dates fall in the current month. Allow a few seconds: the card polls every 3 s.
+  - The throwaway spec above did both flows in about 3 s on the fake, and needs no timing
+    change. The `Regenerar` button, in the same card, is a cheap extra.
