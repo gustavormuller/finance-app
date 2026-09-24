@@ -1,0 +1,21 @@
+{
+  "id": "msg_01Aq9w938a90dw8q7fZNUkJm",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-4-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"3f0c1a52-0b1e-4c8e-9a51-0d6f1c2b7e10\": \"8a1d2c3b-4e5f-4a6b-9c7d-8e9f0a1b2c3d\", \"5b2"
+    }
+  ],
+  "stop_reason": "max_tokens",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 812,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 64,
+    "service_tier": "standard"
+  }
+}
