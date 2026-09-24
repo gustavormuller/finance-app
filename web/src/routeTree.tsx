@@ -5,6 +5,7 @@ import CategoriesPage from './routes/CategoriesPage';
 import DashboardPage from './routes/DashboardPage';
 import ImportPage from './routes/ImportPage';
 import LoginPage from './routes/LoginPage';
+import MarketDataPage from './routes/MarketDataPage';
 import ProtectedLayout from './routes/ProtectedLayout';
 import TransactionsPage from './routes/TransactionsPage';
 
@@ -78,7 +79,15 @@ const categoriesRoute = createRoute({
   component: CategoriesPage,
 });
 
+// 006: not in the navigation (spec: reachable from settings later), but guarded like
+// every other page.
+const marketDataRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/market-data',
+  component: MarketDataPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute]),
 ]);
