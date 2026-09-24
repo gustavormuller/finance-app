@@ -11,6 +11,7 @@ import LoginPage from './routes/LoginPage';
 import MarketDataPage from './routes/MarketDataPage';
 import ProtectedLayout from './routes/ProtectedLayout';
 import ReturnsPage from './routes/ReturnsPage';
+import SettingsPage from './routes/SettingsPage';
 import TransactionsPage from './routes/TransactionsPage';
 
 // No component: the default root renders an Outlet, and the application shell lives
@@ -119,7 +120,14 @@ const assetReturnsRoute = createRoute({
   component: AssetReturnsPage,
 });
 
+// 009: "new route, in the nav".
+const settingsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/settings',
+  component: SettingsPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute, assetReturnsRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute, assetReturnsRoute, settingsRoute]),
 ]);

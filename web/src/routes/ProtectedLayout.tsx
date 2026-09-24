@@ -12,6 +12,7 @@ const LINKS: [string, string][] = [
   ['/investments', 'Investimentos'],
   ['/accounts', 'Contas'],
   ['/categories', 'Categorias'],
+  ['/settings', 'Configurações'],
 ];
 
 /**
