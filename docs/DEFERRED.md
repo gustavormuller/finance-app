@@ -1547,3 +1547,131 @@ Full handoff: `docs/handoffs/007.md`. **007 is complete in code; these steps nee
   - Portfolio: `PortfolioAggregation.Sum`, then `TimeWeightedReturn.Compute`. Its `Index`
     has one point per day, ready to sample alongside `BenchmarkAccumulator`'s.
   - Per asset: `FxDecomposition.Split`, whose `Total` equals the asset's BRL TWR.
+
+## 008 · checkpoint 3
+
+- **008 · CP3 · no ADR conflict; nothing to stop on.** Everything is in `Domain/Returns/`:
+  static pure functions and records, with no EF, no `HttpClient`, no clock and no endpoint
+  (ADR-014, ADR-017). There is no migration. CP1's type scans pass over the new files, and
+  every value, locals included, is `decimal`. `specs/008-returns.md` is not edited.
+- **008 · CP3 · what was built.**
+  - `MoneyWeightedReturn.Compute(flows)` returns the annualised XIRR as a `Rate?`.
+  - `MoneyWeightedReturn.FlowsInBrl(currency, movements, fxRates, opening, closing)` builds
+    decision 4's flows for one asset.
+  - `TimingEffect.Of(xirr, twrAnnualised)` returns `xirr - twr.annualised`, or `null` when
+    either side is `null`.
+  - `MovementCash` (internal) holds the cash rules (buy, sell, income net of fees) and the
+    FX lookup, extracted from `ReturnSeries`. TWR and XIRR now read one copy, so nothing is
+    duplicated. `SnapshotBuilder` (007) still has its own lookup over `Benchmark` rows. It
+    was left alone because it is outside this checkpoint.
+- **008 · CP3 · DEVIATION, PENDING HUMAN SIGN-OFF: tests 15 and 16 use option (a).** As
+  CP1 found, the spec's four-day scenarios have XIRR roots of `1 + r ≈ 5.9e-87` (test 15)
+  and about `2.7e79` (its mirror). Both are outside `[-0.99, 10]` and outside the `decimal`
+  range.
+  - `TimingEffectTests` keeps the same moves but puts them on days 0, 91, 182 and 365.
+    TWR is still exactly `0`, total and annualised. XIRR is `-0.676746844602991` (15) and
+    `2.16930501414329` (16), so the timing effect has the sign the spec asks for.
+  - Test 16's mirror scenario is: 1000 in, -50%, 10 000 in, +100%. That is the spec's "big
+    deposit before the gain", and it shows the TWR `0.5 x 2 - 1 = 0`.
+  - A third test pins the literal four-day scenarios, both of them: XIRR `null`, timing
+    effect `null`, TWR `0`.
+  - The test class carries a remark pointing here. **For the human:** confirm (a), or say
+    to switch to (b), which asserts `null` only. Either way the spec text needs a line.
+- **008 · CP3 · solver** (decision 5; spec silent on each point below, each pinned by a test):
+  - **Overflow.** CP1 suggested discounting to the last flow's date. That only moves the
+    overflow to the other end of the bracket: `11^(t/365)` passes the `decimal` range after
+    about 28 years. Instead, the NPV and its slope are both multiplied by `exp(-max
+    exponent)`, so every discount factor is at most 1 and the smallest underflow to 0. That
+    factor is positive, so the NPV's sign (all bisection reads) is kept. It is the same
+    factor for the NPV and its slope, so Newton's step is unchanged too. Two 40-year tests
+    (14 600 days, both ends of the bracket, and bisection on its own) pin it.
+  - **When Newton gives up.** Newton hands over to bisection when:
+    - a step leaves `[-0.99, 10]`;
+    - the slope is exactly 0;
+    - the step itself overflows `decimal` (the "derivative near zero" case);
+    - 100 steps pass without two iterates within `1e-8`.
+  - **Bisection.** It runs on `[-0.99, 10]`, up to 200 steps, and stops when the half-width
+    is below `1e-8`, as the spec says. So a bisected rate is good to about `1e-8`, well
+    inside manual step 3's 4 decimals. If the NPV has the same sign at both ends, the
+    result is `null`.
+  - **`null` rather than an exception** when:
+    - there are fewer than two flows;
+    - the flows are all of one sign;
+    - every flow is on one day;
+    - the root is outside the bracket.
+  - Flows in two currencies are an `ArgumentException`: that is a caller bug.
+  - **More than one root** (flows that change sign more than once): Newton returns the root
+    it reaches from 10%, and bisection returns one root in the bracket. When the bracket
+    holds an even number of roots, its ends have the same sign and the result is `null`.
+    The spec does not address this. It only matters for histories that alternate between
+    large deposits and large withdrawals.
+- **008 · CP3 · test 13's flow set.** The spec says "large late inflow". A search (Python
+  `decimal` at 50 digits for the candidates and in floats for the sweep) found that deposits followed by
+  one late inflow (a single sign change) never made Newton from 10% diverge when the root
+  is a gain. Newton climbs to it monotonically. A rough bound, estimated and not proven,
+  puts that under 100 steps for any ratio `decimal` can hold. Newton diverges on losses,
+  where it overshoots below -0.99, and on alternating flows. The test therefore uses
+  `-100` (day 0), `+1000` (365), `-1000` (730), `+10 000` (7300). Newton leaves the bracket
+  on its fifth step, to -1.03. A sign scan of the NPV over the bracket found exactly one
+  root, `7.87298334620742`. **For the human:** the reading of "large late inflow" is mine.
+- **008 · CP3 · where the expected values come from.** Every XIRR expected value was
+  computed outside the code base twice, and both agree to the 15 digits Calc prints:
+  - Python `decimal` at 50 digits;
+  - LibreOffice Calc 24.2's `XIRR()`, the spreadsheet the spec names as the authority.
+    Calc was installed into the sandbox for this and is not committed.
+- **008 · CP3 · XIRR flows** (these follow the CP1/CP2 defaults):
+  - The flows are from the investor's side:
+    - the opening value out, on the base day;
+    - each movement after the base day and up to the closing day, on its **real** date;
+    - the closing value in, on the closing day.
+  - A buy is `-(qty x price + fees)`, a sell `+(qty x price - fees)`, and a dividend or JCP
+    `+(amount - fees)`. A split is nothing.
+  - A USD movement converts at 007's rule for its own date, rounded to cents. The opening
+    and closing values are `ValueBrl`, BRL already.
+  - A zero opening value (inception) or a zero closing value (sold out) adds no flow.
+  - A movement on or before the base day is in the opening value already, so it is left
+    out. So is a movement after the closing day.
+  - A portfolio's flows are its assets' lists put together. XIRR needs no summing by day.
+- **008 · CP3 · counts.** .NET 701 → 730 (+29: 16 XIRR, 7 flows, 6 timing effect). Web 115.
+  E2E 21. Both verify scripts green.
+- **008 · CP3 · test-first.** Each of the three test commits failed to compile before its
+  feat commit. After the feat, every test in its file passed on the first run. The
+  refactor (`455c3aa`) came first, with the 56 existing returns tests green before and
+  after.
+- **008 · CP3 · diff sizes.** Every commit is under ~200 lines. The largest is `179aef3`, the
+  solver, at 170 lines.
+- **008 · CP3 · handoff to CP4** (`ReturnsQueries`, `GET /api/returns/portfolio` and
+  `/api/returns/assets/{id}`; tests 27–32).
+  - **TWR.** Load `PortfolioDaily` for `[from - 1, to]` and each asset's **whole** movement
+    history. Then run `ReturnSeries.InBrl` per asset, `PortfolioAggregation.Sum`, and
+    `TimeWeightedReturn.Compute`. The CP2 notes above still apply.
+  - **XIRR.** Per asset, call `MoneyWeightedReturn.FlowsInBrl` with:
+    - `opening = (from - 1, ValueBrl on from - 1)`, or 0 when there is no row (inception);
+    - `closing = (to, ValueBrl on to)`;
+    - USDBRL's benchmark points as `fxRates`, which is 007's FX rule.
+
+    For the portfolio, concatenate every asset's flows and call `Compute`. Then
+    `timingEffect = TimingEffect.Of(xirr, twr.Annualised)`.
+  - **Periods and clamping.**
+    - Inception starts at the first movement.
+    - A `from` before the first movement clamps to it (test 29).
+    - The base day is `from - 1` (CP1 decision).
+    - For YTD and 12m, take today from the injected `TimeProvider`, as `SnapshotRebuild`
+      does. No clock goes into the domain.
+  - **Sampling to ≤ 260 points** (test 30). Sample the portfolio index and every benchmark
+    index on the same dates, and always keep the first day (the base, 100) and the last
+    day.
+  - **Missing benchmarks** (test 31). `BenchmarkAccumulator.Accumulate` returns `null` when
+    a benchmark cannot anchor. That benchmark is then `null` in `benchmarks` and absent from
+    `series`, and the others are unaffected. `Spread` in config is percent (`6`), so pass
+    `new Rate(6 / 100m)`.
+  - **Benchmark labels: return codes, not labels.** CLAUDE.md says names shown on screen
+    are mapped in `web/src/lib/labels.ts`. So the API returns benchmark **codes** (`CDI`,
+    `SELIC`, `IPCA6`, `USDBRL`, `IVVB11`) as keys, and the pt-BR labels live in
+    `labels.ts`. The spec's response shape already keys by code and has no label field, so
+    this does not contradict it. Only if the spec explicitly required a label on the wire
+    would it be otherwise. This supersedes CP1's recorded default ("serve the config's
+    `Label`"). **For the human:** `Returns:Benchmarks:*:Label` then has no reader. Remove
+    it, or keep it as documentation; CP4 should not start reading it.
+  - **Test 32.** Hand-compute the expected TWR, XIRR and benchmark returns outside the code
+    (Python `decimal` or Calc) and write them in.
