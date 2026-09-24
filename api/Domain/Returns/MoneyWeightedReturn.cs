@@ -1,3 +1,6 @@
+using Finance.Api.Domain.Investments;
+using Finance.Api.Domain.Transactions;
+
 namespace Finance.Api.Domain.Returns;
 
 /// <summary>
@@ -38,6 +41,56 @@ public static class MoneyWeightedReturn
     {
         var terms = Terms(flows);
         return terms is null ? null : Newton(terms) ?? Bisection(terms);
+    }
+
+    /// <summary>
+    /// Decision 4's flows for one asset in BRL, from the investor's side: the opening value
+    /// out on the base day, each movement after it and up to the closing day, and the
+    /// closing value in. A buy is <c>-(quantity x price + fees)</c>, a sell
+    /// <c>+(quantity x price - fees)</c>, a dividend or JCP <c>+(amount - fees)</c>.
+    /// </summary>
+    /// <remarks>
+    /// Each movement keeps its real date. TWR moves a buy made before the first close onto
+    /// that close, to match the value; XIRR has no daily value to match (DEFERRED, 008 CP2).
+    /// A movement on or before the base day is in the opening value already. A zero opening
+    /// value (inception) or closing value adds no flow. A portfolio's flows are its assets'
+    /// flows put together; they need not be summed by day.
+    /// </remarks>
+    /// <param name="fxRates">BRL per unit of <paramref name="currency"/>; ignored for BRL.</param>
+    /// <param name="opening">The base day and its <c>ValueBrl</c>.</param>
+    /// <param name="closing">The last day and its <c>ValueBrl</c>.</param>
+    public static IReadOnlyList<CashFlow> FlowsInBrl(
+        string currency, IEnumerable<Movement> movements, IReadOnlyList<DailyPoint> fxRates, DailyPoint opening, DailyPoint closing)
+    {
+        if (closing.Date < opening.Date)
+        {
+            throw new ArgumentException($"The closing day ({closing.Date}) is before the base day ({opening.Date}).", nameof(closing));
+        }
+
+        var rates = fxRates.OrderBy(rate => rate.Date).ToList();
+        var flows = new List<CashFlow>();
+        if (opening.Value != 0m)
+        {
+            flows.Add(Brl(opening.Date, -opening.Value));
+        }
+
+        foreach (var movement in movements
+                     .Where(movement => movement.Date > opening.Date && movement.Date <= closing.Date)
+                     .OrderBy(movement => movement.Date))
+        {
+            var (inflow, income) = MovementCash.Of(movement);
+            if (income - inflow != 0m)
+            {
+                flows.Add(Brl(movement.Date, MovementCash.InBrl(currency, rates, movement.Date, income - inflow)));
+            }
+        }
+
+        if (closing.Value != 0m)
+        {
+            flows.Add(Brl(closing.Date, closing.Value));
+        }
+
+        return flows;
     }
 
     /// <summary>Newton alone; <c>null</c> where <see cref="Compute"/> would fall back to bisection.</summary>
@@ -165,6 +218,8 @@ public static class MoneyWeightedReturn
 
         return (value, slope);
     }
+
+    private static CashFlow Brl(DateOnly date, decimal amount) => new(date, new Money(amount, SnapshotBuilder.BaseCurrency));
 
     private readonly record struct Term(decimal Years, decimal Amount);
 }
