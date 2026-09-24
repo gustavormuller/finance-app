@@ -45,18 +45,21 @@ function step(page: Page) {
 /**
  * Pages the dashboard back to the fixture's month, so the test holds on any date and not
  * only while that month is the current one. The month is in the past (never refused as a
- * future one) and fixed, so the fake's figures are too.
+ * future one) and fixed, so the fake's figures are too. The selector opens on the browser's
+ * month, so that is the clock read here.
  */
 async function showFixtureMonth(page: Page) {
   const selected = page.getByTestId('selected-month');
   await expect(selected).toBeVisible();
 
-  const now = new Date();
-  const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  expect(current >= FIXTURE_MONTH.key, 'the fixture month must not be in the future').toBe(true);
-
+  const current = await page.evaluate(() => {
+    const now = new Date();
+    return now.getFullYear() * 12 + now.getMonth();
+  });
   const [year, month] = FIXTURE_MONTH.key.split('-').map(Number);
-  const back = (now.getFullYear() - year) * 12 + (now.getMonth() + 1 - month);
+  const back = current - (year * 12 + month - 1);
+  expect(back, 'the fixture month must not be in the future').toBeGreaterThanOrEqual(0);
+
   for (let i = 0; i < back; i++) {
     await page.getByRole('button', { name: 'Mês anterior' }).click();
   }
