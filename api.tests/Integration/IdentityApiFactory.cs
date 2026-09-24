@@ -93,14 +93,17 @@ internal sealed class TestGoogleHandler(
 /// production cookie policy untested.
 /// <para>
 /// <paramref name="services"/> runs after every other registration, so a test can swap
-/// a service for a fake: the market-data providers, for instance.
+/// a service for a fake: the market-data providers, for instance. <paramref name="settings"/>
+/// is added over the default configuration, for a switch such as
+/// <c>MarketData:FakeProviders</c>.
 /// </para>
 /// </remarks>
 internal sealed class IdentityApiFactory(
     string connectionString,
     string? keysPath = null,
     string environment = "Development",
-    Action<IServiceCollection>? services = null)
+    Action<IServiceCollection>? services = null,
+    IReadOnlyDictionary<string, string?>? settings = null)
     : WebApplicationFactory<Program>
 {
     /// <summary>The origin the Origin check is configured to accept.</summary>
@@ -137,7 +140,7 @@ internal sealed class IdentityApiFactory(
                 // validates that both are present before it will run at all.
                 ["Google:ClientId"] = "test-client-id",
                 ["Google:ClientSecret"] = "test-client-secret",
-            }));
+            }).AddInMemoryCollection(settings ?? new Dictionary<string, string?>()));
 
         builder.ConfigureServices(services =>
         {
