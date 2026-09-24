@@ -13,6 +13,9 @@ namespace Finance.Api.Infrastructure.Ai;
 /// </remarks>
 public sealed class FakeAiProvider : IAiProvider
 {
+    /// <summary>A categorisation row whose description holds this gets a garbage answer (spec test 20).</summary>
+    public const string GarbageMarker = "GARBAGE";
+
     private const string Answer =
         "## Resumo\n\nResposta de teste do provedor simulado. Nenhum dado saiu do servidor.";
 
