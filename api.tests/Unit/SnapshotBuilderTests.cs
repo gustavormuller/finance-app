@@ -120,6 +120,22 @@ public sealed class SnapshotBuilderTests
     }
 
     /// <summary>
+    /// Not in the spec (DEFERRED, 007 CP2): a USD buy dated before the first known
+    /// rate costs at the earliest rate after it, and days with no rate yet are skipped.
+    /// </summary>
+    [Fact]
+    public void Buy_before_the_first_rate_costs_at_the_earliest_later_rate()
+    {
+        var rows = Usd(
+            [Buy(Monday, 10m, 100m)],
+            [new Price { Date = Monday, Close = 100m }],
+            [Fx(Monday.AddDays(2), 5m)]);
+
+        Assert.Equal(Monday.AddDays(2), rows[0].Date);
+        Assert.Equal(5000m, rows[0].CostBasisBrl);
+    }
+
+    /// <summary>
     /// Rounding at the column: average cost to 8 places, BRL amounts to 2, both half to
     /// even, as <c>Money</c> does. 30.01 / 3 = 10.00333...; 3 x 0.125 = 0.375 -> 0.38;
     /// 1 x 0.125 = 0.125 -> 0.12.
