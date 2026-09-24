@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Finance.Api.Application;
 using Finance.Api.Application.Dashboard;
 using Finance.Api.Endpoints;
