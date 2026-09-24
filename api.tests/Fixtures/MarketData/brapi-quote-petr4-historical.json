@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "currency": "BRL",
+      "shortName": "PETROBRAS   PN      N2",
+      "longName": "Petróleo Brasileiro S.A. - Petrobras",
+      "regularMarketPrice": 37.95,
+      "regularMarketTime": "2024-01-08T20:07:00.000Z",
+      "symbol": "PETR4",
+      "usedInterval": "1d",
+      "usedRange": "5d",
+      "historicalDataPrice": [
+        {"date": 1704204000, "open": 37.35, "high": 37.72, "low": 37.06, "close": 37.64, "volume": 40120300, "adjustedClose": 37.64},
+        {"date": 1704290400, "open": 37.70, "high": 38.26, "low": 37.61, "close": 38.18, "volume": 52914100, "adjustedClose": 38.18},
+        {"date": 1704376800, "open": 38.10, "high": 38.40, "low": 37.80, "close": 37.93, "volume": 38801200, "adjustedClose": 37.93},
+        {"date": 1704463200, "open": 37.90, "high": 38.05, "low": 37.55, "close": 37.62, "volume": 31207800, "adjustedClose": 37.62},
+        {"date": 1704722400, "open": 37.60, "high": 38.02, "low": 37.40, "close": 37.95, "volume": 35510900, "adjustedClose": 37.95}
+      ],
+      "logourl": "https://icons.brapi.dev/icons/PETR4.svg"
+    }
+  ],
+  "requestedAt": "2024-01-09T12:00:00.000Z",
+  "took": "0ms"
+}
