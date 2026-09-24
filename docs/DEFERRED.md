@@ -2404,3 +2404,137 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
     `completion_tokens`). Cover a refusal or empty content, and a `max_tokens` stop.
   - **Wrong model or provider.** The boot does not check that a model belongs to
     `Ai:Provider`. Give a bad model id a clear error message.
+
+## 009 · checkpoint 3
+
+- **009 · CP3 · the ADR check found no conflict.** Both adapters sit in `Infrastructure/Ai/`
+  and implement `IAiProvider` (ADR-015: two real implementations, config-selected, plus the
+  fake). `Domain/` gains nothing. There is no Repository, no MediatR, no migration and no
+  schema change. Token counts are `int` and no money is computed in the adapters, so CP1's
+  `decimal` scan of the AI namespaces still passes.
+- **009 · CP3 · the adapters are typed `HttpClient`s with no SDK package.** The spec does not
+  fix this. This follows 006's providers. The network is blocked here, and the fixture tests
+  stub `HttpMessageHandler`, which an SDK would hide. Adding an Anthropic or OpenAI SDK later
+  would only change these two classes.
+- **009 · CP3 · Anthropic, the Messages API** (`AnthropicAiProvider`):
+  - `POST {Ai:Anthropic:BaseUrl}v1/messages`, headers `x-api-key` and
+    `anthropic-version: 2023-06-01`. The version is a constant in the adapter, not a setting:
+    it is the wire contract the code is written against.
+  - The body is exactly `model`, `max_tokens`, `system` and one `user` message. A test pins
+    the property list. `claude-opus-5` answers 400 to `temperature`, `top_p`, `top_k`,
+    `budget_tokens` and an assistant prefill, so none is sent.
+  - The text is the concatenation of the `text` blocks. `thinking` blocks, which adaptive
+    thinking on `claude-opus-5` can add with empty text, are skipped.
+  - Tokens are `usage.input_tokens` and `usage.output_tokens`. No prompt caching is used, so
+    `cache_*_input_tokens` are ignored. **If caching is ever turned on, those must be priced
+    too.**
+  - **Verified as current by the user:** the ids `claude-haiku-4-5` (USD 1 / 5 per MTok) and
+    `claude-opus-5` (USD 5 / 25) in `appsettings.json`, with no date suffixes. This settles
+    the model-id and price half of CP2's "for the human" item. `Ai:UsdBrl` 5.40 is still an
+    assumed rate.
+- **009 · CP3 · OpenAI, Chat Completions** (`OpenAiProvider`):
+  - `POST {Ai:OpenAi:BaseUrl}v1/chat/completions`, `Authorization: Bearer <key>`.
+  - The body is `model`, a `system` and a `user` message, and `max_completion_tokens`. The
+    reasoning models refuse the older `max_tokens`. No sampling parameters are sent.
+  - The text is `choices[0].message.content`. Tokens are `usage.prompt_tokens` and
+    `usage.completion_tokens`, and reasoning tokens are inside the latter.
+  - The spec names only "OpenAi", with no endpoint and no model. The Responses API was not
+    used, because the brief asked for the Chat Completions shape. **For the human:** no
+    OpenAI model or price is configured (CP2), so switching needs both models and their
+    `Ai:Pricing` entries.
+- **009 · CP3 · what counts as an answer (the spec is silent).** Only these succeed:
+  - Anthropic: `end_turn` or `stop_sequence` with some text.
+  - OpenAI: `stop` with some content and no `refusal`.
+
+  Everything else is an `AiProviderException` **carrying the billed tokens**, so the gateway
+  records exactly what was spent:
+  - Anthropic `refusal` (an HTTP 200) and OpenAI `refusal` or `content_filter`.
+  - A truncated answer: Anthropic `max_tokens`, OpenAI `length`. **I chose failure over
+    returning the partial text.** A cut-off JSON object cannot be parsed by CP4 anyway, and
+    a cut-off analysis would be stored as `Completed`. **Pending human.**
+  - Any other stop reason, and an empty answer.
+- **009 · CP3 · failures, all mapped to CP2's `AiProviderException`** (`AiHttp`, shared):
+  - A **4xx** was refused before inference, so it carries `InputTokens = 0`: Anthropic's 400,
+    401, 402, 403, 404 and 429, and OpenAI's alike.
+  - A **5xx** (Anthropic 500, 529; OpenAI 500, 503), a non-JSON error page, a 200 body that is
+    not the documented shape, and a **dropped connection** carry `null`. The gateway then
+    estimates the input at 4 characters a token. **For the human:** this errs towards the
+    budget refusing. If Anthropic never bills a 529, it could be `0`.
+  - The message holds the status and the body's `error.type` and `error.message`, truncated
+    to 300 characters. Any occurrence of the key is replaced with `[redacted]`. A 404 also
+    names the model id and `Ai:Provider`, the usual cause being the other provider's id.
+  - **An empty key fails the call, not the boot,** with `InputTokens = 0` and no request
+    sent. AI is off by default, and dev and test hosts have no key.
+  - Cancellation is never mapped, so the gateway can tell its own timeout from the caller
+    leaving.
+  - Error bodies carry no `usage` for either provider, so none is read from them.
+- **009 · CP3 · keys, in headers only (ADR-015, 006's pattern).** Tests assert that the key is
+  in `x-api-key` or `Authorization` and not in the URL or the body. Both typed clients call
+  `RedactLoggedHeaders` on their key header. Nothing in the adapters logs.
+- **009 · CP3 · no retries.** The clients have no resilience handler. Every attempt spends
+  tokens, and the gateway records one usage row per call. A failure is returned, never
+  retried, so tokens are never summed across attempts. A caller that wants a retry makes a
+  second gateway call, which is budgeted and recorded.
+- **009 · CP3 · timeouts are the gateway's, per purpose.** `AiRequest` carries no purpose (the
+  spec's shape, kept verbatim), so an adapter cannot pick its own timeout:
+  - The settings are `Ai:Categorisation:TimeoutSeconds` (30, decision 4) and
+    `Ai:Analysis:TimeoutSeconds`. **120 is my choice, pending human:** Opus 5's adaptive
+    thinking and 400 words of output can take a while, and the job runs in the background.
+    Both must be positive at boot.
+  - `AiGateway` links the caller's token to a timer on its `TimeProvider`. Past the timeout,
+    it records the call with the estimated input and throws `AiProviderTimeoutException`, a
+    new subtype of `AiProviderException` (now unsealed). The caller's own cancellation stays
+    an `OperationCanceledException` and is still recorded.
+  - The typed clients' own `Timeout` is infinite, so `HttpClient` never cuts a call short
+    with a cancellation that looks like the caller's.
+- **009 · CP3 · the base URLs are new settings the spec does not list.** They are
+  `Ai:Anthropic:BaseUrl` and `Ai:OpenAi:BaseUrl`, both in `appsettings.json`. The boot
+  refuses one that is not an absolute http(s) URL ending in `/`. `AiKeyOptions` is renamed
+  `AiProviderOptions`. **For the human:** ARCHITECTURE's environment block does not list
+  them, or the timeouts. Overriding them is optional.
+- **009 · CP3 · fixtures are hand-written.** They are in `api.tests/Fixtures/Ai/`, with a
+  provenance table in its README:
+  - Three Anthropic fixtures: `end_turn` with an empty thinking block and two text blocks,
+    `max_tokens`, and `refusal`.
+  - Three OpenAI fixtures: `stop`, `length`, and a refusal.
+
+  Error and malformed bodies are inline in the tests. **Pending human: capture each fixture
+  against the real API** (same file name, a short prompt), OpenAI's especially. Its error
+  `type` values in the tests are my reading of the docs.
+- **009 · CP3 · wiring.** Without `Ai:FakeProvider`, `Ai:Provider` (any case) resolves
+  `AnthropicAiProvider` or `OpenAiProvider`. `AiFakeProviderTests` now asserts both, and
+  that each client's timeout is infinite. The E2E API still runs on the fake. **No test
+  touches the network.**
+- **009 · CP3 · commit sizes.** Two test commits are over about 200 lines, and most of each is
+  fixture JSON: f5a6246 (259) and b1e1ee4 (257). OpenAI's tests stayed in one commit
+  because its error paths go through `AiHttp`, which was already green, so a second red
+  commit was not possible. The rest are between 31 and 134.
+- **009 · CP3 · counts.** .NET went from 815 to 869 (+54): 24 Anthropic cases, 19 OpenAI, 7
+  settings, 3 gateway timeout cases, and the fake's "no adapter" test is now two cases. Web
+  stayed at 145 and E2E at 22. The flaky 006 test (CP2) passed in this run.
+- **009 · CP3 · handoff to CP4** (categorisation: tolerant parsing, `CategorySource`, the
+  suggest endpoint, `PATCH /api/auth/me`; tests 5–10 and 15–20, likely as 4a and 4b):
+  - **The status map for `POST /api/imports/{id}/suggest`:**
+    - `AiDisabledException` → 403.
+    - `AiBudgetExceededException` → 402.
+    - `AiProviderTimeoutException` → 504. Catch it before its base class.
+    - Any other `AiProviderException` is not in the spec. I suggest 502 with a pt-BR
+      problem detail.
+
+    All of these are pt-BR problem details, and none may echo the exception message, which
+    is English and may name the model.
+  - **The gateway saves a usage row on the scope's context,** even on failure. Write the
+    suggestions after the call, or in a separate `SaveChanges`, and never hold unsaved
+    staging edits across it (CP2's note).
+  - **`MaxTokens` for categorisation.** A batch answer that hits the limit now fails (see
+    above) instead of returning half a JSON object. Size it from the row count, and consider
+    sending batches. Opus 5's thinking counts against `max_tokens` too, which matters for
+    CP5's analysis more than for Haiku.
+  - **Tolerant parsing (tests 5–10)** should treat the adapter's text as untrusted: code
+    fences, prose around the JSON, unknown ids. The adapters only guarantee non-empty text
+    on success.
+  - **The fake must be shaped for tests 18–20 and E2E 28.** It must answer
+    `{ rowId: categoryId }` built from the request's rows. Its current fixed markdown answer
+    is right for "garbage → `suggested: 0`" (test 20).
+  - **`PATCH /api/auth/me { aiEnabled }`** is the only way to turn AI on from the app. The
+    gateway already refuses a user with it off.
