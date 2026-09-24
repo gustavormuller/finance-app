@@ -193,3 +193,19 @@ Step 2 is the check that tells you whether the ledger is complete.
 - Test 6 passes — no Dapper query without a `UserId` predicate
 - Migration SQL reviewed
 - `/` is the dashboard
+
+## Amendments
+
+Added by the orchestrator of the autonomous run after reconciling with docs/handoffs/004.md.
+
+1. **The web assumes two category kinds.** `TransactionForm` derives the sign from the kind, and
+   `PreviewStep` and `CategoriesPage` offer only Income and Expense (handoff 004). E2E 26 and the
+   "existing users create Transferência by hand" policy both require the UI to accept
+   `Transfer`: the categories page must let a user create a Transfer category, the transaction
+   form must let the user choose the sign freely for a Transfer category, and `labels.ts` maps
+   `Transfer` → "Transferência". Done in checkpoint 3.
+2. **`CategorySuggester` discards a history match whose kind does not match the sign**
+   (handoff 004). §Domain says a Transfer history match must be kept. Rule: a history match
+   in a Transfer category is always kept; the sign default still never picks Transfer.
+3. **No way to set `OpeningBalance` exists.** Manual step 1 requires it. The existing account
+   create/update endpoints and account form accept `openingBalance` (decimal, default 0).
