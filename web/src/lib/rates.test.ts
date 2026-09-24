@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NO_DATA, formatPoints, formatRate } from './rates';
+import { NO_DATA, formatIndexTick, formatPoints, formatRate } from './rates';
 
 describe('formatRate', () => {
   it('writes a fraction as a pt-BR percentage with its sign', () => {
@@ -23,5 +23,19 @@ describe('formatPoints', () => {
     expect(formatPoints(2_000n)).toBe('+20,00 p.p.');
     expect(formatPoints(0n)).toBe('0,00 p.p.');
     expect(formatPoints(123_456n)).toBe('+1.234,56 p.p.');
+  });
+});
+
+/** Found by E2E 36's first real-browser run: on a 100 to 103 axis, 101,5 and 102,5 both read "102". */
+describe('formatIndexTick', () => {
+  it('keeps a base-100 tick\'s fraction, so two ticks never read the same', () => {
+    expect(formatIndexTick(101.5)).toBe('101,5');
+    expect(formatIndexTick(102.5)).toBe('102,5');
+    expect(formatIndexTick(100.25)).toBe('100,25');
+  });
+
+  it('drops the fraction of a whole tick', () => {
+    expect(formatIndexTick(100)).toBe('100');
+    expect(formatIndexTick(1250)).toBe('1.250');
   });
 });
