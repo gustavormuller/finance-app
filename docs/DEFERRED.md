@@ -1294,3 +1294,147 @@ Full handoff: `docs/handoffs/007.md`. **007 is complete in code; these steps nee
   - Days before an asset's first close have no row.
   - Derive the benchmark types from 006's `BenchmarkUnit`.
   - A syncing E2E spec must follow CP5's project rule.
+
+## 008 · checkpoint 1
+
+- **008 · CP1 · no ADR conflict; nothing to stop on.** Checked against the ADRs and what 006
+  and 007 built:
+  - 008 adds no table and no migration. It reads `PortfolioDaily` and `Movements` (both
+    `IUserOwned`, filtered) and `Benchmarks` (shared, unfiltered), as ADR-007 and CLAUDE.md
+    say.
+  - `Domain/Returns/` is static pure functions and value objects. No EF, no `HttpClient`, no
+    clock, no configuration type (ADR-014, ADR-017). No port, Repository or MediatR.
+  - Every value is `decimal`, locals included. Two tests pin this: a reflection scan, and a
+    source scan of `Domain/Returns/` and `Application/Returns/` for `double`, `float`,
+    `Half`, a `d`/`f` literal suffix, and `Math.Pow`/`Exp`/`Log`/`Sqrt` outside comments.
+  - The spec's daily linking is ARCHITECTURE's "sub-periods at every cash movement" with a
+    sub-period per day, not a departure from it. Base 100 "at the period start" is the
+    architecture's "date of the first contribution" at inception.
+  - `benchmark_hint` (dropped in 007) is not needed. 008 compares every asset with the same
+    configured set.
+- **008 · CP1 · for the human, before CP3: spec test 15 cannot pass as written.** Scenario 3
+  runs over four days. Its XIRR root is `1 + r ≈ 5.9e-87`, found with Python's `decimal` at
+  50 digits. That is outside decision 5's bisection bracket `[-0.99, 10]` and below the
+  smallest `decimal` (`1e-28`). So the solver returns `null`, not "negative", and test 15's
+  `timingEffect` is `null` too. Test 16's mirror has the opposite problem: its root is
+  `1 + r ≈ 2.7e79`, far above 10. The options:
+  - **(a) Proposed default:** keep the scenarios' shape and returns, but space the four
+    dates over a year, for example at days 0, 91, 182 and 365. TWR stays exactly `0`, since
+    it is chained per step. XIRR is then finite, and the signs the spec asks for are
+    testable. This changes the fixture, not the method.
+  - **(b)** Keep the four days and assert `null`. This keeps the letter of the dates but
+    drops the point of the test.
+  - **(c)** Widen the bracket. Not possible: `decimal` cannot represent the root.
+  CP3 will take (a) unless told otherwise.
+- **008 · CP1 · `DecimalMath` (`Exp`, `Ln`, `Pow`).** `decimal` has no `Pow`, and decision 10
+  rules out `double`, so the module has its own:
+  - `Exp` splits off the whole part (`e^n` by squaring, then a Taylor series on the
+    fraction). `Ln` halves or doubles into `[0.75, 1.5]`, then uses the atanh series.
+  - A whole exponent is repeated multiplication, which is exact where the type can hold the
+    result. `1.0005^3` is exactly `1.001500750125`.
+  - Measured against a 40-digit reference, results agree to 1e-24 relative, or 1e-27
+    absolute for values that small. Every expected value in the test was computed outside
+    this code base (Python `decimal`) and written in by hand.
+  - `Exp` above 66.5 throws `OverflowException`. Below −66.5 it returns 0.
+  - **For CP3:** the XIRR discount `(1 + r)^(-t/365)` at `r = -0.99` over 15 or more years is
+    `exp(> 66)`. So `NPV(-0.99)` overflows on a long history, and the bisection must guard
+    it. One way is to discount to the last flow's date instead of the first: the
+    exponents are then negative and underflow harmlessly to 0. Test that case.
+- **008 · CP1 · value objects.** `Rate`, `CashFlow(Date, Money)` and `DailyPoint(Date,
+  decimal)` are as the spec sketches them, one file each. `DailyPoint` is a measurement, so
+  it holds a raw `decimal`, not `Money`. That follows 007's decision 10 and the 007 handoff.
+- **008 · CP1 · `BenchmarkAccumulator`: what the spec leaves open** (spec silent; each choice
+  is pinned by a test):
+  - **The base day.** `start` holds exactly 100. A rate row compounds on its own date when
+    that date is in `(start, end]`, so a row dated `start` does not compound. This is the
+    spec's recurrence `index_d = index_{d-1} × …` taken literally. CP4 passes `start =
+    from - 1`, so the first day of the period counts (see below).
+  - **The output is one point per calendar day,** so it lines up with the portfolio index
+    built from `PortfolioDaily`. Sampling (≤ 260 points) is CP4's job.
+  - **`MonthlyRate` compounds a month's whole rate on the date of its row.** IPCA is dated
+    the first of its month. So a period from 14 March to 2 April includes none of March and
+    all of April. There is no pro-rata. Over months or years, each end is off by at most
+    one month's rate. The spread `(1 + s)^(1/12)` is applied on the same rows only, so the
+    months IPCA has not yet published hold flat, spread included. Manual step 4 checks CDI
+    only; **for the human:** if IPCA + 6% has to match a calculator to the day, this needs
+    pro-rata by days.
+  - **`Level` anchors on the last value on or before `start`,** and carries forward on
+    gaps.
+  - **`null`** (spec test 31 needs it) means a level with no positive value on or before
+    `start`, or a rate with no row in `(start, end]`. A rate series that stops partway
+    through the period holds flat after its last row. It is not `null`.
+  - A spread on anything but a `MonthlyRate` is an `ArgumentException`, and so is an end
+    before the start.
+- **008 · CP1 · `Returns:Benchmarks` and test 21.** The spec's five entries are in
+  `appsettings.json`:
+  - CDI, SELIC, IPCA6 (`Source: IPCA`, `Spread: 6`), USDBRL and IVVB11, with the spec's
+    labels.
+  - `ReturnsOptions.Problems` checks each type against the `BenchmarkUnit` that 006 records
+    for its source. The source is the benchmark's own key unless `Source` names another.
+    Units are read from `MarketData:Bcb:Series` or `MarketData:PriceBenchmarks`.
+  - The mapping is `DailyRate` ↔ `PercentPerDay`, `MonthlyRate` ↔ `PercentPerMonth` and
+    `Level` ↔ `Level`.
+  - Each of these is a problem:
+    - an unknown source;
+    - a type that does not match its unit;
+    - a spread on anything but a `MonthlyRate`;
+    - an empty section.
+  - `Program.cs` calls `RefuseMismatchedBenchmarks` at boot, next to 006's fake-provider
+    check and before the migration. One `InvalidOperationException` lists every problem in
+    English, like the other boot checks, and names the key (`Returns:Benchmarks:CDI`).
+  - The unit is not copied by hand: the domain has its own `BenchmarkType` because
+    `Domain/` cannot reference `Application/`'s `BenchmarkUnit`. The two are tied by the
+    check, as the 007 handoff asked ("derive or assert").
+  - Test 21 has a unit half (`ReturnsOptionsTests`) and a host half (`ReturnsBootTests`: `CDI`
+    set to `Level` fails the boot). A test also asserts that the committed appsettings pass.
+  - `Spread` is percent a year (`6`), as the spec writes it. The accumulator takes it as a
+    `Rate` (`0.06`), so CP4 divides by 100.
+- **008 · CP1 · decisions recorded now for later checkpoints** (spec silent; CP2–CP4 build on
+  them unless the human says otherwise):
+  - **Period base day (CP4).** The TWR rows and the benchmark indices start at `from - 1`,
+    the base day, so the first day's return counts. XIRR's opening flow is `-V(from - 1)`,
+    dated `from - 1`. At inception that value is 0, so decision 4 applies literally. For YTD,
+    12m and custom periods it is the standard opening balance.
+  - **A flow dated before its asset's first daily row** (a buy before the first close) moves
+    to that first row's date. Otherwise the portfolio would record the cash going out one
+    day and the value arriving on another, with no flow to match. A two-asset test in CP2
+    pins it.
+  - **Dividends and JCP are net of their fees,** in both `D_d` and XIRR. That is the cash
+    received, and it matches 007's `dividendsBrl`.
+  - **USD flows** convert at 007's rule: the latest USDBRL on or before the date, else the
+    earliest after it. This is the same rule the rows use, so `r_fx` decomposes cleanly.
+  - **SELIC is returned too.** The spec's configuration lists it, but its response example
+    does not. Every configured benchmark is returned.
+  - **`annualised` for a period of a year or less: open.** The spec says to annualise
+    past a year and to report both, and `timingEffect = xirr − twr.annualised`. XIRR is
+    always annualised. The default CP2/CP3 will take: always compute the annualised TWR,
+    so `timingEffect` compares like with like. Whether the screen shows it for YTD/12m is
+    CP5's choice. **For the human** to confirm.
+  - **Labels.** The spec puts pt-BR labels in the configuration, but CLAUDE.md maps
+    identifiers in `web/src/lib/labels.ts`. CP4/CP5 will serve the config's `Label` (already
+    pt-BR, one source) unless the human prefers `labels.ts`.
+- **008 · CP1 · counts.** .NET 611 → 667 (+56: 24 decimal maths, 14 accumulator, 16 config
+  and boot, 2 type scans), web 115, E2E 21.
+- **008 · CP1 · test-first.** Each test commit failed before its feat commit: 24/24, 14/14
+  and 16/16. The two type scans passed from the start. They are guards, not drivers.
+- **008 · CP1 · diff sizes.** Every commit is under ~200 lines. The test-21 commit was 262
+  lines with the type scans, and was split before handoff (`336a30c`, 80, and `9705372`,
+  182).
+- **008 · CP1 · handoff to CP2** (`TimeWeightedReturn`, `FxDecomposition`, portfolio
+  aggregation; tests 1–8 and 22–26).
+  - Everything goes in `Domain/Returns/`, pure. The inputs are plain records. The
+    type scans already cover the namespace.
+  - Use `DecimalMath.Pow` for annualising (`Pow(1.21m, 365m/730m)` is `1.1` to 1e-27). Test
+    7 needs a tolerance, not `Assert.Equal`. `365m/730m` is `0.5` exactly, but most ratios
+    are not.
+  - Inputs by day: `V_d` (`ValueBrl`), `D_d` (net income) and `F_d` (buys positive, sells
+    negative). Skip a day when `V_{d-1} = 0` (test 6). The index series starts at exactly
+    `100` (test 8); return `DailyPoint`s so it can be sampled with the benchmarks.
+  - Aggregation (25, 26) sums by day across assets, with 0 before an asset starts. Move a
+    flow dated before its asset's first row to that row (decision above). A test should
+    show the portfolio does not jump on that day.
+  - FX (22–24): `r_native` is TWR on `Quantity × Price` and native flows. `r_total` is TWR
+    on `ValueBrl` and BRL flows. `r_fx = (1 + r_total)/(1 + r_native) − 1`, with the
+    identity checked to 1e-10. BRL gives `null`.
+  - Money flows are `CashFlow`, so `Money` rounds them to 2 places. Values are raw
+    `decimal`.
