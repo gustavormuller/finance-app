@@ -20,13 +20,20 @@ public sealed record AiCompletion(string Text, int InputTokens, int OutputTokens
 /// spending, <c>0</c> when it says nothing was billed (a refused key, say), and <c>null</c>
 /// when it is unknown (a timeout): <see cref="AiGateway"/> then records an estimate.
 /// </summary>
-public sealed class AiProviderException(string message, int? inputTokens = null, int outputTokens = 0, Exception? innerException = null)
+public class AiProviderException(string message, int? inputTokens = null, int outputTokens = 0, Exception? innerException = null)
     : Exception(message, innerException)
 {
     public int? InputTokens { get; } = inputTokens;
 
     public int OutputTokens { get; } = outputTokens;
 }
+
+/// <summary>
+/// The call ran past its purpose's <c>TimeoutSeconds</c> (<see cref="AiGateway"/>). Its tokens
+/// are unknown, so the gateway records an estimate. The suggest endpoint answers <c>504</c> (CP4).
+/// </summary>
+public sealed class AiProviderTimeoutException(string message, Exception? innerException = null)
+    : AiProviderException(message, inputTokens: null, outputTokens: 0, innerException);
 
 /// <summary>The user has spent their month's budget (ADR-008). The endpoints answer <c>402</c>.</summary>
 public sealed class AiBudgetExceededException(decimal spentBrl, decimal budgetBrl)

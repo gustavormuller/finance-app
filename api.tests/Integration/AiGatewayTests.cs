@@ -111,12 +111,18 @@ public sealed partial class AiGatewayTests(PostgresFixture postgres)
     /// fake clock and the scripted provider. A fresh database, because <c>Benchmarks</c> is
     /// shared and other tests store <c>USDBRL</c>.
     /// </summary>
-    private async Task<Host> HostAsync(IAiProvider provider, TimeProvider clock, CancellationToken ct)
+    private async Task<Host> HostAsync(IAiProvider provider, TimeProvider clock, CancellationToken ct, params (string Key, string Value)[] extra)
     {
+        var settings = new Dictionary<string, string?>(Settings);
+        foreach (var (key, value) in extra)
+        {
+            settings[key] = value;
+        }
+
         var connection = await postgres.CreateEmptyDatabaseAsync(ct);
-        var users = new IdentityApiFactory(connection, settings: Settings);
+        var users = new IdentityApiFactory(connection, settings: settings);
         await users.MigrateAsync(ct);
-        var gateway = new IdentityApiFactory(connection, settings: Settings, services: services =>
+        var gateway = new IdentityApiFactory(connection, settings: settings, services: services =>
         {
             services.AddSingleton(provider);
             services.AddSingleton(clock);

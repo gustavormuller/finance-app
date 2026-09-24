@@ -43,16 +43,22 @@ public sealed class AiFakeProviderTests(PostgresFixture postgres)
         Assert.True(row.InputTokens > 0 && row.CostBrl > 0m);
     }
 
-    [Fact]
-    public async Task Without_the_switch_the_fake_is_not_what_answers()
+    /// <summary>
+    /// Without the switch <c>Ai:Provider</c> picks the adapter (ADR-015). Its client has no
+    /// timeout of its own: <see cref="AiGateway"/> times each call out by purpose.
+    /// </summary>
+    [Theory]
+    [InlineData("anthropic", typeof(AnthropicAiProvider))]
+    [InlineData("OpenAI", typeof(OpenAiProvider))]
+    public async Task Without_the_switch_the_configured_adapter_answers(string provider, Type adapter)
     {
-        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        await using var factory = new IdentityApiFactory(
+            postgres.ConnectionString, settings: new Dictionary<string, string?> { ["Ai:Provider"] = provider });
         await using var scope = factory.Services.CreateAsyncScope();
 
-        // CP2 has no real adapter yet, so resolving fails; CP3 asserts the configured adapter here.
-        var error = Assert.ThrowsAny<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<IAiProvider>());
-
-        Assert.Contains("Ai:Provider", error.Message);
+        Assert.IsType(adapter, scope.ServiceProvider.GetRequiredService<IAiProvider>());
+        var client = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(adapter.Name);
+        Assert.Equal(Timeout.InfiniteTimeSpan, client.Timeout);
     }
 
     [Theory]
