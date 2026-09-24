@@ -2,6 +2,7 @@
 using Finance.Api.Application;
 using Finance.Api.Application.Dashboard;
 using Finance.Api.Application.Investments;
+using Finance.Api.Application.Returns;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
 using Finance.Api.Infrastructure.MarketData;
@@ -76,6 +77,9 @@ Require(
 
 // The E2E run's network-free market-data providers never reach another environment.
 MarketDataSetup.RefuseFakeProvidersOutsideDevelopment(app.Configuration, app.Environment);
+
+// 008's benchmark types must match the units 006 records for their series (spec test 21).
+ReturnsOptions.RefuseMismatchedBenchmarks(app.Configuration);
 
 var appOrigin = app.Configuration[ConfigurationKeys.AppOrigin]!;
 
