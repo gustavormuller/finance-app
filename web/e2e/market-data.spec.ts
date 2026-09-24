@@ -8,8 +8,9 @@ import { devLogin, uniqueEmail } from './support';
  * The API runs with `MarketData:FakeProviders=true` (scripts/verify-e2e.sh): the sync
  * uses fixed, network-free providers, and the ten-minute window between manual syncs is
  * zero, because the catalogue and the sync runs are shared by every test and kept
- * between runs. Only the sync test triggers a sync, so no test here races another for
- * the sync gate.
+ * between runs. Only the sync test triggers a sync here. The investments spec also syncs,
+ * and runs only after this file has finished (playwright.config.ts), so nothing races
+ * test 26 for the sync gate.
  */
 
 /** A ticker no earlier run registered: the catalogue is shared and never emptied. */
