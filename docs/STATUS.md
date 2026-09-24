@@ -17,3 +17,4 @@ web unit 43 passed, E2E 13 passed.
 | 005 | CP2 Dapper aggregations + endpoints | ff3722b | OK — .NET 397, web 43, E2E 13; CP1 flake root-caused (inotify, config reload disabled in test hosts) |
 | 005 | CP3 web dashboard + Transfer/openingBalance in UI | 1ae3b22 | OK — .NET 397, web 67, E2E 13 |
 | 005 | CP4 E2E + handoff | 7f4468d | OK — .NET 397, web 67, E2E 16; 005 complete in code, manual steps 1–5 pending human |
+| 006 | CP1 data model + migration | 0ed7f0c | OK — .NET 410, web 67, E2E 16. Paused before CP2: spec's two ports vs ADR-015 needs a human decision |
