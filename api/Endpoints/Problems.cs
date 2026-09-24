@@ -56,6 +56,21 @@ internal static class Problems
             statusCode: StatusCodes.Status409Conflict);
 
     /// <summary>
+    /// A refusal that resolves itself with time. <c>Retry-After</c> says how long, in
+    /// whole seconds, rounded up.
+    /// </summary>
+    public static IResult TooManyRequests(HttpContext context, string reason, TimeSpan retryAfter)
+    {
+        context.Response.Headers.RetryAfter =
+            ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        return Results.Problem(
+            title: "Muitas solicitações",
+            detail: reason,
+            statusCode: StatusCodes.Status429TooManyRequests);
+    }
+
+    /// <summary>
     /// Turns a unique-index violation into the 409 it is. Caught rather than
     /// pre-checked with a query, because a pre-check races with a concurrent insert
     /// and the index does not.

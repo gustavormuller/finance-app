@@ -32,14 +32,17 @@ public static class MarketDataSetup
     }
 
     /// <summary>
-    /// The sync and its nightly host. Scoped, like the context they take (ADR-016); the job
-    /// opens a scope per run. <c>MarketData:ScheduledSync</c> decides whether the job runs.
+    /// The sync, its nightly host and its manual trigger. The sync is scoped, like the
+    /// context it takes (ADR-016); the job and the trigger open a scope per run and share
+    /// one gate, so runs never overlap. <c>MarketData:ScheduledSync</c> decides whether the
+    /// job runs.
     /// </summary>
     public static IServiceCollection AddMarketDataSync(this IServiceCollection services)
     {
         services.AddScoped<MarketDataStore>();
         services.AddScoped<MarketDataSync>();
         services.AddSingleton<MarketDataSyncGate>();
+        services.AddSingleton<ManualMarketDataSync>();
         services.AddHostedService<MarketDataSyncJob>();
         return services;
     }

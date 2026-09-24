@@ -4,9 +4,10 @@ namespace Finance.Api.Application.MarketData;
 /// One market-data sync at a time in the process: the manual trigger and the nightly job
 /// both hold it for the whole run, so they never overlap. A singleton. The API is one
 /// process (ADR-004), so an in-process semaphore is enough; a second instance would need
-/// a PostgreSQL advisory lock instead.
+/// a PostgreSQL advisory lock instead. Not disposable on purpose: a run still in the
+/// background when the container is disposed must still be able to release it.
 /// </summary>
-public sealed class MarketDataSyncGate : IDisposable
+public sealed class MarketDataSyncGate
 {
     private readonly SemaphoreSlim semaphore = new(1, 1);
 
@@ -17,6 +18,4 @@ public sealed class MarketDataSyncGate : IDisposable
     public Task WaitAsync(CancellationToken cancellationToken) => semaphore.WaitAsync(cancellationToken);
 
     public void Release() => semaphore.Release();
-
-    public void Dispose() => semaphore.Dispose();
 }

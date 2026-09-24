@@ -2,6 +2,7 @@
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
+using Finance.Api.Infrastructure.Jobs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -46,6 +47,20 @@ public static class MarketDataEndpoints
     private sealed record PriceResponse(DateOnly Date, decimal Close);
 
     private sealed record BenchmarkResponse(DateOnly Date, decimal Value);
+
+    private sealed record SyncAccepted(Guid SyncRunId);
+
+    /// <summary><c>Summary</c> parsed into the sync's own shape, so the screen reads an object, not a string.</summary>
+    private sealed record SyncRunResponse(
+        Guid Id,
+        DateTimeOffset StartedAt,
+        DateTimeOffset? FinishedAt,
+        SyncTrigger Trigger,
+        SyncRunStatus Status,
+        Dictionary<string, ProviderSyncSummary> Summary);
+
+    /// <summary>The run history the spec asks for.</summary>
+    private const int SyncRunLimit = 20;
 
     public static IEndpointRouteBuilder MapMarketDataEndpoints(this IEndpointRouteBuilder routes)
     {
@@ -141,6 +156,28 @@ public static class MarketDataEndpoints
             return Results.Ok(await query.OrderBy(value => value.Date)
                 .Select(value => new BenchmarkResponse(value.Date, value.Value)).ToListAsync(cancellationToken));
         });
+
+        marketData.MapPost("/sync", async (ManualMarketDataSync sync, HttpContext context, CancellationToken cancellationToken) =>
+        {
+            var started = await sync.StartAsync(cancellationToken);
+            if (started.SyncRunId is not { } syncRunId)
+            {
+                var minutes = (int)Math.Ceiling(started.RetryAfter.TotalMinutes);
+                return Problems.TooManyRequests(
+                    context,
+                    "Uma sincronização foi iniciada há menos de 10 minutos ou ainda está em andamento. "
+                    + $"Tente novamente em {minutes} {(minutes == 1 ? "minuto" : "minutos")}.",
+                    started.RetryAfter);
+            }
+
+            return Results.Accepted(value: new SyncAccepted(syncRunId));
+        });
+
+        marketData.MapGet("/sync-runs", async (AppDbContext database, CancellationToken cancellationToken) =>
+            Results.Ok((await database.Set<SyncRun>().AsNoTracking()
+                    .OrderByDescending(run => run.StartedAt).Take(SyncRunLimit).ToListAsync(cancellationToken))
+                .Select(run => new SyncRunResponse(
+                    run.Id, run.StartedAt, run.FinishedAt, run.Trigger, run.Status, SyncSummaryJson.Read(run.Summary)))));
 
         return routes;
     }

@@ -19,7 +19,11 @@ namespace Finance.Api.Infrastructure.Jobs;
 /// the boot. A failed run is logged and the schedule goes on.
 /// </remarks>
 public sealed class MarketDataSyncJob(
-    IServiceScopeFactory scopes, IOptions<MarketDataOptions> options, TimeProvider clock, ILogger<MarketDataSyncJob> logger)
+    IServiceScopeFactory scopes,
+    IOptions<MarketDataOptions> options,
+    TimeProvider clock,
+    ILogger<MarketDataSyncJob> logger,
+    MarketDataSyncGate gate)
     : BackgroundService
 {
     /// <summary>A latest run older than this at startup means the scheduled one was missed.</summary>
@@ -119,9 +123,18 @@ public sealed class MarketDataSyncJob(
             .Set<SyncRun>().MaxAsync(run => (DateTimeOffset?)run.StartedAt, stoppingToken);
     }
 
+    /// <summary>Behind the gate the manual trigger uses: waits out a manual run in progress, then runs.</summary>
     private async Task RunOnceAsync(CancellationToken stoppingToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<MarketDataSync>().RunAsync(SyncTrigger.Scheduled, stoppingToken);
+        await gate.WaitAsync(stoppingToken);
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<MarketDataSync>().RunAsync(SyncTrigger.Scheduled, stoppingToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 }

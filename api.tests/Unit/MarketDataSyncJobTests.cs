@@ -116,7 +116,8 @@ public sealed class MarketDataSyncJobTests
         // A container with nothing in it: a job that reached for the database would throw.
         var scopes = new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
         var job = new MarketDataSyncJob(
-            scopes, Microsoft.Extensions.Options.Options.Create(options), clock, NullLogger<MarketDataSyncJob>.Instance);
+            scopes, Microsoft.Extensions.Options.Options.Create(options), clock, NullLogger<MarketDataSyncJob>.Instance,
+            new MarketDataSyncGate());
         return (clock, Channel.CreateUnbounded<DateTimeOffset>(), job);
     }
 

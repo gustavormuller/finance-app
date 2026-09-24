@@ -37,7 +37,15 @@ public sealed class MarketDataSync(
     /// <summary>The summary key of the <see cref="IBenchmarkProvider"/>'s series.</summary>
     public const string BenchmarkProviderName = "Bcb";
 
-    public async Task<SyncRun> RunAsync(SyncTrigger trigger, CancellationToken cancellationToken)
+    /// <summary>Records a run and performs it: <see cref="StartAsync"/>, then <see cref="ExecuteAsync(Guid, CancellationToken)"/>.</summary>
+    public async Task<SyncRun> RunAsync(SyncTrigger trigger, CancellationToken cancellationToken) =>
+        await ExecuteAsync(await StartAsync(trigger, cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// Writes the <see cref="SyncRunStatus.Running"/> row and returns it, so the manual
+    /// trigger can answer with its id before the run itself happens.
+    /// </summary>
+    public async Task<SyncRun> StartAsync(SyncTrigger trigger, CancellationToken cancellationToken)
     {
         var run = new SyncRun
         {
@@ -48,7 +56,15 @@ public sealed class MarketDataSync(
         };
         db.Add(run);
         await db.SaveChangesAsync(cancellationToken);
+        return run;
+    }
 
+    /// <summary>Performs a run <see cref="StartAsync"/> recorded, possibly in another scope.</summary>
+    public async Task<SyncRun> ExecuteAsync(Guid syncRunId, CancellationToken cancellationToken) =>
+        await ExecuteAsync(await db.Set<SyncRun>().SingleAsync(run => run.Id == syncRunId, cancellationToken), cancellationToken);
+
+    private async Task<SyncRun> ExecuteAsync(SyncRun run, CancellationToken cancellationToken)
+    {
         var summary = new SortedDictionary<string, ProviderSyncSummary>(StringComparer.Ordinal);
         try
         {
