@@ -360,3 +360,47 @@ describe('ReturnsPage: per asset', () => {
     );
   });
 });
+
+describe('AssetReturnsPage', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows one asset\'s returns, its benchmarks, and the three-way FX split of a USD asset', async () => {
+    const seen = stubReturns(() => ({ body: halfYear }), [aapl, petr4], assetAnswers);
+    renderAt('/investments/a-aapl/returns');
+
+    expect(await screen.findByRole('heading', { name: 'AAPL · Rentabilidade' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '← AAPL' })).toHaveAttribute('href', '/investments/a-aapl');
+
+    const twr = await screen.findByTestId('headline-twr');
+    expect(plain(twr)).toContain('+21,00% no período');
+    expect(plain(screen.getByTestId('headline-xirr'))).toContain('+47,51% a.a.');
+
+    const fx = screen.getByTestId('fx-split');
+    expect(plain(within(fx).getByTestId('fx-native'))).toContain('+10,00%');
+    expect(plain(within(fx).getByTestId('fx-fx'))).toContain('+10,00%');
+    expect(plain(within(fx).getByTestId('fx-total'))).toContain('+21,00%');
+
+    expect(screen.getByTestId('comparison-chart')).toBeInTheDocument();
+    expect(plain(screen.getByTestId('benchmark-row-CDI'))).toContain('+17,79 p.p.');
+    expect(seen.filter((request) => request.url.startsWith('/api/returns/')).map((request) => request.url)).toEqual([
+      '/api/returns/assets/a-aapl?period=inception',
+    ]);
+  });
+
+  it('has no FX split for a BRL asset', async () => {
+    stubReturns(() => ({ body: halfYear }), [aapl, petr4], assetAnswers);
+    renderAt('/investments/a-petr4/returns');
+
+    await screen.findByTestId('headline-twr');
+    expect(screen.queryByTestId('fx-split')).not.toBeInTheDocument();
+  });
+
+  it('says so when the asset is not found', async () => {
+    stubReturns(() => ({ body: halfYear }), [], () => ({ status: 404 }));
+    renderAt('/investments/a-gone/returns');
+
+    expect(await screen.findByText('Ativo não encontrado.')).toBeInTheDocument();
+  });
+});
