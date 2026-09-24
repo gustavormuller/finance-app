@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Finance.Api.Application.Ai;
 using Finance.Api.Domain.Import;
 using Finance.Api.Domain.Transactions;
@@ -14,8 +14,9 @@ namespace Finance.Api.Infrastructure.Ai;
 /// A categorisation request (rung 3's system prompt) is answered as a model would, with a
 /// <c>{ rowId: categoryId }</c> object: each row gets the first category of its kind, in the
 /// order sent, that is not a sign default. A row holding <see cref="GarbageMarker"/> turns
-/// the whole answer into the fixed markdown instead (spec test 20). Anything else gets the
-/// fixed pt-BR markdown. CP7 shapes the analysis for E2E.
+/// the whole answer into the fixed markdown instead (spec test 20). An analysis request (the
+/// monthly-analysis prompt) gets the prompt's five sections, quoting the month and its
+/// expense from the input. Anything else gets the fixed pt-BR markdown.
 /// </remarks>
 public sealed class FakeAiProvider : IAiProvider
 {
@@ -28,8 +29,38 @@ public sealed class FakeAiProvider : IAiProvider
     public Task<AiCompletion> CompleteAsync(AiRequest request, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var text = request.System == AiCategorisation.System ? Categorise(request.User) ?? Answer : Answer;
+        var text = request.System == AiCategorisation.System ? Categorise(request.User) ?? Answer
+            : request.System == MonthlyAnalysisPrompt.Current.System ? Analyse(request.User)
+            : Answer;
         return Task.FromResult(new AiCompletion(text, Tokens(request.System.Length + request.User.Length), Tokens(text.Length)));
+    }
+
+    private static string Analyse(string user)
+    {
+        using var sent = JsonDocument.Parse(user);
+        var month = sent.RootElement.GetProperty("month").GetString();
+        var expense = sent.RootElement.GetProperty("monthOverMonth").GetProperty("expense").GetProperty("current").GetRawText();
+        return $"""
+            ## Resumo
+
+            Análise de teste de {month}, escrita pelo provedor simulado. Nenhum dado saiu do servidor.
+
+            ## Onde o dinheiro foi
+
+            As saídas do mês somaram R$ {expense}.
+
+            ## O que mudou
+
+            Resposta de teste.
+
+            ## Investimentos
+
+            Resposta de teste.
+
+            ## Sugestões
+
+            - Resposta de teste.
+            """;
     }
 
     private static string? Categorise(string user)
