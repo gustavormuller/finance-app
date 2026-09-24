@@ -3,10 +3,14 @@ import { useState } from 'react';
 
 import type { ReturnsQuery } from '@/api/finance';
 import Alert from '@/components/Alert';
+import { orderedCodes } from '@/components/returns/benchmarks';
+import BenchmarksTable from '@/components/returns/BenchmarksTable';
+import ComparisonChart from '@/components/returns/ComparisonChart';
 import Headline from '@/components/returns/Headline';
 import PeriodSelector from '@/components/returns/PeriodSelector';
 import { fieldErrors, usePortfolioReturns } from '@/components/returns/queries';
 import { formatDate } from '@/lib/labels';
+import { showsAnnualised } from '@/lib/rates';
 
 /**
  * `/investments/returns` (008): how the money did, and against what. Every figure is the
@@ -49,6 +53,16 @@ export default function ReturnsPage() {
               twr={returns.data.twr}
               xirr={returns.data.xirr}
               timingEffect={returns.data.timingEffect}
+            />
+            <ComparisonChart
+              series={returns.data.series}
+              codes={orderedCodes(returns.data.benchmarks).filter((code) => returns.data.benchmarks[code])}
+            />
+            <BenchmarksTable
+              twr={returns.data.twr}
+              benchmarks={returns.data.benchmarks}
+              codes={orderedCodes(returns.data.benchmarks)}
+              annualised={showsAnnualised(returns.data.period)}
             />
           </>
         ))}
