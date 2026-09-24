@@ -832,3 +832,196 @@ Full handoff: `docs/handoffs/006.md`. **006 is complete in code; these steps nee
       fake close is dated yesterday.
     - Two sub-checkpoints are likely: first the rebuild, `POST /rebuild` and the
       nightly job, then the routes.
+
+## 007 · checkpoint 3
+
+Done in two parts. 3a is the rebuild and the asset and movement routes (tests 16, 17,
+19–24). 3b is positions against the calculator, the summary, `POST /rebuild` and the
+rebuild after the sync (tests 18, 25–27).
+
+- **007 · CP3 · no ADR conflict, no migration.** The code reads and writes the CP1 tables
+  as they are.
+  - `Application/Investments/` has `SnapshotRebuild`, `PositionQueries` and
+    `MovementCommands`, which use `AppDbContext` directly (ADR-016).
+  - The endpoints stay thin (`Endpoints/InvestmentEndpoints.cs`).
+  - The after-sync step is in `Infrastructure/Jobs/`, beside the two sync triggers.
+  - The domain is unchanged from CP2. No port, no Repository, no MediatR.
+- **007 · CP3 · the rebuild (`SnapshotRebuild`, the spec's `RebuildSnapshots`).**
+  - It deletes the asset's rows with `Date >= from`, calls `SnapshotBuilder.Build(…, from,
+    today)` and inserts the result.
+  - It loads the whole movement history, the closes from the latest one on or before
+    `from`, and the USDBRL rates from the latest one on or before the first movement.
+  - "Today" is the **UTC** date, which the sync's "yesterday" also counts from. São Paulo
+    is behind UTC, so this never refuses a movement dated today in local time. From 21:00
+    local time it accepts one dated tomorrow.
+  - **One transaction (test 22).** The rebuild opens its own transaction, or joins the
+    caller's when there is one. A movement write therefore saves and rebuilds in **one**
+    transaction. That is stronger than the spec asks: a failing rebuild never leaves a
+    movement without its rows.
+  - A transaction-scoped advisory lock on the asset (`pg_advisory_xact_lock`) serialises
+    two rebuilds of it. Without the lock, both would delete, then both insert, and one
+    would fail on the primary key.
+  - Rows are detached after the save, whether it succeeds or fails, so one context can
+    rebuild many assets. Test 22 makes the insert fail through a real `numeric(18,2)`
+    overflow.
+- **007 · CP3 · movement writes (`MovementCommands`).**
+  - Each write is checked with `MovementRules.Validate`, then with `ValidatePositions` over
+    the history as it stands after the write (a PUT replaces the old row, a DELETE removes
+    it). It then saves and rebuilds from `min(oldDate, newDate)`.
+  - Fields irrelevant to the kind are **stored as zero**, as the CP2 handoff asked:
+    quantity and unit price on Dividend and Jcp, unit price on Split, and amount on
+    Buy, Sell and Split. Fees are kept on every kind; the calculator ignores them on a
+    Split.
+  - `currency` may be omitted, and then defaults to the asset's. When sent, it is
+    trimmed and upper-cased before the rule compares it.
+  - An unknown `kind` sent as a number is a 400 on `kind`. An unknown name fails JSON
+    binding, which is the framework's 400.
+  - **For the human:** a DELETE that would uncover a later sell is a **409** whose
+    `detail` is the rule's text (`Quantidade vendida maior que a posição`). The spec
+    names no status for it, and a DELETE has no field to blame. A POST or PUT that
+    breaks the rule is a 400 on `quantity`.
+  - **Not validated: excess precision.** PostgreSQL silently rounds a quantity or unit
+    price past 8 places, and an amount or fee past 2. The rebuild reads what was stored,
+    so rows and positions stay consistent with each other, but the stored value may not
+    be what was typed. A value past the column's range is a 500. Refusing either needs
+    new pt-BR copy.
+- **007 · CP3 · positions (`GET /assets`, `PositionQueries`).**
+  - Quantity, `averageCost`, `realisedBrl` and `dividendsBrl` come from
+    `PositionCalculator` over the movements, at full precision. `averageCost` is then
+    rounded to 8 places, half to even, the column's rounding. It is never read back from
+    `PortfolioDaily` (CP2 handoff).
+  - `price`, `priceDate`, `valueBrl` and `costBasisBrl` come from the asset's latest
+    daily row. `unrealisedBrl` is `valueBrl − costBasisBrl`, and `unrealisedPct` is that
+    over `costBasisBrl`, to 4 places (the spec's example shows 0.0927). All six are
+    `null` while the asset has no row: no movement yet, or no close yet.
+  - `dividendsBrl` is net of the fees on the income (CP2's rule).
+  - Every held asset is listed, including ones with no movement and positions sold to
+    zero. The order is `valueBrl` descending, then ticker.
+  - **For the human: `realisedBrl` and `dividendsBrl` of a USD asset.** The spec does not
+    say how to convert them. Each event is converted at the USDBRL rate of **its own
+    date**: the latest on or before it, or the earliest after it, which is how CP2 costs
+    a buy. The alternative, today's rate, would move a gain that is already realised.
+    Both are `null` for a USD asset while no USDBRL rate exists at all. Pinned by
+    `A_usd_position_converts_each_event_at_its_own_dates_rate`.
+- **007 · CP3 · `POST /assets`.**
+  - The body takes `{ marketAssetId, nickname? }`, or the 006 registration
+    `{ ticker, name?, class, provider, providerSymbol, currency }`. The registration goes
+    through 006's own `Validate` and `NewAsset`, which are now `internal` on
+    `MarketDataEndpoints` (not copied).
+  - An entry already in the catalogue under the same `(provider, providerSymbol)` is
+    reused, and the request's other fields do not overwrite it.
+  - Answers:
+    - Holding it already is a 409 (`Você já possui este ativo na carteira.`).
+    - A catalogue race on a new symbol is 006's 409.
+    - An unknown `marketAssetId` is a 400 on `marketAssetId`.
+    - A nickname over 100 characters is a 400 on `nickname`.
+    - Success is a 201 with the position shape (all zeros and nulls).
+- **007 · CP3 · `DELETE /assets/{id}`** answers 404 for someone else's asset or a missing
+  one, 409 when it has movements, and 204 otherwise. The daily rows go with it
+  (CASCADE). The movement check is a query and the FK is not caught, so a movement
+  written concurrently would make it a 500. That is rare, and noted here only.
+- **007 · CP3 · summary and `POST /rebuild`.**
+  - The summary sums the latest daily row of each asset. An asset with no row adds
+    nothing.
+  - `POST /rebuild` rebuilds each of the caller's assets from 1990-01-01, the rule's
+    lower bound, so everything is rebuilt, one transaction per asset. It answers **202
+    `{ assetsRebuilt, rowsWritten }` once done**: 202 because the spec says so, but the
+    work is already finished and there is nothing to poll.
+  - The definition of done's "truncate, rebuild, identical" is a test. It also checks
+    that another user's truncated rows are not rebuilt.
+- **007 · CP3 · the rebuild after the sync (`SnapshotRebuildAfterSync`, test 27).**
+  - **No `IgnoreQueryFilters()`.** A new scoped `ActingUser` is set once, right after a
+    job opens a scope for one user. `HttpCurrentUser` reads it before the request's
+    claims. Each user gets a scope of their own, so every query stays filtered.
+  - Users are listed from `AspNetUsers`, which has no filter. Production code still has
+    no `IgnoreQueryFilters`.
+  - **For the human: it runs after the manual sync too, not only the nightly one.** Both
+    triggers call it after the sync and inside `MarketDataSyncGate`, so it never overlaps
+    itself. Without it, closes from a manual sync would not reach anyone's rows until the
+    next night. The job resolves it from its scope, so `MarketDataSyncJob`'s constructor
+    and unit tests are unchanged.
+  - **For the human: it starts from yesterday, or earlier where rows are missing.** The
+    spec says "from yesterday". Two gaps would stay open forever with that alone, so it
+    starts earlier in two cases (`SnapshotRebuild.NightlyFromAsync`):
+    - The asset's rows stop before yesterday because the job missed nights. It starts the
+      day after the last row.
+    - The rows start after the first day that has a movement, a close and, for USD, a
+      rate. This happens when a new asset's history was backfilled after its movements
+      were written. It starts at that first day.
+  - **The summary section holds counts only.** The key is `Snapshots` (web label
+    "Posições da carteira"):
+    - `rowsWritten` is the rows written, `itemsSynced` the assets rebuilt and
+      `itemsFailed` the assets that failed.
+    - `failures` is always empty.
+    - `error` is a fixed sentence (`Não foi possível recalcular as posições de um ou mais
+      ativos.`).
+    - The asset and user ids go to the log only.
+    - The section is left out when nobody holds anything.
+  - The run's status is recomputed with the section counted. One failed asset therefore
+    makes the run `PartialFailure` on the screen every user sees. That reveals a count,
+    nothing else.
+  - A manual run turns `Succeeded` before the section is written, because the sync
+    finishes first. So `/market-data` can stop polling a few hundred milliseconds before
+    the section appears. It appears on the next refetch.
+  - An exception outside any one asset (the database down, say) reaches the job's
+    handler, and is logged as "the scheduled market-data sync failed".
+- **007 · CP3 · invented pt-BR copy, for review.**
+  - `Você já possui este ativo na carteira.`
+  - `Ativo não encontrado no catálogo.`
+  - `O apelido deve ter até 100 caracteres.`
+  - `O ativo tem movimentações. Exclua-as antes de remover o ativo.`
+  - `O tipo de movimentação não é válido.`
+  - `As observações devem ter até 300 caracteres.`
+  - `Não foi possível recalcular as posições de um ou mais ativos.`
+  - `Posições da carteira`
+- **007 · CP3 · tests.**
+  - `InvestmentsApi` is the test host. Each test gets a database of its own, and the
+    fakes from 006 · CP3 replace brapi and BCB.
+  - The rebuild tests construct `SnapshotRebuild` over a context filtered as the user.
+  - Every test commit failed before its feat commit, with two exceptions:
+    - The validation guards (`670da77`) were written after the routes and passed on
+      their first run.
+    - Both cases of test 25 (`e680c0a`) passed against 3a's position read, which already
+      existed.
+  - Counts: .NET 580 → 611, web 74 → 76 (the `Snapshots` label), E2E 18.
+- **007 · CP3 · diff sizes.** `d5db351` is 238 lines: the new test host plus the four
+  rebuild tests. Two feat commits went over ~200 and were split before handoff
+  (`3bf51ec`/`748a143` and `a8c1e3f`/`12ced45`). Every other commit is under ~200.
+- **007 · CP3 · handoff to CP4** (web `/investments`, asset detail, movement form, add
+  asset; web tests 28–30).
+  - Routes and shapes, all under `/api/investments`, all with problem details in pt-BR:
+    - `GET assets` returns `[position]`. A position is the spec's shape plus `nickname`
+      and `class`.
+    - `POST assets` answers `201 position`, or 400 `errors[marketAssetId|nickname|ticker|
+      currency|…]`, or 409 `detail`.
+    - `DELETE assets/{id}` answers 204, or 404, or 409 `detail`.
+    - `GET assets/{id}/movements` returns `[{ id, assetId, date, kind, quantity,
+      unitPrice, amount, fees, currency, notes, createdAt }]`, oldest first (replay
+      order).
+    - `POST assets/{id}/movements` answers 201. `PUT movements/{id}` answers 200.
+    - A rule broken on POST or PUT is a 400 with `errors[quantity|amount|fees|currency|
+      date|kind|notes]`, whose texts are the spec's table.
+    - `DELETE movements/{id}` answers 204, or 409 `detail` when it would uncover a later
+      sell.
+    - `GET assets/{id}/daily?from&to` returns `[{ date, quantity, averageCost, price,
+      priceDate, fxRate, valueBrl, costBasisBrl }]`, oldest first. This is the Recharts
+      series.
+    - `GET summary` returns `{ totalBrl, totalCostBrl, unrealisedBrl }`.
+    - `POST rebuild` answers `202 { assetsRebuilt, rowsWritten }`.
+  - Enums cross as names. `MovementKind` (`Buy`, `Sell`, `Dividend`, `Jcp`, `Split`)
+    needs pt-BR labels in `web/src/lib/labels.ts`. `class` reuses 006's labels.
+  - The movement form may omit `currency`. For Dividend and Jcp it sends `amount`; the
+    API zeroes quantity and unit price anyway.
+  - A position's valuation fields are `null` until the asset has a daily row. Positions
+    with quantity 0 are listed: the screen decides whether to hide them. Spec E2E 33
+    ("delete the buy → position disappears") needs that decision. Filtering
+    `quantity > 0` in the UI is the simplest, but it must still leave a way to reach an
+    asset that has no movement yet.
+  - Test 30's stale flag reads `priceDate`. The API does not compute staleness.
+  - Add asset: search `GET /api/market-data/assets?q=`, then `POST /api/investments/assets
+    { marketAssetId }`. For inline registration, post the 006 body to the same route.
+  - For CP5's E2E: under `MarketData:FakeProviders` every close is 10, dated yesterday
+    (UTC), and a manual sync now also rebuilds. The order that yields a valued position
+    at once is: register or add PETR4, run a manual sync, then post a buy dated today or
+    yesterday. A buy posted before any close gets rows after the next sync or a `POST
+    /rebuild`.
