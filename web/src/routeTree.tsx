@@ -2,7 +2,7 @@ import { createRootRoute, createRoute } from '@tanstack/react-router';
 
 import AccountsPage from './routes/AccountsPage';
 import CategoriesPage from './routes/CategoriesPage';
-import HomePage from './routes/HomePage';
+import DashboardPage from './routes/DashboardPage';
 import ImportPage from './routes/ImportPage';
 import LoginPage from './routes/LoginPage';
 import ProtectedLayout from './routes/ProtectedLayout';
@@ -39,10 +39,11 @@ const protectedRoute = createRoute({
   component: ProtectedLayout,
 });
 
+// 005: the dashboard is the landing page after sign-in.
 const homeRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/',
-  component: HomePage,
+  component: DashboardPage,
 });
 
 // 003's three screens, all nested under the pathless protected layout so they are
