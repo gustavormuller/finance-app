@@ -1201,3 +1201,96 @@ rebuild after the sync (tests 18, 25–27).
     - The Split fields.
     - float64 on the wire.
     - All invented pt-BR copy.
+
+## 007 · checkpoint 5
+
+- **007 · CP5 · no ADR conflict, no application change, no migration.** E2E 31–33 drive the
+  CP4 screens against the CP3 routes as they are. The only non-test change is
+  `web/playwright.config.ts`.
+- **007 · CP5 · the sync race with test 26: a Playwright project dependency.** Every
+  investments test triggers a manual sync, because a buy with no close has no daily row.
+  The gate refuses a second run while one is going (429), and test 26 asserts a 202.
+  - **Chosen:** `investments.spec.ts` runs in its own project, `investments`, which
+    depends on a `market-data` project holding `market-data.spec.ts`. Everything else
+    stays in `chromium`, still `fullyParallel`, and runs alongside both. The investments
+    tests start only once test 26 has finished, so they can never overlap it. Test 26 is
+    unchanged.
+  - **Also needed:** the three investments tests run in order (`test.describe.configure({
+    mode: 'default' })`), and each waits out a 429 (every 500 ms, up to 30 s) before its
+    sync. The rebuild after a sync runs inside the gate *after* the run reads
+    `Succeeded`, so the next sync can meet a 429 for a moment. A 429 is safe to wait out
+    here, because nothing in this project asserts a 202.
+  - **Rejected:** *Retrying on 429 in the new spec alone.* That does not protect test 26:
+    if the investments sync starts first, test 26 gets the 429.
+  - **Rejected:** *One serial file holding both specs' sync tests.* It would move test 26
+    out of 006's file, and a failure in serial mode skips the rest.
+  - **Rejected:** *Seeding a close without a sync.* The E2E scripts have no database access
+    (006 · CP5).
+  - Cost: if the `market-data` project fails, the investments tests report "did not run"
+    rather than pass or fail. Running `investments.spec.ts` on its own also runs
+    `market-data.spec.ts` first.
+  - No 429 was seen in either full run. The wait is a guard, not a workaround for an
+    observed failure.
+- **007 · CP5 · the tests.** Each test brings its own user, adds PETR4 through "Cadastrar
+  novo ativo", syncs, and buys 100 @ 9,50 with 4,90 in fees, dated today (the form's
+  default). The preview reads R$ 954,90.
+  - PETR4 is registered on the first run and reused after that (Brapi/PETR4 already in the
+    catalogue, no 409). BRL, so the fakes' 0.05 USDBRL never enters.
+  - **31:** on the detail page, Quantidade `100`, Valor `R$ 1.000,00` (the fake close of
+    10) and Resultado `+R$ 45,10`. On the list, the row and the total row both show R$
+    1.000,00.
+  - **32:** Proventos goes from `R$ 0,00` to `R$ 12,34`. Quantidade stays `100`, and Valor
+    stays `R$ 1.000,00`.
+  - **33:** a dividend of 5 is recorded, and only the buy is deleted. This answers CP4's
+    open question: the rules allow income on a zero position, so the delete is accepted.
+    Quantidade reads `0`. The list says "Nenhuma posição em aberto." with no row. Ticking
+    "Mostrar ativos sem posição (1)" shows the PETR4 row again, so it is hidden and not
+    removed.
+- **007 · CP5 · test-first, honestly.** The screens and routes existed since CP4, and CP4's
+  throwaway probe had already walked this path. All three tests passed on their first run.
+  They guard the path; they did not drive it.
+- **007 · CP5 · two back-to-back `verify-e2e.sh` runs passed**, 21/21 each, against the kept
+  database. `market-data.spec.ts`'s header comment was updated to name the investments
+  spec's sync (`e98f1c6`).
+- **007 · CP5 · counts.** .NET 611, web 115, E2E 18 → 21.
+- **007 · CP5 · diff sizes.** `afec18a` is 183 lines (the spec and the config), and
+  `e98f1c6` is 5. The handoff (`74b569b`) is 216 lines, one document, left whole.
+
+## 007 · handoff
+
+Full handoff: `docs/handoffs/007.md`. **007 is complete in code; these steps need a human.**
+
+- **006's pending steps first.** Manual step 3 needs real closes, so it needs the brapi
+  token. Step 4 needs Twelve Data's key and the real USDBRL series (006 · handoff).
+- **Manual steps 1–6** with a real broker statement. **Step 2 settles rounding.** The
+  calculator carries full precision and rounds once at the column (average to 8 places,
+  BRL to 2, half to even; 007 · CP2). If the broker disagrees by a cent, change the
+  column boundary, not the formulas.
+- **Migration sign-off.** `docs/migrations/007-AddInvestments.sql` (shown in 007 · CP1).
+- **Spec-silent decisions to confirm or overturn:**
+  - USD `realisedBrl` and `dividendsBrl` at each event's own FX rate (CP3).
+  - The nightly rebuild also starts before yesterday where rows are missing, and it also
+    runs after a manual sync (CP3).
+  - The 409 on a DELETE that uncovers a later sell (CP3).
+  - `POST /rebuild` answers 202 after it has already finished (CP3).
+  - Silent rounding of excess decimals, and a 500 past a column's range (CP3).
+  - float64 JSON numbers past 15 significant digits (CP4).
+  - Zero positions hidden by default (CP4).
+  - Stale price counting weekdays, with holidays unknown (CP4).
+  - Split fields: quantity only (CP2, CP4).
+  - Fees on income subtracted; irrelevant fields stored as zero; no unit-price rule; a
+    split on a zero position allowed (CP2).
+- **Invented pt-BR copy**, listed in 007 · CP2, CP3 and CP4, for a native review.
+- **ARCHITECTURE.md's Investments block** is stale against the spec (007 · CP1). It needs a
+  one-block edit. `benchmark_hint` was dropped with no replacement, and 008 may want it
+  back.
+- **CLAUDE.md's shared-table list** should also name `market_assets` and `sync_runs` (006).
+  007 adds no shared table.
+- **Starting spec 008.** Read `specs/008-returns.md`, `docs/handoffs/007.md` ("Starting spec
+  008") and the 007 entries above. The baseline is .NET 611, web 115, E2E 21.
+  - Flows come from `Movements`, not `PortfolioDaily`. Convert USD flows with 007's
+    rule: the latest rate on or before the date, else the earliest after it.
+  - Decide gross or net dividends (`dividendsBrl` is net of fees).
+  - Days before an asset's first close have no row.
+  - Derive the benchmark types from 006's `BenchmarkUnit`.
+  - A syncing E2E spec must follow CP5's project rule.
