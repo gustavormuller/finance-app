@@ -14,3 +14,4 @@ web unit 43 passed, E2E 13 passed.
 | 004 | handoff | bec084f | OK — 004 complete in code (tests 1–66 present); manual steps 1–8 pending human |
 | 005 | CP1 domain + migration | f6878c6 | OK — .NET 372, web 43, E2E 13; 3 TransactionPersistenceTests flaked once (DEFERRED) |
 | 005 | CP2 Dapper aggregations + endpoints | ff3722b | OK — .NET 397, web 43, E2E 13; CP1 flake root-caused (inotify, config reload disabled in test hosts) |
+| 005 | CP3 web dashboard + Transfer/openingBalance in UI | 1ae3b22 | OK — .NET 397, web 67, E2E 13 |
