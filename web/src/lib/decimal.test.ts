@@ -82,9 +82,10 @@ describe('pointsDifference', () => {
   });
 
   it('rounds half to even, as the API does', () => {
-    expect(pointsDifference(0.0000005, 0)).toBe(0n);
-    expect(pointsDifference(0.0000015, 0)).toBe(2n);
-    expect(pointsDifference(0, 0.0000015)).toBe(-2n);
-    expect(pointsDifference(0.0000025, 0)).toBe(2n);
+    // A hundredth of a point is 1e-4 of a rate, so 5e-5 is exactly half of one.
+    expect(pointsDifference(0.00005, 0)).toBe(0n);
+    expect(pointsDifference(0.00015, 0)).toBe(2n);
+    expect(pointsDifference(0, 0.00015)).toBe(-2n);
+    expect(pointsDifference(0.00025, 0)).toBe(2n);
   });
 });
