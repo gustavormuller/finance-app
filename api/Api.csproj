@@ -10,6 +10,11 @@
     <InternalsVisibleTo Include="Finance.Api.Tests" />
   </ItemGroup>
 
+  <!-- 009, decision 8: the reviewed prompt files ship inside the assembly. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Infrastructure/Ai/Prompts/*.md" LogicalName="Prompts/%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Cronos" Version="0.11.1" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
