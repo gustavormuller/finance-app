@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { api } from '@/api/finance';
 import { useMe } from '@/auth/useMe';
@@ -21,15 +22,20 @@ export default function SettingsPage() {
   // The API's default month is the one the budget counts in (UTC-3), so none is sent.
   const usage = useQuery({ queryKey: ['ai', 'usage'], queryFn: api.aiUsage });
 
+  // Where the switch is going, set in the click handler itself. The mutation's own pending
+  // state reaches the page a tick later, and in that tick the controlled switch went back.
+  const [saving, setSaving] = useState<boolean | null>(null);
+
   const toggle = useMutation({
     mutationFn: (aiEnabled: boolean) => api.updateMe({ aiEnabled }),
     // The answer is the whole of `me`, so every page reading the flag sees it at once.
     onSuccess: (user) => queryClient.setQueryData(['me'], user),
+    onSettled: () => setSaving(null),
   });
 
   // RequireAuth renders pages only once `me` has resolved to a user. While the PATCH is
   // in flight the switch shows where it is going; a refusal puts it back.
-  const aiEnabled = toggle.isPending ? toggle.variables : (me.data?.aiEnabled ?? false);
+  const aiEnabled = saving ?? me.data?.aiEnabled ?? false;
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8">
@@ -61,8 +67,11 @@ export default function SettingsPage() {
                 role="switch"
                 className="accent-primary size-5"
                 checked={aiEnabled}
-                disabled={toggle.isPending}
-                onChange={(event) => toggle.mutate(event.target.checked)}
+                disabled={saving !== null}
+                onChange={(event) => {
+                  setSaving(event.target.checked);
+                  toggle.mutate(event.target.checked);
+                }}
               />
             </div>
           </div>
