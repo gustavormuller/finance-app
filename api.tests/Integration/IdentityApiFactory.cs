@@ -91,11 +91,16 @@ internal sealed class TestGoogleHandler(
 /// <c>Secure</c>, and a cookie container will not send one back over <c>http</c>. The
 /// alternative — relaxing <c>CookieSecurePolicy</c> under test — would leave the
 /// production cookie policy untested.
+/// <para>
+/// <paramref name="services"/> runs after every other registration, so a test can swap
+/// a service for a fake: the market-data providers, for instance.
+/// </para>
 /// </remarks>
 internal sealed class IdentityApiFactory(
     string connectionString,
     string? keysPath = null,
-    string environment = "Development")
+    string environment = "Development",
+    Action<IServiceCollection>? services = null)
     : WebApplicationFactory<Program>
 {
     /// <summary>The origin the Origin check is configured to accept.</summary>
@@ -153,6 +158,11 @@ internal sealed class IdentityApiFactory(
                 options.SchemeMap[GoogleDefaults.AuthenticationScheme].HandlerType =
                     typeof(TestGoogleHandler));
         });
+
+        if (services is not null)
+        {
+            builder.ConfigureServices(services);
+        }
     }
 
     /// <summary>
