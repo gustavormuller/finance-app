@@ -24,6 +24,21 @@ public sealed class MarketDataOptionsTests
                 .Select(pair => (pair.Key, pair.Value.Code, pair.Value.Unit)));
     }
 
+    /// <summary>CP3: the job is on in production; IVVB11 is a brapi price stored as a benchmark level.</summary>
+    [Fact]
+    public void Appsettings_turns_on_the_nightly_job_and_serves_IVVB11_from_brapi()
+    {
+        var options = Bind();
+
+        Assert.True(options.ScheduledSync);
+        var ivvb11 = Assert.Single(options.PriceBenchmarks);
+        Assert.Equal(
+            ("IVVB11", Finance.Api.Domain.MarketData.ProviderKind.Brapi, "IVVB11", BenchmarkUnit.Level),
+            (ivvb11.Key, ivvb11.Value.Provider, ivvb11.Value.Symbol, ivvb11.Value.Unit));
+        Assert.Equal((3, TimeSpan.FromSeconds(2), 5), (
+            options.Resilience.RetryAttempts, options.Resilience.RetryBaseDelay, options.Resilience.FailuresToBreak));
+    }
+
     [Fact]
     public void Series_codes_are_looked_up_ignoring_case()
     {
