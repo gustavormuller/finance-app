@@ -3,6 +3,7 @@ using Finance.Api.Application;
 using Finance.Api.Domain;
 using Finance.Api.Domain.Identity;
 using Finance.Api.Domain.Import;
+using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Domain.Transactions;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -60,6 +61,12 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
 
     public DbSet<SyncRun> SyncRuns => Set<SyncRun>();
 
+    public DbSet<Asset> Assets => Set<Asset>();
+
+    public DbSet<Movement> Movements => Set<Movement>();
+
+    public DbSet<PortfolioDaily> PortfolioDaily => Set<PortfolioDaily>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -83,6 +90,7 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
         modelBuilder.ConfigureTransactions();
         modelBuilder.ConfigureImport();
         modelBuilder.ConfigureMarketData();
+        modelBuilder.ConfigureInvestments();
 
         // ADR-007, the part that matters: one loop, not one line per entity. A new
         // user-owned entity is isolated because it implements IUserOwned, not because
