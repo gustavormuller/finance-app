@@ -5,9 +5,9 @@ import type { ReturnsPoint } from '@/api/finance';
 import SectionHeading from '@/components/dashboard/SectionHeading';
 import { Button } from '@/components/ui/button';
 import { benchmarkLabel, formatDate } from '@/lib/labels';
+import { formatIndexTick } from '@/lib/rates';
 
 const index = (value: number) => value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const tick = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const shortDay = (isoDay: string) => formatDate(isoDay).slice(0, 5);
 
 /** Muted and told apart by dash as well as shade, so colour is never the only carrier. */
@@ -49,7 +49,7 @@ export default function ComparisonChart({ series, codes }: { series: ReturnsPoin
           <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--border)" />
             <XAxis dataKey="date" tickFormatter={shortDay} tickLine={false} axisLine={false} minTickGap={32} />
-            <YAxis tickFormatter={tick} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
+            <YAxis tickFormatter={formatIndexTick} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
             <Tooltip
               cursor={{ stroke: 'var(--border)' }}
               labelFormatter={(date) => formatDate(String(date))}

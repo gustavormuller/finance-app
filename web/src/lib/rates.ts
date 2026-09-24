@@ -51,3 +51,11 @@ export function signTone(rate: number | null): string | undefined {
 
   return rate > 0 ? 'text-green-700 dark:text-green-500' : 'text-chart-expense';
 }
+
+const indexTick = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
+
+/**
+ * A base-100 axis tick: `101,5`, `100`. The fraction is kept, because over a short period
+ * the axis spans a few points, and ticks rounded to whole numbers repeat.
+ */
+export const formatIndexTick = (value: number) => indexTick.format(value);
