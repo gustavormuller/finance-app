@@ -3,6 +3,7 @@ using Finance.Api.Application;
 using Finance.Api.Application.Dashboard;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
+using Finance.Api.Infrastructure.MarketData;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +35,10 @@ builder.Services.AddScoped<ImportCommands>();
 
 // 005's dashboard reads: Dapper on the context's connection (ARCHITECTURE.md section 6).
 builder.Services.AddScoped<DashboardQueries>();
+
+// 006's market-data provider adapters and the MarketData settings. Nothing calls them
+// yet: the sync that does arrives with its job.
+builder.Services.AddMarketDataProviders();
 
 var app = builder.Build();
 
