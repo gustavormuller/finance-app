@@ -10,6 +10,7 @@ const categories: Category[] = [
   { id: 'cat-food', name: 'Alimentação', kind: 'Expense', parentId: null, createdAt: '' },
   { id: 'cat-other', name: 'Outros', kind: 'Expense', parentId: null, createdAt: '' },
   { id: 'cat-income', name: 'Outras receitas', kind: 'Income', parentId: null, createdAt: '' },
+  { id: 'cat-transfer', name: 'Transferência', kind: 'Transfer', parentId: null, createdAt: '' },
 ];
 
 function row(partial: Partial<StagedRow> & Pick<StagedRow, 'id' | 'rowNumber' | 'status'>): StagedRow {
@@ -138,5 +139,24 @@ describe('PreviewStep', () => {
     expect(Array.from(income.querySelectorAll('option')).map((option) => option.textContent)).toEqual([
       'Outras receitas',
     ]);
+  });
+
+  /**
+   * 005 amendment 1. A transfer takes any sign, so Transferência is offered next to
+   * the kind the sign implies, on a leaving row and an arriving one alike.
+   */
+  it('offers a Transfer category whatever the row sign', () => {
+    renderStep([
+      row({ id: 'r1', rowNumber: 1, status: 'Ready', amount: -3000 }),
+      row({ id: 'r2', rowNumber: 2, status: 'Ready', amount: 3000, categoryId: 'cat-income' }),
+    ]);
+
+    const options = (rowNumber: number) =>
+      [...screen.getByLabelText(`Categoria da linha ${rowNumber}`).querySelectorAll('option')].map(
+        (option) => option.textContent,
+      );
+
+    expect(options(1)).toEqual(['Alimentação', 'Outros', 'Transferência']);
+    expect(options(2)).toEqual(['Outras receitas', 'Transferência']);
   });
 });

@@ -31,9 +31,16 @@ const categories: Category[] = [
     parentId: null,
     createdAt: '2026-09-01T00:00:00Z',
   },
+  {
+    id: 'cat-transfer',
+    name: 'Transferência',
+    kind: 'Transfer',
+    parentId: null,
+    createdAt: '2026-09-01T00:00:00Z',
+  },
 ];
 
-async function fillAndSubmit(amount: string, categoryId: string) {
+async function fillAndSubmit(amount: string, categoryId: string, direction?: 'Saída' | 'Entrada') {
   const onSubmit = vi.fn();
   const user = userEvent.setup();
 
@@ -53,6 +60,9 @@ async function fillAndSubmit(amount: string, categoryId: string) {
   await user.clear(screen.getByLabelText('Data'));
   await user.type(screen.getByLabelText('Data'), '2026-09-13');
   await user.type(screen.getByLabelText('Descrição'), 'Supermercado');
+  if (direction) {
+    await user.click(screen.getByRole('radio', { name: direction }));
+  }
   await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
   return onSubmit;
@@ -130,6 +140,51 @@ describe('TransactionForm', () => {
       .querySelectorAll('optgroup');
 
     // The members stay English on the wire; only the reading of them is Portuguese.
-    expect([...groups].map((group) => group.label)).toEqual(['Receita', 'Despesa']);
+    expect([...groups].map((group) => group.label)).toEqual(['Receita', 'Despesa', 'Transferência']);
+  });
+
+  /**
+   * 005 amendment 1. A transfer has no direction of its own — the same category
+   * leaves checking and arrives on the card — so the user picks the sign.
+   */
+  it.each([
+    ['Saída', -500],
+    ['Entrada', 500],
+  ] as const)('lets the user choose the sign for a Transfer category: %s', async (direction, amount) => {
+    const onSubmit = await fillAndSubmit('500', 'cat-transfer', direction);
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({ categoryId: 'cat-transfer', amount });
+  });
+
+  /** For Income and Expense the kind still decides, so there is nothing to choose. */
+  it('offers no direction for an Income or Expense category', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TransactionForm accounts={accounts} categories={categories} submitLabel="Salvar" onSubmit={vi.fn()} />,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Categoria'), 'cat-expense');
+    expect(screen.queryByRole('radio', { name: 'Saída' })).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Categoria'), 'cat-transfer');
+    expect(screen.getByRole('radio', { name: 'Saída' })).toBeChecked();
+  });
+
+  /** Editing an arriving transfer opens on the direction it already has. */
+  it('opens an existing transfer on its own direction', () => {
+    render(
+      <TransactionForm
+        accounts={accounts}
+        categories={categories}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+        defaultValues={{ categoryId: 'cat-transfer', amount: '500.00', direction: 'in' }}
+      />,
+    );
+
+    expect(screen.getByRole('radio', { name: 'Entrada' })).toBeChecked();
   });
 });
