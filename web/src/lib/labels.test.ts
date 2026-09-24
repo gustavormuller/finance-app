@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { syncProviderLabel } from './labels';
+import { movementKindLabels, movementKinds, syncProviderLabel } from './labels';
 
 describe('syncProviderLabel', () => {
   it('names every summary key in Portuguese, the snapshot rebuild included', () => {
@@ -10,5 +10,17 @@ describe('syncProviderLabel', () => {
 
   it('shows an unknown key as sent', () => {
     expect(syncProviderLabel('Unknown')).toBe('Unknown');
+  });
+});
+
+describe('movementKindLabels', () => {
+  it('names every movement kind in Portuguese, in the order the form offers them', () => {
+    expect(movementKinds.map((kind) => movementKindLabels[kind])).toEqual([
+      'Compra',
+      'Venda',
+      'Dividendo',
+      'JCP',
+      'Desdobramento',
+    ]);
   });
 });

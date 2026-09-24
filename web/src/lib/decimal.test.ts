@@ -1,0 +1,59 @@
+import { describe, expect, it } from 'vitest';
+
+import { movementTotal, parseDecimal, toApiNumber } from './decimal';
+
+describe('parseDecimal', () => {
+  it('reads a comma or a dot as the decimal separator, and dots as grouping beside a comma', () => {
+    expect(parseDecimal('32,12')).toBe(3_212_000_000n);
+    expect(parseDecimal('32.12')).toBe(3_212_000_000n);
+    expect(parseDecimal('1.234,5')).toBe(123_450_000_000n);
+    expect(parseDecimal(' 0,00000001 ')).toBe(1n);
+    expect(parseDecimal('-3')).toBe(-300_000_000n);
+  });
+
+  it('refuses what is not a number, or has more places than the column keeps', () => {
+    expect(parseDecimal('abc')).toBeNull();
+    expect(parseDecimal('1,2,3')).toBeNull();
+    expect(parseDecimal('0,000000001')).toBeNull();
+  });
+
+  it('reads a blank field as nothing typed', () => {
+    expect(parseDecimal('')).toBeNull();
+    expect(parseDecimal('   ')).toBeNull();
+  });
+});
+
+describe('toApiNumber', () => {
+  it('turns what was typed into the number the API receives', () => {
+    expect(toApiNumber('1.234,56')).toBe(1234.56);
+    expect(toApiNumber('')).toBe(0);
+  });
+});
+
+describe('movementTotal', () => {
+  it('is quantity times price plus fees on a buy, exact to the cent', () => {
+    // 0.1 × 3 is 0.30000000000000004 in floating point; here it is 0.30 exactly.
+    expect(movementTotal('Buy', { quantity: '3', unitPrice: '0,1', amount: '', fees: '' })).toBe(30n);
+    expect(movementTotal('Buy', { quantity: '100', unitPrice: '32,1234', amount: '', fees: '5' })).toBe(321_734n);
+  });
+
+  it('deducts fees from the proceeds of a sell', () => {
+    expect(movementTotal('Sell', { quantity: '50', unitPrice: '40', amount: '', fees: '4,90' })).toBe(199_510n);
+  });
+
+  it('is the amount net of fees on income', () => {
+    expect(movementTotal('Dividend', { quantity: '', unitPrice: '', amount: '120', fees: '' })).toBe(12_000n);
+    expect(movementTotal('Jcp', { quantity: '', unitPrice: '', amount: '100', fees: '15' })).toBe(8_500n);
+  });
+
+  it('rounds a half cent to even, as the API does', () => {
+    expect(movementTotal('Buy', { quantity: '1', unitPrice: '0,125', amount: '', fees: '' })).toBe(12n);
+    expect(movementTotal('Buy', { quantity: '1', unitPrice: '0,135', amount: '', fees: '' })).toBe(14n);
+  });
+
+  it('has no total for a split, nor while a field cannot be read', () => {
+    expect(movementTotal('Split', { quantity: '100', unitPrice: '', amount: '', fees: '' })).toBeNull();
+    expect(movementTotal('Buy', { quantity: 'x', unitPrice: '10', amount: '', fees: '' })).toBeNull();
+    expect(movementTotal('Buy', { quantity: '', unitPrice: '10', amount: '', fees: '' })).toBeNull();
+  });
+});
