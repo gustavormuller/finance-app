@@ -50,9 +50,17 @@ const nothingHeld: Returns = {
 
 type Answer = { status?: number; body?: unknown };
 
-function stubReturns(portfolio: (url: URL) => Answer, positions: Position[] = []) {
+function stubReturns(
+  portfolio: (url: URL) => Answer,
+  positions: Position[] = [],
+  asset: (id: string, url: URL) => Answer | undefined = () => undefined,
+) {
   return stubFetch((request: SeenRequest) => {
     const url = new URL(request.url, 'http://localhost');
+    const assetId = /^\/api\/returns\/assets\/([^/]+)$/.exec(url.pathname)?.[1];
+    if (assetId) {
+      return asset(assetId, url);
+    }
 
     switch (`${request.method} ${url.pathname}`) {
       case 'GET /api/auth/me':
@@ -281,5 +289,74 @@ describe('ReturnsPage: comparison', () => {
     expect(plain(cdi)).toContain('+6,47%');
     expect(plain(screen.getByTestId('benchmark-row-portfolio'))).toContain('+10,00%');
     expect(plain(cdi)).toContain('+29,89 p.p.');
+  });
+});
+
+const position = (assetId: string, ticker: string, currency: string): Position => ({
+  assetId,
+  ticker,
+  name: ticker,
+  class: currency === 'BRL' ? 'StockBr' : 'StockUs',
+  currency,
+  nickname: null,
+  quantity: 10,
+  averageCost: 10,
+  price: 10,
+  priceDate: '2026-08-31',
+  valueBrl: 100,
+  costBasisBrl: 100,
+  unrealisedBrl: 0,
+  unrealisedPct: 0,
+  realisedBrl: 0,
+  dividendsBrl: 0,
+});
+
+const petr4 = position('a-petr4', 'PETR4', 'BRL');
+const aapl = position('a-aapl', 'AAPL', 'USD');
+const itub4 = position('a-itub4', 'ITUB4', 'BRL');
+
+const assetAnswers = (id: string): Answer | undefined =>
+  ({
+    'a-petr4': { body: { ...halfYear, twr: { total: 0.0312, annualised: 0.0629 }, xirr: 0.0415, fx: null } },
+    'a-aapl': { body: { ...halfYear, twr: { total: 0.21, annualised: 0.4596 }, xirr: 0.4751, fx: { native: 0.1, fx: 0.1, total: 0.21 } } },
+    'a-itub4': { body: { ...nothingHeld, fx: null } },
+  })[id];
+
+describe('ReturnsPage: per asset', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('lists each asset\'s TWR and XIRR, the FX split for a USD asset, and links to its own page', async () => {
+    stubReturns(() => ({ body: halfYear }), [aapl, petr4, itub4], assetAnswers);
+    renderAt('/investments/returns');
+
+    const usd = await screen.findByTestId('asset-returns-a-aapl');
+    expect(within(usd).getByRole('link', { name: 'AAPL' })).toHaveAttribute('href', '/investments/a-aapl/returns');
+    await vi.waitFor(() => expect(plain(usd)).toContain('+21,00%'));
+    expect(plain(usd)).toContain('+47,51% a.a.');
+    expect(plain(usd)).toContain('+10,00%+10,00%');
+
+    const brl = screen.getByTestId('asset-returns-a-petr4');
+    await vi.waitFor(() => expect(plain(brl)).toContain('+3,12%'));
+    expect(plain(brl)).toContain('+4,15% a.a.');
+    expect(brl).toHaveTextContent('Ativo em reais');
+
+    await vi.waitFor(() => expect(screen.getByTestId('asset-returns-a-itub4')).toHaveTextContent('Sem dadosSem dados'));
+  });
+
+  it('asks for every asset in the selected period', async () => {
+    const seen = stubReturns(() => ({ body: halfYear }), [petr4], assetAnswers);
+    renderAt('/investments/returns');
+
+    await screen.findByTestId('asset-returns-a-petr4');
+    await userEvent.click(screen.getByRole('button', { name: '12 meses' }));
+
+    await vi.waitFor(() =>
+      expect(seen.filter((request) => request.url.startsWith('/api/returns/assets/')).map((request) => request.url)).toEqual([
+        '/api/returns/assets/a-petr4?period=inception',
+        '/api/returns/assets/a-petr4?period=12m',
+      ]),
+    );
   });
 });
