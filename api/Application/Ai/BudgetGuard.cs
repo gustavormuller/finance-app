@@ -6,5 +6,10 @@ namespace Finance.Api.Application.Ai;
 public sealed class BudgetGuard
 {
     /// <summary>Whether a user who has spent <paramref name="spentBrl"/> may make another call.</summary>
-    public static bool Allows(decimal spentBrl, decimal budgetBrl) => throw new NotImplementedException();
+    /// <remarks>
+    /// Refused at <c>spent &gt;= budget</c> (spec tests 1-2). The check runs before the call, so
+    /// the call that crosses the line still completes: a month can end over the budget by at
+    /// most one call's cost.
+    /// </remarks>
+    public static bool Allows(decimal spentBrl, decimal budgetBrl) => spentBrl < budgetBrl;
 }
