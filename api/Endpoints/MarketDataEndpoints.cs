@@ -22,9 +22,11 @@ public static class MarketDataEndpoints
 
     /// <remarks>
     /// <c>Name</c> is not in the spec's body, but the column is required: when omitted,
-    /// the ticker stands in for it.
+    /// the ticker stands in for it. Internal, with <see cref="Validate"/> and
+    /// <see cref="NewAsset"/>: 007's <c>POST /api/investments/assets</c> registers a missing
+    /// catalogue entry through them.
     /// </remarks>
-    private sealed record AssetRequest(
+    internal sealed record AssetRequest(
         string? Ticker,
         string? Name,
         MarketAssetClass Class,
@@ -92,19 +94,7 @@ public static class MarketDataEndpoints
                 return invalid;
             }
 
-            var ticker = request.Ticker!.Trim().ToUpperInvariant();
-            var asset = new MarketAsset
-            {
-                Id = Guid.NewGuid(),
-                Ticker = ticker,
-                Name = string.IsNullOrWhiteSpace(request.Name) ? ticker : request.Name.Trim(),
-                Class = request.Class,
-                Currency = request.Currency!.Trim().ToUpperInvariant(),
-                Provider = request.Provider,
-                ProviderSymbol = request.ProviderSymbol!.Trim(),
-                IsActive = true,
-                CreatedAt = clock.GetUtcNow(),
-            };
+            var asset = NewAsset(request, clock);
             database.Add(asset);
 
             try
@@ -113,8 +103,7 @@ public static class MarketDataEndpoints
             }
             catch (DbUpdateException exception) when (exception.IsDuplicate())
             {
-                return Problems.Conflict(
-                    $"O símbolo '{asset.ProviderSymbol}' já está cadastrado no provedor {asset.Provider}.");
+                return DuplicateSymbol(asset);
             }
 
             return Results.Created($"/api/market-data/assets/{asset.Id}", Describe(asset));
@@ -182,7 +171,28 @@ public static class MarketDataEndpoints
         return routes;
     }
 
-    private static IResult? Validate(AssetRequest request, MarketDataOptions options)
+    /// <summary>A new, active catalogue row from a request <see cref="Validate"/> accepted.</summary>
+    internal static MarketAsset NewAsset(AssetRequest request, TimeProvider clock)
+    {
+        var ticker = request.Ticker!.Trim().ToUpperInvariant();
+        return new MarketAsset
+        {
+            Id = Guid.NewGuid(),
+            Ticker = ticker,
+            Name = string.IsNullOrWhiteSpace(request.Name) ? ticker : request.Name.Trim(),
+            Class = request.Class,
+            Currency = request.Currency!.Trim().ToUpperInvariant(),
+            Provider = request.Provider,
+            ProviderSymbol = request.ProviderSymbol!.Trim(),
+            IsActive = true,
+            CreatedAt = clock.GetUtcNow(),
+        };
+    }
+
+    internal static IResult DuplicateSymbol(MarketAsset asset) =>
+        Problems.Conflict($"O símbolo '{asset.ProviderSymbol}' já está cadastrado no provedor {asset.Provider}.");
+
+    internal static IResult? Validate(AssetRequest request, MarketDataOptions options)
     {
         var currency = request.Currency?.Trim().ToUpperInvariant();
         return Problems.Validation(
