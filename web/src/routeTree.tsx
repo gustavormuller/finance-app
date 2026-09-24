@@ -9,6 +9,7 @@ import InvestmentsPage from './routes/InvestmentsPage';
 import LoginPage from './routes/LoginPage';
 import MarketDataPage from './routes/MarketDataPage';
 import ProtectedLayout from './routes/ProtectedLayout';
+import ReturnsPage from './routes/ReturnsPage';
 import TransactionsPage from './routes/TransactionsPage';
 
 // No component: the default root renders an Outlet, and the application shell lives
@@ -96,6 +97,14 @@ const investmentsRoute = createRoute({
   component: InvestmentsPage,
 });
 
+// 008: "linked from the positions page", not the navigation. A static segment, so it
+// ranks above `$assetId` and no asset id can shadow it.
+const returnsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/investments/returns',
+  component: ReturnsPage,
+});
+
 const assetRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/investments/$assetId',
@@ -104,5 +113,5 @@ const assetRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, assetRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute]),
 ]);
