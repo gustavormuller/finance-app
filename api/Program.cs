@@ -116,6 +116,7 @@ app.MapTransactionEndpoints();
 app.MapImportEndpoints();
 app.MapCsvTemplateEndpoints();
 app.MapDashboardEndpoints();
+app.MapMarketDataEndpoints();
 
 app.Run();
 
