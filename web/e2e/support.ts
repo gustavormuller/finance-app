@@ -89,3 +89,43 @@ export async function createTransaction(
   // in flight, and the row silently never exists.
   await expect(page.getByRole('button', { name: 'Criar lançamento' })).toBeHidden();
 }
+
+/**
+ * A manual sync, so an asset has closes before its buy: a buy with no close yet has no
+ * daily row until the next sync. Posted from the page so the browser sends the Origin
+ * header the API's CSRF check requires, then polled until the run has finished. A 429 is
+ * waited out: the rebuild after the previous run's sync can still hold the gate for a
+ * moment after that run reads `Succeeded` (007 · CP5).
+ */
+export async function syncMarketData(page: Page) {
+  const syncRunId = await page.evaluate(async () => {
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const response = await fetch('/api/market-data/sync', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (response.status === 202) {
+        return ((await response.json()) as { syncRunId: string }).syncRunId;
+      }
+      if (response.status !== 429) {
+        throw new Error(`sync answered ${response.status}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error('the sync gate stayed busy for 30 s');
+  });
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (id) => {
+          const response = await fetch('/api/market-data/sync-runs', { credentials: 'same-origin' });
+          const runs = (await response.json()) as { id: string; status: string }[];
+          return runs.find((run) => run.id === id)?.status;
+        }, syncRunId),
+      { timeout: 15_000 },
+    )
+    .toBe('Succeeded');
+}

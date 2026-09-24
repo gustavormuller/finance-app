@@ -1,14 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { devLogin, uniqueEmail } from './support';
+import { devLogin, syncMarketData, uniqueEmail } from './support';
 
 /**
  * Spec 007 E2E (tests 31–33), against the real API process and a real PostgreSQL.
  *
- * The API runs with `MarketData:FakeProviders=true` (scripts/verify-e2e.sh): every close is
- * 10 and dated yesterday (UTC). PETR4 is BRL, so no FX is involved (the fakes price USDBRL
- * at 0.05). The catalogue is shared and kept between runs: the first run registers PETR4,
- * later runs reuse that entry. Each test brings its own user.
+ * The API runs with `MarketData:FakeProviders=true` (scripts/verify-e2e.sh): the latest
+ * close is always 10, dated yesterday (UTC), and a buy dated today is valued at it. PETR4
+ * is BRL, so no FX is involved (the fakes price USDBRL at 0.05). The catalogue is shared
+ * and kept between runs: the first run registers PETR4, later runs reuse that entry. Each test brings its own user.
  *
  * Every test here triggers a manual sync, and the sync gate refuses a second run while
  * one is going (429). So:
@@ -35,44 +35,6 @@ async function addPetr4(page: Page) {
 
   await expect(page.getByRole('heading', { name: 'PETR4' })).toBeVisible();
   return page.url().split('/').pop()!;
-}
-
-/**
- * A manual sync, so PETR4 has a close before the buy: a buy with no close yet has no daily
- * row until the next sync. Posted from the page so the browser sends the Origin header the
- * API's CSRF check requires, then polled until the run has finished.
- */
-async function syncMarketData(page: Page) {
-  const syncRunId = await page.evaluate(async () => {
-    for (let attempt = 0; attempt < 60; attempt++) {
-      const response = await fetch('/api/market-data/sync', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      if (response.status === 202) {
-        return ((await response.json()) as { syncRunId: string }).syncRunId;
-      }
-      if (response.status !== 429) {
-        throw new Error(`sync answered ${response.status}`);
-      }
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-    throw new Error('the sync gate stayed busy for 30 s');
-  });
-
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async (id) => {
-          const response = await fetch('/api/market-data/sync-runs', { credentials: 'same-origin' });
-          const runs = (await response.json()) as { id: string; status: string }[];
-          return runs.find((run) => run.id === id)?.status;
-        }, syncRunId),
-      { timeout: 15_000 },
-    )
-    .toBe('Succeeded');
 }
 
 /** A movement through the real form, dated today (its default). */
