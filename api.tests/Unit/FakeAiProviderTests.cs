@@ -24,6 +24,26 @@ public sealed class FakeAiProviderTests
         Assert.StartsWith("## Resumo", first.Text);
     }
 
+    /// <summary>For tests 21-23 and E2E 29: the prompt's five sections, and the month and its expense from the input.</summary>
+    [Fact]
+    public async Task An_analysis_request_is_answered_with_the_five_sections_and_numbers_from_the_input()
+    {
+        var input = AnalysisInputBuilder.Build(new AnalysisAggregates(
+            "2026-08",
+            [new("2026-06", 0m, 0m), new("2026-07", 10m, -20m), new("2026-08", 5900m, -2800.5m)],
+            [], [], [], 0m, new Application.Investments.PortfolioSummary(0m, 0m, 0m)));
+        var request = new AiRequest("any-model", MonthlyAnalysisPrompt.Current.System, input, 8000);
+
+        var first = await new FakeAiProvider().CompleteAsync(request, TestContext.Current.CancellationToken);
+        var second = await new FakeAiProvider().CompleteAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(first, second);
+        var headings = first.Text.Split('\n').Where(line => line.StartsWith("## ", StringComparison.Ordinal));
+        Assert.Equal(["## Resumo", "## Onde o dinheiro foi", "## O que mudou", "## Investimentos", "## Sugestões"], headings);
+        Assert.Contains("2026-08", first.Text, StringComparison.Ordinal);
+        Assert.Contains("2800.50", first.Text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Its_tokens_are_four_characters_each_rounded_up()
     {
