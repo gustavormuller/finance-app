@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Finance.Api.Application;
+using Finance.Api.Application.Dashboard;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,9 @@ builder.Services.AddAuthorization();
 // 004's use cases. Scoped, like the context they take (ADR-016).
 builder.Services.AddScoped<ImportStaging>();
 builder.Services.AddScoped<ImportCommands>();
+
+// 005's dashboard reads: Dapper on the context's connection (ARCHITECTURE.md section 6).
+builder.Services.AddScoped<DashboardQueries>();
 
 var app = builder.Build();
 
@@ -105,6 +109,7 @@ app.MapCategoryEndpoints();
 app.MapTransactionEndpoints();
 app.MapImportEndpoints();
 app.MapCsvTemplateEndpoints();
+app.MapDashboardEndpoints();
 
 app.Run();
 
