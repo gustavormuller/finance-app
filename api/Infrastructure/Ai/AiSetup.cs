@@ -16,14 +16,30 @@ public static class AiSetup
         services.AddScoped<AiPricing>();
         services.AddScoped<AiGateway>();
 
-        // A delegate, so that without the switch resolving it is what fails, not the boot:
-        // the real adapters arrive in CP3.
+        // No resilience handler: every attempt spends tokens and the gateway records one
+        // usage row per call, so a failure is returned, never retried. No client timeout
+        // either: the gateway times each call out by purpose. Keys never reach a log.
+        services.AddHttpClient<AnthropicAiProvider>()
+            .ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .RedactLoggedHeaders(["x-api-key"]);
+        services.AddHttpClient<OpenAiProvider>()
+            .ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .RedactLoggedHeaders(["Authorization"]);
+
         services.AddTransient<IAiProvider>(provider =>
         {
             var options = provider.GetRequiredService<IOptions<AiOptions>>().Value;
-            return options.FakeProvider
-                ? new FakeAiProvider()
-                : throw new InvalidOperationException($"Ai:Provider '{options.Provider}' has no adapter yet.");
+            if (options.FakeProvider)
+            {
+                return new FakeAiProvider();
+            }
+
+            return options.Provider.ToLowerInvariant() switch
+            {
+                "anthropic" => provider.GetRequiredService<AnthropicAiProvider>(),
+                "openai" => provider.GetRequiredService<OpenAiProvider>(),
+                _ => throw new InvalidOperationException($"Ai:Provider '{options.Provider}' has no adapter."),
+            };
         });
 
         return services;
