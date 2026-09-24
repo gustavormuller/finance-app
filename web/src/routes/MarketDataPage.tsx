@@ -1,3 +1,4 @@
+import AssetCatalogue from '@/components/market-data/AssetCatalogue';
 import SyncRuns from '@/components/market-data/SyncRuns';
 
 /**
@@ -15,6 +16,7 @@ export default function MarketDataPage() {
       </div>
 
       <SyncRuns />
+      <AssetCatalogue />
     </section>
   );
 }
