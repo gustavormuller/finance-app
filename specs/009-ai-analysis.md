@@ -82,14 +82,16 @@ Ai:Provider                     anthropic | openai
 Ai:MonthlyBudgetBrl             15.00
 Ai:Categorisation:Model         <cheap model id>
 Ai:Analysis:Model               <better model id>
-Ai:Pricing:<model>:InputPerMTokBrl
-Ai:Pricing:<model>:OutputPerMTokBrl
+Ai:Pricing:<model>:InputPerMTokUsd
+Ai:Pricing:<model>:OutputPerMTokUsd
 Ai:Anthropic:ApiKey
 Ai:OpenAi:ApiKey
 Ai:UsdBrl                       fallback rate for pricing if the benchmark is missing
 ```
 
 Cost per call `= (input / 1e6) × inputPrice + (output / 1e6) × outputPrice`, prices in BRL derived from USD list prices at the latest `USDBRL` benchmark (006), or the fallback.
+
+Prices are configured in USD, as the providers list them (`…PerMTokUsd`): decided by the user in 009 · CP2.
 
 ## Domain and application
 
