@@ -600,3 +600,143 @@ Full handoff: `docs/handoffs/006.md`. **006 is complete in code; these steps nee
   it; its nightly rebuild goes after the sync in `MarketDataSyncJob` and takes the same
   `MarketDataSyncGate`. Its E2E runs on `MarketData:FakeProviders`, where every close is
   `10` and dated yesterday (UTC).
+
+## 007 · checkpoint 1
+
+- **007 · CP1 · no ADR conflict found; nothing to stop on.** Checked against the ADRs and
+  what 006 built:
+  - `Asset`, `Movement` and `PortfolioDaily` all implement `IUserOwned`. Each gets its
+    query filter from the loop in `AppDbContext`, and a test asserts the filter is declared.
+  - The only shared data the spec touches is `MarketAssets`, `Prices` and `Benchmarks`,
+    read through FKs. `PortfolioDaily` copies a price and an FX rate per user. That copy is
+    derived, user-owned data (ADR-011), not shared data.
+  - Every quantity, price, FX rate and amount is `decimal`. A reflection test covers
+    `Domain.Investments` and `Application.Investments`.
+  - `Domain/Investments/` is POCOs with no EF or `HttpClient`. No port is introduced, so
+    ADR-015 is not touched. No Repository and no MediatR.
+  - Spec decision 10 (raw decimals for prices and quantities, not `Money`) is compatible
+    with §4 and ADR-014. `Money` is a ledger amount pinned to two places; a unit price
+    with eight places is not one.
+  - The synchronous rebuild (decision 9) is compatible with ADR-011 and principle 6. It
+    reads only local Postgres.
+- **007 · CP1 · for the human: ARCHITECTURE.md's Investments data-model block is stale.** It
+  lists `assets` with `ticker, name, class (… fixed_income …), currency, benchmark_hint`,
+  movement kind `amortization`, and a five-column `portfolio_daily`. The spec replaces the
+  asset columns with `MarketAssetId` → `MarketAssets` (what 006's `prices` correction
+  already implies). It defers fixed income and amortization, and adds `Movement.Amount`,
+  `Movement.Currency` and the extra `PortfolioDaily` columns. That block is a data model,
+  not an ADR, so I did not treat this as a conflict, and I did not edit the file. It needs a
+  one-block edit. `benchmark_hint` is dropped with no replacement; 008 may want it back.
+- **007 · CP1 · commit order.** The four entity declarations were committed first, unmapped
+  (`cf2b820`), so the failing tests would compile. That is 006 · CP1's order. The two test
+  commits failed 13 of 14 cases against the unmapped model; the mapping commit turned them
+  green. The decimal-type scan passed from the start. It is a guard, not a driver.
+- **007 · CP1 · `Amount` and `Fees` are plain `decimal`, not a `Money` complex property.**
+  Both share the movement's one `Currency` column, and two EF complex properties cannot map
+  to one column. They become `Money` where they are summed (CP2/CP3), as decision 10 says
+  for totals.
+- **007 · CP1 · foreign keys.** `Assets → AspNetUsers`, `Movements → AspNetUsers` and
+  `PortfolioDaily → AspNetUsers` are CASCADE, like 003. `Assets → MarketAssets` is RESTRICT
+  (spec), so a catalogue row someone holds cannot go. `Movements → Assets` is RESTRICT
+  (spec, test 24). `PortfolioDaily → Assets` is **CASCADE**. The spec is silent here.
+  Derived rows never hold their asset in place (ADR-011), and the endpoint refuses deleting
+  an asset with movements anyway. Deleting a user takes everything with it: I checked this
+  in a scratch PostgreSQL 16, because RESTRICT sits between two tables that both cascade
+  from the user, as `Transactions → Accounts` already does.
+- **007 · CP1 · no CHECK constraints.** The spec's rules (quantity > 0, fees ≥ 0, currency
+  equal to the asset's) are domain rules, as 003's are. The codebase has no CHECK
+  constraints, and CP2 writes the rules.
+- **007 · CP1 · no composite FK for `Movement.UserId = Asset.UserId`.** A movement row could
+  in principle carry B's `UserId` and A's `AssetId`. The endpoint resolves the asset
+  through the filter first, so B gets a 404 (test 17), which is 003's shape for
+  transactions and accounts. A composite FK `(UserId, AssetId) → Assets(UserId, Id)`
+  would close it in the database, at the cost of an alternate key. That is optional
+  hardening for the human.
+- **007 · CP1 · names and indexes.** The table is `PortfolioDaily` (singular, set explicitly),
+  which matches the spec's manual step 6 in `psql`. The DbSet is `PortfolioDaily`. Indexes:
+  - Unique `(UserId, MarketAssetId)` on `Assets`.
+  - `(UserId, AssetId, Date)` on `Movements` (spec).
+  - EF's FK indexes on `Assets.MarketAssetId`, `Movements.AssetId` and
+    `PortfolioDaily.AssetId`.
+  `PortfolioDaily`'s PK `(UserId, AssetId, Date)` serves the per-asset range reads and the
+  delete-from-date of the rebuild.
+- **007 · CP1 · column precision is tested at the edges.** `numeric(18,8)` is used for
+  quantity, unit price, average cost, price and FX, and `numeric(18,2)` for amount, fees,
+  `ValueBrl` and `CostBasisBrl`. Each value is written at the edge of its column and must
+  come back exact.
+- **007 · CP1 · migration SQL** (`dotnet ef migrations script AddMarketData AddInvestments`,
+  also in `docs/migrations/007-AddInvestments.sql`):
+
+  ```sql
+  CREATE TABLE "Assets" (
+      "Id" uuid NOT NULL,
+      "UserId" uuid NOT NULL,
+      "MarketAssetId" uuid NOT NULL,
+      "Nickname" character varying(100),
+      "CreatedAt" timestamp with time zone NOT NULL,
+      CONSTRAINT "PK_Assets" PRIMARY KEY ("Id"),
+      CONSTRAINT "FK_Assets_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+      CONSTRAINT "FK_Assets_MarketAssets_MarketAssetId" FOREIGN KEY ("MarketAssetId") REFERENCES "MarketAssets" ("Id") ON DELETE RESTRICT
+  );
+  CREATE TABLE "Movements" (
+      "Id" uuid NOT NULL, "UserId" uuid NOT NULL, "AssetId" uuid NOT NULL,
+      "Date" date NOT NULL, "Kind" integer NOT NULL,
+      "Quantity" numeric(18,8) NOT NULL, "UnitPrice" numeric(18,8) NOT NULL,
+      "Amount" numeric(18,2) NOT NULL, "Fees" numeric(18,2) NOT NULL,
+      "Currency" char(3) NOT NULL, "Notes" character varying(300),
+      "CreatedAt" timestamp with time zone NOT NULL,
+      CONSTRAINT "PK_Movements" PRIMARY KEY ("Id"),
+      CONSTRAINT "FK_Movements_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+      CONSTRAINT "FK_Movements_Assets_AssetId" FOREIGN KEY ("AssetId") REFERENCES "Assets" ("Id") ON DELETE RESTRICT
+  );
+  CREATE TABLE "PortfolioDaily" (
+      "UserId" uuid NOT NULL, "AssetId" uuid NOT NULL, "Date" date NOT NULL,
+      "Quantity" numeric(18,8) NOT NULL, "AverageCost" numeric(18,8) NOT NULL,
+      "Price" numeric(18,8) NOT NULL, "PriceDate" date NOT NULL,
+      "FxRate" numeric(18,8) NOT NULL,
+      "ValueBrl" numeric(18,2) NOT NULL, "CostBasisBrl" numeric(18,2) NOT NULL,
+      CONSTRAINT "PK_PortfolioDaily" PRIMARY KEY ("UserId", "AssetId", "Date"),
+      CONSTRAINT "FK_PortfolioDaily_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+      CONSTRAINT "FK_PortfolioDaily_Assets_AssetId" FOREIGN KEY ("AssetId") REFERENCES "Assets" ("Id") ON DELETE CASCADE
+  );
+  CREATE INDEX "IX_Assets_MarketAssetId" ON "Assets" ("MarketAssetId");
+  CREATE UNIQUE INDEX "IX_Assets_UserId_MarketAssetId" ON "Assets" ("UserId", "MarketAssetId");
+  CREATE INDEX "IX_Movements_AssetId" ON "Movements" ("AssetId");
+  CREATE INDEX "IX_Movements_UserId_AssetId_Date" ON "Movements" ("UserId", "AssetId", "Date");
+  CREATE INDEX "IX_PortfolioDaily_AssetId" ON "PortfolioDaily" ("AssetId");
+  ```
+- **007 · CP1 · counts.** .NET 539 → 549 (nine persistence cases, one type scan), web 74,
+  E2E 18.
+- **007 · CP1 · handoff to CP2** (domain, tests 1–15) **and CP3** (rebuild and endpoints).
+  - Keep the domain free of any clock. The "after today" rule takes `today` as an argument,
+    as `TransactionRules.ValidateDate` does, and `SnapshotBuilder` takes `to`.
+  - **Rounding.** `AverageCost` is stored at 8 places, and `ValueBrl`/`CostBasisBrl` at 2.
+    Decide whether `PositionCalculator` carries full `decimal` precision and rounds only
+    when writing a row. Test 9 ("reproduces a hand-computed result exactly") and broker
+    agreement "to the cent" both depend on this. If it rounds, round `ToEven` to match
+    `Money`, and say so.
+  - The validation texts in the spec's table are pt-BR and are rendered verbatim. A C# file
+    that holds them needs a UTF-8 BOM (`Quantidade vendida maior que a posição`,
+    `Moeda diferente do ativo`).
+  - **Nightly rebuild across users (test 27).** A job has no `ICurrentUser` (`Id` is null),
+    so every filtered query returns nothing. Either open one scope per user with an
+    `ICurrentUser` set to that user, which keeps the filter on, or use
+    `IgnoreQueryFilters()` with explicit `UserId` predicates. I prefer the first.
+    Production code has no `IgnoreQueryFilters` today.
+  - **The rebuild's section in `SyncRun.Summary` is shared data.** Every signed-in user sees
+    it on `/market-data`. Write counts only, with no ticker, asset id or user id in
+    `failures`, so no one learns what someone else holds. The summary is typed
+    provider → `ProviderSyncSummary`. A key such as `Snapshots` in that shape needs a
+    pt-BR label in `syncProviderLabel` (`web/src/lib/labels.ts`).
+  - FX is benchmark `USDBRL` (level, BRL per USD). Under `MarketData:FakeProviders` every
+    benchmark is `0.05` and every close is `10`, dated yesterday (UTC). A USD asset in E2E
+    would be valued at 0.05 BRL per USD, so keep the E2E on a BRL asset (PETR4, as the spec
+    says).
+  - Test 19 ("rows from that date to today") needs a price on or before the buy date.
+    `SnapshotBuilder` skips days before the first price (decision/test 12).
+  - `POST /assets` registering a missing catalogue entry should reuse
+    `MarketDataEndpoints`' validation. The nightly rebuild goes after the sync in
+    `MarketDataSyncJob.RunOnceAsync`, under `MarketDataSyncGate`.
+  - CP3 carries twelve integration tests and the whole API surface. It will likely need
+    two sub-checkpoints to stay near ~200 lines a commit: the rebuild, `POST /rebuild` and
+    the nightly job, then the routes.

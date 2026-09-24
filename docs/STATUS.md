@@ -7,6 +7,7 @@ web unit 43 passed, E2E 13 passed.
 
 - 005 checkpoints: CP1 domain + data model + migration (tests 1–4, 19; Transfer kind, rule 3, suggester, OpeningBalance, seeding) · CP2 Dapper aggregations + endpoints (tests 5–18) · CP3 web dashboard + Transfer in UI (tests 20–23) · CP4 E2E (24–26) · handoff.
 - 006 checkpoints: CP1 data model + AddMarketData migration + upsert store + ADR-003/`prices` amendments (tests 17, 18, database half of 19, declared-type half of 9) · CP2 ports, provider registry, options with SGS codes and units, four provider adapters against fixtures (tests 1–9) · CP3 MarketDataSync, per-provider resilience, BackgroundService + Cronos (tests 10–16, 23, 24) · CP4 market-data endpoints + manual-sync rate limit (tests 19–22) · CP5 web `/market-data` + E2E + handoff (tests 25, 26).
+- 007 checkpoints: CP1 data model + AddInvestments migration (context halves of tests 16, 23, 24; declared-type half of 9) · CP2 domain `PositionCalculator`, movement rules, `SnapshotBuilder` (tests 1–15) · CP3 `RebuildSnapshots` in one transaction, `/api/investments` endpoints, `POST /rebuild`, summary, nightly rebuild after the sync under the gate (tests 16–27, HTTP halves of 16, 23, 24) · CP4 web `/investments`, asset detail, movement form, add asset (tests 28–30) · CP5 E2E + handoff (tests 31–33).
 
 ## Log
 
@@ -23,3 +24,4 @@ web unit 43 passed, E2E 13 passed.
 | 006 | CP4 market-data endpoints, manual sync + rate limit | 3cc56e5 | OK — .NET 535, web 67, E2E 16. Limit counts the latest run of any trigger (DB); one process-wide gate shared with the nightly job; run after the 202 in the background |
 | 006 | CP5 web `/market-data` + E2E | eb6847f | OK — .NET 539, web 74, E2E 18. E2E API runs on `MarketData:FakeProviders` (Development only, boot refused elsewhere), which also zeroes the manual-sync window so E2E reruns never hit the 429 |
 | 006 | handoff | c71a180 | OK — 006 complete in code (tests 1–26 present); provider keys, live fixtures, SGS codes, container TZ and manual steps 1–7 pending human |
+| 007 | CP1 data model + migration | 0044305 | OK — .NET 549, web 74, E2E 18. No ADR conflict; ARCHITECTURE.md's Investments data-model block is stale against the spec (not edited, pending human) |
