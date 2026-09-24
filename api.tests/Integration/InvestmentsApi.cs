@@ -14,13 +14,17 @@ namespace Finance.Api.Tests.Integration;
 /// </summary>
 internal sealed class InvestmentsApi : IAsyncDisposable
 {
-    private InvestmentsApi(string connectionString)
+    private InvestmentsApi(string connectionString, TimeProvider? clock)
     {
         ConnectionString = connectionString;
         Factory = new IdentityApiFactory(connectionString, services: services =>
         {
             services.AddSingleton<IPriceProviderRegistry>(new PriceProviderRegistry([Brapi]));
             services.AddSingleton<IBenchmarkProvider>(Bcb);
+            if (clock is not null)
+            {
+                services.AddSingleton(clock);
+            }
         });
     }
 
@@ -35,10 +39,11 @@ internal sealed class InvestmentsApi : IAsyncDisposable
 
     public FakeBenchmarkProvider Bcb { get; } = new();
 
-    /// <summary>A database of its own, migrated by booting the host.</summary>
-    public static async Task<InvestmentsApi> StartAsync(PostgresFixture postgres, CancellationToken cancellationToken)
+    /// <summary>A database of its own, migrated by booting the host; <paramref name="clock"/> replaces the API's.</summary>
+    public static async Task<InvestmentsApi> StartAsync(
+        PostgresFixture postgres, CancellationToken cancellationToken, TimeProvider? clock = null)
     {
-        var api = new InvestmentsApi(await postgres.CreateEmptyDatabaseAsync(cancellationToken));
+        var api = new InvestmentsApi(await postgres.CreateEmptyDatabaseAsync(cancellationToken), clock);
         await api.Factory.MigrateAsync(cancellationToken);
         return api;
     }
