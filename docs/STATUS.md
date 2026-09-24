@@ -25,3 +25,4 @@ web unit 43 passed, E2E 13 passed.
 | 006 | CP5 web `/market-data` + E2E | eb6847f | OK — .NET 539, web 74, E2E 18. E2E API runs on `MarketData:FakeProviders` (Development only, boot refused elsewhere), which also zeroes the manual-sync window so E2E reruns never hit the 429 |
 | 006 | handoff | c71a180 | OK — 006 complete in code (tests 1–26 present); provider keys, live fixtures, SGS codes, container TZ and manual steps 1–7 pending human |
 | 007 | CP1 data model + migration | 0044305 | OK — .NET 549, web 74, E2E 18. No ADR conflict; ARCHITECTURE.md's Investments data-model block is stale against the spec (not edited, pending human) |
+| 007 | CP2 domain PositionCalculator, MovementRules, SnapshotBuilder | 2248ce2 | OK — .NET 580, web 74, E2E 18. Full precision in the calculator, rounded once at the column (avg 8 places, BRL 2, half to even); broker agreement to the cent pending human (manual step 2). Invented pt-BR copy for fees ≥ 0 pending review (DEFERRED) |

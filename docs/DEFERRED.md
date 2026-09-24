@@ -740,3 +740,95 @@ Full handoff: `docs/handoffs/006.md`. **006 is complete in code; these steps nee
   - CP3 carries twelve integration tests and the whole API surface. It will likely need
     two sub-checkpoints to stay near ~200 lines a commit: the rebuild, `POST /rebuild` and
     the nightly job, then the routes.
+
+## 007 · checkpoint 2
+
+- **007 · CP2 · no ADR conflict found.** `PositionCalculator`, `MovementRules` and
+  `SnapshotBuilder` are static pure functions in `Domain/Investments/`, with no EF,
+  no `HttpClient` and no clock (ADR-014, ADR-017). No port, no Repository. They read
+  `Price` and `Benchmark` as plain POCOs. Every value is `decimal`, locals included,
+  and the CP1 reflection scan still covers the namespace.
+- **007 · CP2 · rounding (for the human: manual step 2 decides it).** The spec says
+  nothing about where to round. I chose **full precision in the calculator, rounded
+  once at the column**:
+  - `PositionCalculator` applies the spec's formulas exactly as written. It carries the
+    average as state at `decimal`'s 28 significant digits, so a sell leaves the average
+    untouched to the last digit. Nothing is rounded there.
+  - `SnapshotBuilder` rounds when it writes a row. `AverageCost` goes to 8 places and
+    `ValueBrl`/`CostBasisBrl` go to 2 (through `Money`). Both use
+    `MidpointRounding.ToEven`, as `Money` does. As far as I know this is also ABNT NBR
+    5891's rule for a half, but I have not checked the standard.
+  - Why: a broker's preço médio is total cost over quantity, rounded for display.
+    Rounding the average at every step (to 2 or even 8 places) drifts from it over many
+    buys. The calculator's full-precision average, rounded to 2, is the closest match
+    to "agrees to the cent".
+  - Risk: some brokers round intermediate values, or truncate the displayed preço
+    médio. That can only be settled against a real statement, which is the spec's
+    manual step 2. If it disagrees by a cent, the fix is at the column boundary and not
+    in the formulas.
+  - CP3 should read the position endpoint's `averageCost` from the calculator
+    unrounded, or round it the same way. It must not recompute it from the rounded
+    `PortfolioDaily.AverageCost`.
+- **007 · CP2 · spec gaps I closed, each for the human to confirm:**
+  - **Fees ≥ 0 has no message in the spec's table.** The data model requires it, so
+    I added `Taxas não podem ser negativas`. That is invented copy and needs a pt-BR
+    review.
+  - **Fees on a Dividend/Jcp are subtracted from income** (`Income += Amount − Fees`).
+    This mirrors sell proceeds (decision 5).
+  - **Fees on a Split are ignored,** because the spec's split formula has none.
+    Rejecting them would need another invented message.
+  - **Fields irrelevant to the kind are ignored, not rejected.** The calculator ignores
+    `UnitPrice` on a Split, `Quantity`/`UnitPrice` on income, and `Amount` on
+    Buy/Sell/Split. CP3 should zero them on write, so the stored row matches the data
+    model's "0 for …" notes. The form hides those fields anyway.
+  - **Buy/Sell `UnitPrice` has no rule.** Zero and negative prices pass, as the spec
+    lists no rule for them.
+  - **A USD buy dated before the first known FX rate is costed at the earliest later
+    rate.** Days with no rate yet are skipped, like days with no close. This only
+    happens on a catalogue whose USDBRL history has not been backfilled. A guard test
+    pins it (`Buy_before_the_first_rate_costs_at_the_earliest_later_rate`).
+  - **A split on a zero position is allowed.** It gives quantity > 0 with average 0.
+    The spec has no rule against it.
+- **007 · CP2 · shapes CP3 builds on.**
+  - `PositionCalculator.Calculate(movements, fxOn?)` returns a `PositionStep` per
+    movement. Each step holds `Quantity`, `AverageCost`, `CostBasisBrl`,
+    `RealisedGain` and `Income`. `RealisedGain` and `Income` are **native currency**.
+  - `InOrder` is the single ordering, by date then `CreatedAt`. `Apply` throws on an
+    oversell, and that is a bug, not a user error.
+  - `MovementRules.Validate(movement, assetCurrency, today)` returns the field
+    violations. `ValidatePositions(history)` takes the whole history *after* the write.
+    For a PUT, replace the old row in the list. For a DELETE, remove it: deleting a
+    buy can uncover a later sell. Violations are 003's `RuleViolation`, ready for
+    problem details.
+  - `SnapshotBuilder.Build(userId, assetId, currency, movements, prices, fxRates,
+    from, to)` needs the **whole** movement history. It also needs the latest close
+    and FX rate **on or before** `from` (and before each USD buy), not only the rows
+    in `[from, to]`. The rows start at `max(from, first movement)`.
+- **007 · CP2 · counts.** .NET 549 → 580, web 74, E2E 18. The 31 new tests are 9
+  calculator (tests 1–6, 9, plus ordering), 12 rules (tests 7, 8, plus the table), and
+  10 builder (tests 10–15, plus four for skips, from-date, the FX edge and rounding).
+  Each test commit stubbed its signatures with `NotImplementedException` and failed
+  every case before its feat commit, except the FX guard, which was added after.
+- **007 · CP2 · handoff to CP3** (rebuild, routes, `POST /rebuild`, summary, nightly
+  job; tests 16–27).
+  - **`realisedBrl` and `dividendsBrl` in the position shape are open for USD assets.**
+    The calculator yields them in native currency. Converting at each event's FX rate
+    (like the cost basis) is the consistent choice, but the spec does not say, so
+    decide it and record the decision. For BRL assets, native is BRL.
+  - `RebuildSnapshots` loads what `Build` needs as described above. It deletes the
+    rows `>= fromDate`, inserts `Build(..., fromDate, today)`, and does both in one
+    transaction (test 22). `today` comes from the caller's `TimeProvider`, never from
+    the domain.
+  - Carried over from CP1, unchanged:
+    - **Nightly rebuild across users:** open one scope per user with `ICurrentUser`
+      set, which keeps the filter on. This is preferred over `IgnoreQueryFilters()`
+      with explicit `UserId` predicates. Production code has no `IgnoreQueryFilters`
+      today.
+    - **The rebuild's section in `SyncRun.Summary` holds counts only.** No ticker,
+      asset id or user id, because every user sees it. The new key needs a pt-BR label
+      in `syncProviderLabel`.
+    - **E2E stays on PETR4 (BRL).** Fake providers price every benchmark, USDBRL
+      included, at `0.05`. Test 19 needs a close on or before the buy date, and the
+      fake close is dated yesterday.
+    - Two sub-checkpoints are likely: first the rebuild, `POST /rebuild` and the
+      nightly job, then the routes.
