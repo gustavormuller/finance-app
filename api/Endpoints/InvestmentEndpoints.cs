@@ -32,6 +32,29 @@ public static class InvestmentEndpoints
         string? ProviderSymbol,
         string? Currency);
 
+    private sealed record MovementResponse(
+        Guid Id,
+        Guid AssetId,
+        DateOnly Date,
+        MovementKind Kind,
+        decimal Quantity,
+        decimal UnitPrice,
+        decimal Amount,
+        decimal Fees,
+        string Currency,
+        string? Notes,
+        DateTimeOffset CreatedAt);
+
+    private sealed record DailyResponse(
+        DateOnly Date,
+        decimal Quantity,
+        decimal AverageCost,
+        decimal Price,
+        DateOnly PriceDate,
+        decimal FxRate,
+        decimal ValueBrl,
+        decimal CostBasisBrl);
+
     public static IEndpointRouteBuilder MapInvestmentEndpoints(this IEndpointRouteBuilder routes)
     {
         var investments = routes.MapGroup("/api/investments").RequireAuthorization();
@@ -135,6 +158,65 @@ public static class InvestmentEndpoints
             return Results.NoContent();
         });
 
+        // In replay order: by date, then by creation (PositionCalculator.InOrder).
+        investments.MapGet("/assets/{id:guid}/movements", async (Guid id, AppDbContext database, CancellationToken cancellationToken) =>
+            await database.Assets.AnyAsync(asset => asset.Id == id, cancellationToken)
+                ? Results.Ok((await database.Movements.AsNoTracking().Where(movement => movement.AssetId == id)
+                        .OrderBy(movement => movement.Date).ThenBy(movement => movement.CreatedAt).ToListAsync(cancellationToken))
+                    .Select(Describe))
+                : Results.NotFound());
+
+        investments.MapPost("/assets/{id:guid}/movements", async (
+            Guid id, MovementInput input, MovementCommands commands, CancellationToken cancellationToken) =>
+            Answer(await commands.AddAsync(id, input, cancellationToken),
+                movement => Results.Created($"/api/investments/movements/{movement.Id}", Describe(movement))));
+
+        investments.MapPut("/movements/{id:guid}", async (
+            Guid id, MovementInput input, MovementCommands commands, CancellationToken cancellationToken) =>
+            Answer(await commands.UpdateAsync(id, input, cancellationToken), movement => Results.Ok(Describe(movement))));
+
+        // A delete that would uncover a later sell has no field to blame: a 409 with the rule's text.
+        investments.MapDelete("/movements/{id:guid}", async (Guid id, MovementCommands commands, CancellationToken cancellationToken) =>
+            await commands.DeleteAsync(id, cancellationToken) switch
+            {
+                { Outcome: MovementOutcome.NotFound } => Results.NotFound(),
+                { Outcome: MovementOutcome.Invalid, Violations: [var violation, ..] } => Problems.Conflict(violation.Message),
+                _ => Results.NoContent(),
+            });
+
+        // Both ends inclusive, oldest first.
+        investments.MapGet("/assets/{id:guid}/daily", async (
+            Guid id,
+            AppDbContext database,
+            CancellationToken cancellationToken,
+            DateOnly? from = null,
+            DateOnly? to = null) =>
+        {
+            if (!await database.Assets.AnyAsync(asset => asset.Id == id, cancellationToken))
+            {
+                return Results.NotFound();
+            }
+
+            var rows = database.PortfolioDaily.AsNoTracking().Where(row => row.AssetId == id);
+            rows = from is { } start ? rows.Where(row => row.Date >= start) : rows;
+            rows = to is { } end ? rows.Where(row => row.Date <= end) : rows;
+            return Results.Ok(await rows.OrderBy(row => row.Date)
+                .Select(row => new DailyResponse(
+                    row.Date, row.Quantity, row.AverageCost, row.Price, row.PriceDate, row.FxRate, row.ValueBrl, row.CostBasisBrl))
+                .ToListAsync(cancellationToken));
+        });
+
         return routes;
     }
+
+    private static IResult Answer(MovementWrite write, Func<Movement, IResult> done) => write switch
+    {
+        { Outcome: MovementOutcome.NotFound } => Results.NotFound(),
+        { Outcome: MovementOutcome.Invalid } => Problems.Validation([.. write.Violations!.Select(violation => (RuleViolation?)violation)])!,
+        _ => done(write.Movement!),
+    };
+
+    private static MovementResponse Describe(Movement movement) =>
+        new(movement.Id, movement.AssetId, movement.Date, movement.Kind, movement.Quantity, movement.UnitPrice,
+            movement.Amount, movement.Fees, movement.Currency, movement.Notes, movement.CreatedAt);
 }

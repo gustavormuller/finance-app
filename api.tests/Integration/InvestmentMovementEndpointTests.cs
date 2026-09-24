@@ -38,7 +38,10 @@ public sealed partial class InvestmentMovementEndpointTests(PostgresFixture post
         var rows = await DailyAsync(user, assetId, ct);
         Assert.Equal(Days(Today.AddDays(-5), Today), rows.Select(row => row.Date));
         Assert.All(rows, row => Assert.Equal((100m, 10.05m, 1005m), (row.Quantity, row.AverageCost, row.CostBasisBrl)));
-        Assert.Equal([movement], await user.Client.GetFromJsonAsync<List<MovementItem>>($"/api/investments/assets/{assetId}/movements", ct));
+        var listed = await user.Client.GetFromJsonAsync<List<MovementItem>>($"/api/investments/assets/{assetId}/movements", ct);
+
+        // PostgreSQL keeps microseconds, so the stored CreatedAt is the posted one truncated.
+        Assert.Equal([movement with { CreatedAt = default }], listed!.Select(item => item with { CreatedAt = default }));
     }
 
     /// <summary>Spec integration test 20.</summary>
