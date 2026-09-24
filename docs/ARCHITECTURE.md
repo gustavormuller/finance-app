@@ -398,7 +398,7 @@ The dependency arrows point inward: input adapters (Endpoints, Jobs) and output 
 // Application/ or Domain/
 public interface IPriceProvider     { Task<IReadOnlyList<DailyClose>> GetDailyClosesAsync(...); }
 public interface IBenchmarkProvider { Task<IReadOnlyList<DailyValue>> GetSeriesAsync(...); }
-public interface IAiProvider        { Task<string> AnalyzeAsync(...); }
+public interface IAiProvider        { Task<AiCompletion> CompleteAsync(AiRequest request, CancellationToken ct); }
 ```
 
 Concrete justification, not dogma: there are already four market sources (brapi, BCB, CoinGecko/Binance, Twelve Data) and the AI provider may change. This is exactly the case ports-and-adapters was invented for.
@@ -620,10 +620,13 @@ Cache by normalized description: same store → same category without a new call
 ### Cost control
 
 ```
-ai_usage    id, user_id, month, input_tokens, output_tokens, cost_brl
+AiUsage       id, user_id, month char(7), purpose, provider, model,
+              input_tokens, output_tokens, cost_brl NUMERIC(10,4), succeeded, created_at
+AiAnalyses    id, user_id, month char(7), status, content, error, prompt_version,
+              created_at, started_at, completed_at        -- unique (user_id, month)
 ```
 
-Middleware checks `ai_enabled` and the month's accumulated total **per user** before every call, and cuts off on reaching `AI_MONTHLY_BUDGET_BRL`. No exceptions.
+Middleware checks `ai_enabled` and the month's accumulated total **per user** before every call, and cuts off on reaching `Ai:MonthlyBudgetBrl`. No exceptions. A call is recorded even when it fails: its input tokens were spent (009).
 
 With open registration, `ai_enabled` defaults to `false` — whoever creates an account and is not enabled generates no cost at all.
 
@@ -741,10 +744,14 @@ BRAPI_TOKEN=
 COINGECKO_DEMO_KEY=
 TWELVEDATA_KEY=
 
-# AI
-AI_PROVIDER=anthropic
-AI_API_KEY=
-AI_MONTHLY_BUDGET_BRL=15             # per user, hard ceiling
+# AI (009) — the Ai: configuration section; "__" is ":" in an environment variable
+Ai__Provider=anthropic               # anthropic | openai
+Ai__MonthlyBudgetBrl=15.00           # per user, hard ceiling
+Ai__Anthropic__ApiKey=
+Ai__OpenAi__ApiKey=
+Ai__UsdBrl=                          # fallback rate for pricing when the USDBRL benchmark is missing
+# Model ids and per-token prices are configuration too (Ai:Categorisation:Model,
+# Ai:Analysis:Model, Ai:Pricing:<model>:*); see specs/009-ai-analysis.md.
 
 # Backup
 AGE_PUBLIC_KEY=
