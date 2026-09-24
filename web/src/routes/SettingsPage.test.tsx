@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -147,6 +147,24 @@ describe('SettingsPage', () => {
 
     expect(toggle).toBeChecked();
     release();
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).toBeChecked();
+  });
+
+  /**
+   * Found by E2E test 28: the in-flight state reaches the page on the query client's next
+   * tick, so the controlled switch went back to off for that tick and Playwright's `check()`
+   * saw no change. It has to hold the new state from the click itself.
+   */
+  it('holds the new state from the click itself, not from the next tick', async () => {
+    stubApi();
+    renderSettings();
+
+    const toggle = await screen.findByRole('switch', { name: 'Usar IA nesta conta' });
+    fireEvent.click(toggle);
+
+    expect(toggle).toBeChecked();
+    expect(screen.getByTestId('ai-state')).toHaveTextContent('Ligada');
     await waitFor(() => expect(toggle).toBeEnabled());
     expect(toggle).toBeChecked();
   });
