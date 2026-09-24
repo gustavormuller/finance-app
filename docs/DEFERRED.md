@@ -2000,3 +2000,106 @@ Full handoff: `docs/handoffs/007.md`. **007 is complete in code; these steps nee
   - **The handoff should list the open items:** CP1–CP4's pending decisions, this
     checkpoint's two (annualised TWR for short periods, and the expense colour), the p.p.
     basis past a year, per-asset rows with no data, and the copy review.
+
+## 008 · checkpoint 6
+
+- **008 · CP6 · no ADR conflict, no API change, no migration.** The fakes are Development
+  only, behind 006's switch, refused elsewhere at boot. The web changes are two display
+  fixes.
+- **008 · CP6 · the fakes' shape.** `FakeMarketDataProviders` now gives a close for every
+  calendar day in `[from, to]`: `10 - 0.01 × min(days before to, 500)`. So the close on `to`
+  is 10, and from 500 days back it holds at 5, so it never reaches zero over the five-year
+  backfill.
+  - The latest close is still 10, so 007's `R$ 1.000,00` and `+R$ 45,10` hold. 006's test 26
+    counts items, not rows, so it holds too. `MarketDataFakeProvidersTests` (2 items on
+    Brapi, rows > 0) passes unchanged.
+  - **Benchmarks are unchanged:** one 0.05 per series, dated `to`. IVVB11 is a price, so it
+    gets the shape.
+  - **Rejected:** *1% lower for each day before `to`* (the CP5 handoff's example). Over the
+    five-year backfill that is `0.99^1826 ≈ 1e-8`, below the column's 8 places.
+  - **Rejected:** *a close from the date alone.* The latest close could then not always be 10.
+  - Cost: a close depends on the run that fetched it, because it is counted back from that
+    run's `to`, and the sync never refetches a stored day.
+- **008 · CP6 · test 36.** It is in `web/e2e/returns.spec.ts`:
+  - It registers a **new ticker each run** (`RET` + 8 hex). A reused PETR4 carries the flat
+    closes earlier runs stored, and a sync only fetches days after the latest stored close.
+    The new ticker is backfilled in full by this run's sync.
+  - It buys 100 at 9,71, with no fees, dated 30 days back in UTC, the API's calendar. The
+    close that day is 9,71, 29 days before `to`.
+  - It asserts:
+    - the period reads "30 dias";
+    - the TWR is `+2,99%` (`1000/971 - 1`) in the headline and in the benchmark table;
+    - the XIRR is `+43,05% a.a.`, which is `(1000/971)^(365/30) - 1`, computed in Python
+      `decimal`;
+    - the chart is visible, with at least one line path;
+    - "12 meses" refetches and clamps to the buy;
+    - the asset's own page shows the same TWR and a chart.
+  - Not asserted: the timing effect, which is 0 by construction (a buy at the close with no
+    fees), and the benchmarks, which are sparse in the kept database.
+  - A buy near UTC midnight could cross days between steps. That is accepted.
+- **008 · CP6 · the sync chain.** `returns.spec.ts` is a fourth project, `returns`, which
+  depends on `investments`. So the chain is `market-data` → `investments` → `returns`, and
+  test 26's 202 is untouched. `syncMarketData`, with its 429 wait, moved from
+  `investments.spec.ts` to `support.ts`, unchanged, so both specs share it.
+- **008 · CP6 · test-first.**
+  - The fakes' unit tests failed 5/6 before the feat. The sixth, the same range giving the
+    same closes, passed already; it is a guard.
+  - Test 36 was run against the old fakes and failed: "25/08/2026 a 24/09/2026 · 1 dias". It
+    passed once the new fakes were in.
+- **008 · CP6 · UI bugs found by the first real-browser run.** Each was fixed with a failing
+  test first.
+  - **"1 dias".** The period line said "1 dias" for a one-day period (the red run above). It
+    now says "1 dia". Test in `ReturnsPage.test.tsx`.
+  - **Repeated axis ticks.** Seen in a throwaway screenshot pass, not committed. The chart's
+    Y axis formatted ticks with no decimals, so a 100–103 axis printed "102" twice (101,5 and
+    102,5). `formatIndexTick` keeps up to two decimals. jsdom cannot lay out Recharts' tick
+    text, so the test is on the formatter in `lib/rates.test.ts`.
+  - **Seen, not changed:**
+    - The tooltip's order is Recharts', not portfolio first.
+    - When the first close comes after the buy, `period.from` is the buy's date while `days`
+      counts from the first close. That is CP4's semantics. **For the human.**
+  - Otherwise the pages rendered as the jsdom tests described: headline, chart, benchmark
+    table, per-asset table and the asset's page.
+- **008 · CP6 · E2E runs.** `verify-e2e.sh` passed twice back to back, 22/22 each, against
+  the kept database.
+- **008 · CP6 · counts.** .NET 759 → 765 (+6, the fakes). Web 142 → 145 (+1 singular, +2
+  ticks). E2E 21 → 22.
+- **008 · CP6 · diff sizes.** Every commit is under ~200 lines. The largest code commit is
+  `eb25ee5`, test 36 and the config, at 95. The handoff, `f43811c`, is 215 lines. It is one
+  document, left whole, as 007's was.
+
+## 008 · handoff
+
+Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps need a human.**
+
+- **006's and 007's pending steps first.** Real closes need brapi's token. A USD asset needs
+  Twelve Data's key and the real USDBRL series.
+- **Manual steps 1–5** against a real portfolio. **Step 3** (a spreadsheet's `XIRR()` to 4
+  decimals) is the authority for XIRR, and **step 4** (a CDI calculator) for CDI.
+- **Tests 15/16:** sign off option (a), or switch to (b). The spec needs a line either way
+  (CP1, CP3).
+- **Decisions to confirm or overturn:**
+  - Test 13's reading of "a large late inflow" (CP3).
+  - Multiple XIRR roots: Newton's root from 10%, or one root from bisection, or `null` (CP3).
+  - IPCA + 6% with whole months and no pro-rata (CP1).
+  - Annualised TWR hidden for 365 days or less, and the noisy timing effect over short
+    periods (CP2, CP4, CP5).
+  - The 260-point cap against weekly over 5 years (262) (CP4).
+  - Assets with no row in the period left out (CP4).
+  - The unread `Returns:Benchmarks:*:Label`: remove it or keep it (CP3, CP4).
+  - No expense red: the timing effect's loss is orange, about 3:1 on white (CP5).
+  - The p.p. difference on the period's returns, also past a year (CP5).
+  - Per-asset "Sem dados" rows kept (CP5).
+  - The asset returns route is not linked from `AssetPage` (CP5).
+  - The period is not stored in the URL (CP5).
+  - USD flows priced at their own date's rate (CP2, CP3).
+  - FX reported as 0 after a −100% native return (CP2).
+  - `period.from` against the base day when the first close comes after the buy (CP6).
+- **Invented pt-BR copy** in 008 · CP4 and CP5, plus "dia", for a native review.
+- **Starting spec 009.** Read `specs/009-ai-analysis.md`, `docs/handoffs/008.md` ("Starting
+  spec 009") and the 008 entries above. The baseline is .NET 765, web 145, E2E 22.
+  - Amend ADR-003 to its final form.
+  - `AddAi` needs its SQL shown.
+  - The config names differ from ARCHITECTURE's environment block.
+  - USDBRL is 0.05 under the E2E fakes, so AI cost in E2E is off by about 100 times.
+  - Decide whether the analysis sees 008's returns.
