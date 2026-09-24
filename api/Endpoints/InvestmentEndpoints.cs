@@ -55,6 +55,8 @@ public static class InvestmentEndpoints
         decimal ValueBrl,
         decimal CostBasisBrl);
 
+    private sealed record RebuildResponse(int AssetsRebuilt, int RowsWritten);
+
     public static IEndpointRouteBuilder MapInvestmentEndpoints(this IEndpointRouteBuilder routes)
     {
         var investments = routes.MapGroup("/api/investments").RequireAuthorization();
@@ -204,6 +206,17 @@ public static class InvestmentEndpoints
                 .Select(row => new DailyResponse(
                     row.Date, row.Quantity, row.AverageCost, row.Price, row.PriceDate, row.FxRate, row.ValueBrl, row.CostBasisBrl))
                 .ToListAsync(cancellationToken));
+        });
+
+        investments.MapGet("/summary", async (PositionQueries positions, CancellationToken cancellationToken) =>
+            Results.Ok(await positions.SummaryAsync(cancellationToken)));
+
+        // 202 as the spec says, but the work is done when it answers: one user's assets
+        // take well under a second each (decision 9), so there is nothing to poll.
+        investments.MapPost("/rebuild", async (SnapshotRebuild rebuild, CancellationToken cancellationToken) =>
+        {
+            var (assets, rows) = await rebuild.RebuildAllAsync(cancellationToken);
+            return Results.Accepted(value: new RebuildResponse(assets, rows));
         });
 
         return routes;

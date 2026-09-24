@@ -1,4 +1,4 @@
-using Finance.Api.Domain.Investments;
+﻿using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +34,23 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
     public const string UsdBrl = "USDBRL";
 
     public DateOnly Today => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+
+    /// <summary>
+    /// Every asset of the current user, from its first movement, each in its own
+    /// transaction (<c>POST /api/investments/rebuild</c>). Returns the assets and rows.
+    /// </summary>
+    public async Task<(int Assets, int Rows)> RebuildAllAsync(CancellationToken cancellationToken)
+    {
+        var ids = await db.Assets.Select(asset => asset.Id).ToListAsync(cancellationToken);
+        var rows = 0;
+        foreach (var id in ids)
+        {
+            // No movement or row can predate the rule's lower bound.
+            rows += await RebuildAsync(id, MovementRules.MinimumDate, cancellationToken);
+        }
+
+        return (ids.Count, rows);
+    }
 
     /// <summary>Rebuilds one asset from <paramref name="from"/>; returns the rows written.</summary>
     /// <exception cref="InvalidOperationException">The asset is not the current user's.</exception>
