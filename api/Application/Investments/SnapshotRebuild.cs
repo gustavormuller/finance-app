@@ -102,6 +102,43 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
         return rows.Count;
     }
 
+    /// <summary>
+    /// Where the nightly rebuild starts for an asset: <paramref name="yesterday"/>, the day
+    /// the sync just wrote, or earlier when rows are missing before it. Rows stop early
+    /// when the job missed nights; they start late, or not at all, when the closes (or
+    /// USDBRL rates) were backfilled after the movements were written.
+    /// </summary>
+    public async Task<DateOnly> NightlyFromAsync(Guid assetId, DateOnly yesterday, CancellationToken cancellationToken)
+    {
+        var asset = await (
+                from held in db.Assets
+                join market in db.MarketAssets on held.MarketAssetId equals market.Id
+                where held.Id == assetId
+                select new { held.MarketAssetId, market.Currency })
+            .SingleAsync(cancellationToken);
+        var rows = db.PortfolioDaily.Where(row => row.AssetId == assetId);
+        var firstRow = await rows.MinAsync(row => (DateOnly?)row.Date, cancellationToken);
+        var lastRow = await rows.MaxAsync(row => (DateOnly?)row.Date, cancellationToken);
+
+        // The first day SnapshotBuilder can write: a movement, a close and, unless BRL, a rate.
+        DateOnly?[] starts =
+        [
+            await db.Movements.Where(movement => movement.AssetId == assetId).MinAsync(movement => (DateOnly?)movement.Date, cancellationToken),
+            await db.Prices.Where(price => price.MarketAssetId == asset.MarketAssetId).MinAsync(price => (DateOnly?)price.Date, cancellationToken),
+            asset.Currency == SnapshotBuilder.BaseCurrency
+                ? DateOnly.MinValue
+                : await db.Benchmarks.Where(rate => rate.Code == UsdBrl).MinAsync(rate => (DateOnly?)rate.Date, cancellationToken),
+        ];
+
+        var from = lastRow is { } last && last < yesterday ? last.AddDays(1) : yesterday;
+        if (starts.All(start => start is not null) && starts.Max() is { } expected && (firstRow is null || firstRow > expected) && expected < from)
+        {
+            from = expected;
+        }
+
+        return from;
+    }
+
     private async Task<List<Price>> ClosesAsync(Guid marketAssetId, DateOnly from, CancellationToken cancellationToken)
     {
         var closes = db.Prices.AsNoTracking().Where(price => price.MarketAssetId == marketAssetId);

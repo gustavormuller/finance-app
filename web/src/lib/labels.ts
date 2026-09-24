@@ -98,12 +98,18 @@ export const providerKindLabels: Record<ProviderKind, string> = {
 
 export const providerKinds: ProviderKind[] = ['Brapi', 'CoinGecko', 'TwelveData'];
 
+const syncSectionLabels: Record<string, string> = {
+  Bcb: 'Banco Central (SGS)',
+  Snapshots: 'Posições da carteira',
+};
+
 /**
- * A key of a sync run's summary: a `ProviderKind` member, or `Bcb` for the benchmark
- * series. An unknown key is shown as sent rather than hidden.
+ * A key of a sync run's summary: a `ProviderKind` member, `Bcb` for the benchmark series,
+ * or `Snapshots` for 007's rebuild after the sync. An unknown key is shown as sent rather
+ * than hidden.
  */
 export function syncProviderLabel(key: string): string {
-  return key === 'Bcb' ? 'Banco Central (SGS)' : (providerKindLabels[key as ProviderKind] ?? key);
+  return syncSectionLabels[key] ?? providerKindLabels[key as ProviderKind] ?? key;
 }
 
 export const syncTriggerLabels: Record<SyncTrigger, string> = {

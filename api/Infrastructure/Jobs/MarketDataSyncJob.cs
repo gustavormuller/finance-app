@@ -123,14 +123,18 @@ public sealed class MarketDataSyncJob(
             .Set<SyncRun>().MaxAsync(run => (DateTimeOffset?)run.StartedAt, stoppingToken);
     }
 
-    /// <summary>Behind the gate the manual trigger uses: waits out a manual run in progress, then runs.</summary>
+    /// <summary>
+    /// Behind the gate the manual trigger uses: waits out a manual run in progress, then
+    /// runs, then rebuilds the portfolio snapshots from the new closes (007).
+    /// </summary>
     private async Task RunOnceAsync(CancellationToken stoppingToken)
     {
         await gate.WaitAsync(stoppingToken);
         try
         {
             await using var scope = scopes.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<MarketDataSync>().RunAsync(SyncTrigger.Scheduled, stoppingToken);
+            var run = await scope.ServiceProvider.GetRequiredService<MarketDataSync>().RunAsync(SyncTrigger.Scheduled, stoppingToken);
+            await scope.ServiceProvider.GetRequiredService<SnapshotRebuildAfterSync>().RunAsync(run.Id, stoppingToken);
         }
         finally
         {

@@ -191,7 +191,8 @@ public sealed class MarketDataSync(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static SyncRunStatus StatusOf(IEnumerable<ProviderSyncSummary> parts)
+    /// <summary>Succeeded with no failure, Failed with no success, PartialFailure otherwise.</summary>
+    internal static SyncRunStatus StatusOf(IEnumerable<ProviderSyncSummary> parts)
     {
         var (synced, failed) = parts.Aggregate((0, 0), (sum, part) => (sum.Item1 + part.ItemsSynced, sum.Item2 + part.ItemsFailed));
         return failed == 0 ? SyncRunStatus.Succeeded
