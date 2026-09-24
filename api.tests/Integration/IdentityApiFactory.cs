@@ -125,6 +125,9 @@ internal sealed class IdentityApiFactory(
                 ["App:Origin"] = AppOrigin,
                 ["DataProtection:KeysPath"] = _keysPath,
 
+                // The nightly market-data job would sync against the real providers.
+                ["MarketData:ScheduledSync"] = "false",
+
                 // The real handler is never asked to talk to Google, but OAuthOptions
                 // validates that both are present before it will run at all.
                 ["Google:ClientId"] = "test-client-id",

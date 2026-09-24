@@ -46,7 +46,10 @@ step "building API"
 dotnet build "$ROOT_DIR/api" --nologo
 
 step "starting API at $API_URL"
+# MarketData__ScheduledSync=false: the nightly market-data job would otherwise run at
+# once (no sync run in the last 26 hours) against the real providers.
 ASPNETCORE_ENVIRONMENT=Development \
+  MarketData__ScheduledSync=false \
   dotnet "$ROOT_DIR/api/bin/Debug/net10.0/Finance.Api.dll" \
   --contentRoot "$ROOT_DIR/api" --urls "$API_URL" &
 API_PID=$!

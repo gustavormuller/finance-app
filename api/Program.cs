@@ -36,9 +36,10 @@ builder.Services.AddScoped<ImportCommands>();
 // 005's dashboard reads: Dapper on the context's connection (ARCHITECTURE.md section 6).
 builder.Services.AddScoped<DashboardQueries>();
 
-// 006's market-data provider adapters and the MarketData settings. Nothing calls them
-// yet: the sync that does arrives with its job.
+// 006's market-data provider adapters, the MarketData settings, the sync and its
+// nightly job (MarketData:ScheduledSync switches the job off).
 builder.Services.AddMarketDataProviders();
+builder.Services.AddMarketDataSync();
 
 var app = builder.Build();
 

@@ -1,5 +1,6 @@
 using System.Net;
 using Finance.Api.Application.MarketData;
+using Finance.Api.Infrastructure.Jobs;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,18 @@ public static class MarketDataSetup
         services.AddHttpClient<BcbSgsProvider>().WithResilience();
         services.AddTransient<IBenchmarkProvider>(provider => provider.GetRequiredService<BcbSgsProvider>());
 
+        return services;
+    }
+
+    /// <summary>
+    /// The sync and its nightly host. Scoped, like the context they take (ADR-016); the job
+    /// opens a scope per run. <c>MarketData:ScheduledSync</c> decides whether the job runs.
+    /// </summary>
+    public static IServiceCollection AddMarketDataSync(this IServiceCollection services)
+    {
+        services.AddScoped<MarketDataStore>();
+        services.AddScoped<MarketDataSync>();
+        services.AddHostedService<MarketDataSyncJob>();
         return services;
     }
 
