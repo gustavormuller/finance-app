@@ -6,15 +6,25 @@
 
 const moneyFormats = new Map<string, Intl.NumberFormat>();
 
-/** `R$ 3.510,00`; a USD figure as `US$ 10,00`. */
-export function formatMoney(value: number, currency = 'BRL'): string {
-  let format = moneyFormats.get(currency);
+function moneyFormat(currency: string, signed: boolean): Intl.NumberFormat {
+  const key = `${currency}:${signed}`;
+  let format = moneyFormats.get(key);
   if (!format) {
-    format = new Intl.NumberFormat('pt-BR', { style: 'currency', currency });
-    moneyFormats.set(currency, format);
+    format = new Intl.NumberFormat('pt-BR', { style: 'currency', currency, signDisplay: signed ? 'exceptZero' : 'auto' });
+    moneyFormats.set(key, format);
   }
 
-  return format.format(value);
+  return format;
+}
+
+/** `R$ 3.510,00`; a USD figure as `US$ 10,00`. */
+export function formatMoney(value: number, currency = 'BRL'): string {
+  return moneyFormat(currency, false).format(value);
+}
+
+/** A gain or a loss: `+R$ 297,66`, `-R$ 12,00`. */
+export function formatSignedMoney(value: number, currency = 'BRL'): string {
+  return moneyFormat(currency, true).format(value);
 }
 
 /** A price per unit, to the `numeric(18,8)` column's eighth place, never below the cent. */

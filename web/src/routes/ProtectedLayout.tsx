@@ -9,6 +9,7 @@ const LINKS: [string, string][] = [
   ['/', 'Início'],
   ['/transactions', 'Lançamentos'],
   ['/import', 'Importar'],
+  ['/investments', 'Investimentos'],
   ['/accounts', 'Contas'],
   ['/categories', 'Categorias'],
 ];

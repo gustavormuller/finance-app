@@ -1,9 +1,11 @@
 import { createRootRoute, createRoute } from '@tanstack/react-router';
 
 import AccountsPage from './routes/AccountsPage';
+import AssetPage from './routes/AssetPage';
 import CategoriesPage from './routes/CategoriesPage';
 import DashboardPage from './routes/DashboardPage';
 import ImportPage from './routes/ImportPage';
+import InvestmentsPage from './routes/InvestmentsPage';
 import LoginPage from './routes/LoginPage';
 import MarketDataPage from './routes/MarketDataPage';
 import ProtectedLayout from './routes/ProtectedLayout';
@@ -87,7 +89,20 @@ const marketDataRoute = createRoute({
   component: MarketDataPage,
 });
 
+// 007: in the navigation (spec: "Route `/investments`, in the nav").
+const investmentsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/investments',
+  component: InvestmentsPage,
+});
+
+const assetRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/investments/$assetId',
+  component: AssetPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, assetRoute]),
 ]);
