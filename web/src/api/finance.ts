@@ -227,6 +227,53 @@ export interface UndoResult {
   deleted: number;
 }
 
+// ---- 005: dashboard -----------------------------------------------------------
+
+/**
+ * The dashboard's money is signed as stored — `expense` and every Expense category
+ * `amount` are negative — and is only displayed here, never computed with, for the
+ * reason `Transaction.amount` gives.
+ */
+export interface AccountBalance {
+  accountId: string;
+  name: string;
+  type: AccountType;
+  currency: string;
+  balance: number;
+  /** True for every non-BRL account: listed, but not added to `total`. */
+  excludedFromTotal: boolean;
+}
+
+export interface MonthSummary {
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface DashboardSummary {
+  balances: AccountBalance[];
+  total: number;
+  month: MonthSummary;
+}
+
+export interface MonthTotals {
+  /** `YYYY-MM`. */
+  month: string;
+  income: number;
+  expense: number;
+}
+
+export interface CategoryTotal {
+  categoryId: string;
+  name: string;
+  amount: number;
+  /** Fraction of the month's total for the kind, 4 places, positive. */
+  share: number;
+}
+
+/** The kinds the breakdown accepts; a Transfer is neither and the API refuses it. */
+export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
+
 /**
  * A refusal from the API, with the offending fields a 400 names and, for the 409 an
  * upload gets while another import is open, the id of that import.
@@ -365,6 +412,15 @@ export const api = {
   discardImport: (id: string) => request<void>(`/api/imports/${id}`, { method: 'DELETE' }),
 
   undoImport: (id: string) => request<UndoResult>(`/api/imports/${id}/undo`, { method: 'POST' }),
+
+  dashboardSummary: (month: string) =>
+    request<DashboardSummary>(`/api/dashboard/summary?${searchParams({ month })}`),
+
+  dashboardMonthly: (months: number) =>
+    request<MonthTotals[]>(`/api/dashboard/monthly?${searchParams({ months })}`),
+
+  dashboardByCategory: (month: string, kind: BreakdownKind) =>
+    request<CategoryTotal[]>(`/api/dashboard/by-category?${searchParams({ month, kind })}`),
 
   listCsvTemplates: () => request<CsvTemplate[]>('/api/csv-templates'),
 
