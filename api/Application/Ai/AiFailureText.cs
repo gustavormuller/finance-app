@@ -19,5 +19,13 @@ public static class AiFailureText
 
     public const string Interrupted = "A geração da análise foi interrompida. Gere a análise novamente.";
 
-    public static string For(Exception failure) => throw new NotImplementedException();
+    /// <summary>The text for a failure; a timeout before its base class, and anything unforeseen as <see cref="Unexpected"/>.</summary>
+    public static string For(Exception failure) => failure switch
+    {
+        AiDisabledException => Disabled,
+        AiBudgetExceededException => BudgetExceeded,
+        AiProviderTimeoutException => Timeout,
+        AiProviderException => ProviderFailed,
+        _ => Unexpected,
+    };
 }

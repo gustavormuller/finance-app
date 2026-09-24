@@ -36,6 +36,12 @@ public sealed class AiOptions
     /// </summary>
     public bool FakeProvider { get; set; }
 
+    /// <summary>
+    /// The analysis job's sweep of rows a restart left <c>Pending</c> or <c>Running</c>. On
+    /// unless switched off; the test hosts switch it off, as they do the nightly sync.
+    /// </summary>
+    public bool AnalysisSweep { get; set; } = true;
+
     /// <summary>Empty when the configuration is sound; otherwise English diagnostics for the operator.</summary>
     public static IReadOnlyList<string> Problems(AiOptions options)
     {

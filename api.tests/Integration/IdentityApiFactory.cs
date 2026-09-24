@@ -136,6 +136,10 @@ internal sealed class IdentityApiFactory(
                 // The nightly market-data job would sync against the real providers.
                 ["MarketData:ScheduledSync"] = "false",
 
+                // The analysis sweep would run every other test's stale rows in this
+                // shared database. The job itself stays on: it only runs what a host enqueues.
+                ["Ai:AnalysisSweep"] = "false",
+
                 // The real handler is never asked to talk to Google, but OAuthOptions
                 // validates that both are present before it will run at all.
                 ["Google:ClientId"] = "test-client-id",

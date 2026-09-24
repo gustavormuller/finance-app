@@ -1,4 +1,5 @@
 using Finance.Api.Application.Ai;
+using Finance.Api.Infrastructure.Jobs;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
@@ -17,6 +18,11 @@ public static class AiSetup
         services.AddScoped<AiGateway>();
         services.AddScoped<CategorisationCascade>();
         services.AddScoped<AnalysisInputQueries>();
+
+        // The monthly analysis: a channel, the run in a scope acting for the user, and the job.
+        services.AddSingleton<AnalysisQueue>();
+        services.AddScoped<MonthlyAnalysis>();
+        services.AddHostedService<AnalysisJob>();
 
         // No resilience handler: every attempt spends tokens and the gateway records one
         // usage row per call, so a failure is returned, never retried. No client timeout
