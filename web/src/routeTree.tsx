@@ -2,6 +2,7 @@ import { createRootRoute, createRoute } from '@tanstack/react-router';
 
 import AccountsPage from './routes/AccountsPage';
 import AssetPage from './routes/AssetPage';
+import AssetReturnsPage from './routes/AssetReturnsPage';
 import CategoriesPage from './routes/CategoriesPage';
 import DashboardPage from './routes/DashboardPage';
 import ImportPage from './routes/ImportPage';
@@ -111,7 +112,14 @@ const assetRoute = createRoute({
   component: AssetPage,
 });
 
+// 008: "click through to the asset's own returns page".
+const assetReturnsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/investments/$assetId/returns',
+  component: AssetReturnsPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute, assetReturnsRoute]),
 ]);

@@ -26,3 +26,11 @@ export function usePortfolioReturns(query: ReturnsQuery) {
 export function fieldErrors(error: Error | null): Record<string, string[]> {
   return error instanceof ApiError ? error.fields : {};
 }
+
+export function useAssetReturns(assetId: string, query: ReturnsQuery) {
+  return useQuery({
+    queryKey: [...RETURNS, 'asset', assetId, query],
+    queryFn: () => api.assetReturns(assetId, query),
+    retry: retryUnlessRefused,
+  });
+}
