@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -21,6 +21,7 @@ function row(partial: Partial<StagedRow> & Pick<StagedRow, 'id' | 'rowNumber' | 
     rawDescription: 'PAG*IFOOD 10/09',
     externalId: null,
     categoryId: 'cat-other',
+    categorySource: 'Default',
     included: partial.status === 'Ready',
     issues: [],
     ...partial,
@@ -51,9 +52,10 @@ function detail(rows: StagedRow[]): ImportBatchDetail {
   };
 }
 
-function renderStep(rows: StagedRow[]) {
+function renderStep(rows: StagedRow[], { aiEnabled = true }: { aiEnabled?: boolean } = {}) {
   const onPatchRow = vi.fn();
   const onCommit = vi.fn();
+  const onSuggest = vi.fn();
 
   render(
     <PreviewStep
@@ -62,6 +64,9 @@ function renderStep(rows: StagedRow[]) {
       filter=""
       busy={false}
       error={null}
+      notice={null}
+      aiEnabled={aiEnabled}
+      onSuggest={onSuggest}
       onFilter={vi.fn()}
       onPage={vi.fn()}
       onPatchRow={onPatchRow}
@@ -70,7 +75,7 @@ function renderStep(rows: StagedRow[]) {
     />,
   );
 
-  return { onPatchRow, onCommit };
+  return { onPatchRow, onCommit, onSuggest };
 }
 
 describe('PreviewStep', () => {
@@ -145,5 +150,44 @@ describe('PreviewStep', () => {
       'Outras receitas',
       'Transferência',
     ]);
+  });
+
+  /** Spec web unit test 25. With AI off the button stays, disabled, and says why. */
+  it('disables "Sugerir com IA" with the reason when AI is off', () => {
+    const { onSuggest } = renderStep([row({ id: 'r1', rowNumber: 1, status: 'Ready' })], { aiEnabled: false });
+
+    const suggest = screen.getByRole('button', { name: 'Sugerir com IA' });
+    expect(suggest).toBeDisabled();
+    expect(suggest).toHaveAccessibleDescription(
+      'A IA está desligada na sua conta. Ligue-a em Configurações para receber sugestões.',
+    );
+
+    suggest.click();
+    expect(onSuggest).not.toHaveBeenCalled();
+  });
+
+  it('offers "Sugerir com IA" when AI is on', async () => {
+    const { onSuggest } = renderStep([row({ id: 'r1', rowNumber: 1, status: 'Ready' })]);
+
+    const suggest = screen.getByRole('button', { name: 'Sugerir com IA' });
+    expect(suggest).toBeEnabled();
+    expect(suggest).not.toHaveAccessibleDescription();
+
+    await userEvent.setup().click(suggest);
+    expect(onSuggest).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks a row whose category the AI suggested, and no other', () => {
+    renderStep([
+      row({ id: 'r1', rowNumber: 1, status: 'Ready', categoryId: 'cat-food', categorySource: 'Ai' }),
+      row({ id: 'r2', rowNumber: 2, status: 'Ready', categorySource: 'Default' }),
+      row({ id: 'r3', rowNumber: 3, status: 'Ready', categorySource: 'History' }),
+    ]);
+
+    const [first, second, third] = screen.getAllByTestId('staged-row-Ready');
+    expect(within(first!).getByTestId('ai-marker')).toHaveAccessibleName('Sugerida pela IA');
+    expect(within(first!).getByRole('combobox', { name: 'Categoria da linha 1' })).toHaveValue('cat-food');
+    expect(within(second!).queryByTestId('ai-marker')).not.toBeInTheDocument();
+    expect(within(third!).queryByTestId('ai-marker')).not.toBeInTheDocument();
   });
 });
