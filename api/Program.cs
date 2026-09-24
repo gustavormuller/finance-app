@@ -31,6 +31,9 @@ builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+// 010: behind Caddy, the browser's scheme and address come from trusted proxies only.
+builder.Services.AddFinanceForwardedHeaders();
+
 builder.Services.AddFinanceAuthentication();
 builder.Services.AddAuthorization();
 
@@ -110,15 +113,28 @@ void Require(string key, string purpose)
         + $"`dotnet user-secrets set \"{key}\" \"...\" --project api`.");
 }
 
-// The deploy model is `git pull && docker compose up -d --build` with no separate
-// migration step, so the application migrates itself on the way up. The
-// unreachable-database test switches this off: the process has to boot without a
-// database in order to be able to report that it has none.
-if (app.Configuration.GetValue("Database:MigrateOnStartup", defaultValue: true))
+// Production never migrates on the way up (010, decision 2; appsettings.Production.json):
+// deploy.sh runs the published app with the `migrate` argument as its own step, which
+// applies the migrations and exits before serving anything, so a failed migration
+// leaves the running containers alone. Development and the test hosts still migrate on
+// startup. The unreachable-database test switches that off: the process has to boot
+// without a database in order to be able to report that it has none.
+var migrateOnly = args.Contains("migrate", StringComparer.Ordinal);
+
+if (migrateOnly || app.Configuration.GetValue("Database:MigrateOnStartup", defaultValue: true))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }
+
+if (migrateOnly)
+{
+    return;
+}
+
+// First, so everything after it (the Google redirect_uri, the per-IP rate limit, the
+// logs) sees the browser's scheme and address rather than Caddy's.
+app.UseForwardedHeaders();
 
 app.UseRouting();
 
