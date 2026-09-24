@@ -27,8 +27,9 @@ export default function SettingsPage() {
     onSuccess: (user) => queryClient.setQueryData(['me'], user),
   });
 
-  // RequireAuth renders pages only once `me` has resolved to a user.
-  const aiEnabled = me.data?.aiEnabled ?? false;
+  // RequireAuth renders pages only once `me` has resolved to a user. While the PATCH is
+  // in flight the switch shows where it is going; a refusal puts it back.
+  const aiEnabled = toggle.isPending ? toggle.variables : (me.data?.aiEnabled ?? false);
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8">
