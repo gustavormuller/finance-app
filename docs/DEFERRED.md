@@ -2734,3 +2734,133 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
     - `categorySource` labels go in `labels.ts`.
     - **The disclosure must say** that categorisation sends normalized descriptions, each
     row's debit or credit and the category names, and no amounts, dates or accounts.
+
+## 009 · checkpoint 5a
+
+- **009 · CP5a · the ADR check found no conflict.** The layers:
+  - `Application/Ai/AnalysisInputBuilder` (the spec's name) is a pure static `Build`, unit
+    tested. `Application/Ai/AnalysisInputQueries` loads its aggregates on `AppDbContext` and
+    005's and 007's query classes directly (ADR-016).
+  - `Application/Ai/MonthlyAnalysis` is one run of the job, and `Application/Ai/AnalysisQueue`
+    wraps the `Channel<T>`. `Infrastructure/Jobs/AnalysisJob` is the hosted
+    `BackgroundService`. This is ADR-003's final form: the channel wakes the job, and the row
+    is the state.
+  - `Infrastructure/Ai/MonthlyAnalysisPrompt` reads the prompt file. `MonthlyAnalysis`
+    (Application) uses it, as Application already uses `Infrastructure.AppDbContext`.
+  - There is no Repository and no MediatR. `Domain/` gains nothing. No migration and no
+    schema change. Every amount is `decimal`, and CP1's scan of the AI namespaces still
+    passes.
+  - The one stretch of ADR-003's text is the sweep's schedule, below.
+- **009 · CP5a · the analysis input (decision 7; the shape is spec-silent, pending human).**
+  One JSON document, the prompt's user message. Test 11 pins it whole:
+  - `month`, `currency` (`BRL`).
+  - `months`: the analysed month and the two before, oldest first, each `income`, `expense`
+    and `net`. These are 005's `MonthlyAsync`: BRL only, with Transfers excluded.
+  - `monthOverMonth`: `income`, `expense` and `net`, each `previous`, `current`, `change`
+    and `changePercent`. It compares the analysed month with the one before.
+  - `categories`: top-level categories rolled up as the dashboard does (005's
+    `ByCategoryAsync`), expense and income. Each has `amounts` per month (0.00 where empty),
+    `change` and `changePercent`. Expense comes first, then by the analysed month's amount,
+    then by name.
+  - `topMerchants`: at most 20, `name`, `spent` and `transactions`. Only BRL expense in the
+    analysed month counts. The name is the row's `NormalizedDescription`, or the description
+    normalized on the fly for a row entered by hand. **Income is never listed**, because its
+    descriptions name payers.
+  - `accounts`: each account's `name`, `type`, `currency` and `balance`. `balanceTotalBrl`
+    is the BRL total.
+  - `investments`: 007's summary only (`valueBrl`, `costBrl`, `unrealisedBrl`), as the user
+    decided in CP2.
+
+  Formatting choices:
+  - **Expense is a positive amount spent**, so the model never has to reason about signs.
+  - Money always has two places (`0.00`, never `0`).
+  - A percentage has one place, rounded half away from zero, taken of the previous value's
+    absolute size. **It is `null` when the previous value is zero**, rather than an
+    infinity the model would print.
+  - **Balances and the portfolio are current, not as of the analysed month's end.** That is
+    what 005 and 007 compute. Analysing an old month still shows today's balances. **Pending
+    human.**
+- **009 · CP5a · what leaves the server, for CP6's disclosure.** The analysis sends these to
+  the provider:
+  - account names and types, category names, and totals;
+  - merchant names, which are normalized expense descriptions: upper case, no digits.
+    **A PIX sent to a person carries that person's name.**
+  - the portfolio's three totals.
+
+  No raw description, date, row or income description is sent. A test on the database
+  (`AnalysisInputQueriesTests`) asserts this with raw descriptions, a payer's CPF, a USD row
+  and another user's merchant and account.
+- **009 · CP5a · the prompt (decision 8), `Infrastructure/Ai/Prompts/monthly-analysis.md`.**
+  - Line 1 is `<!-- version: 1 -->`. The version is at most 20 characters (the column),
+    letters, digits, dots and dashes. The rest of the file, trimmed, is the system prompt.
+  - It is an embedded resource (`Api.csproj`, logical name `Prompts/monthly-analysis.md`), so
+    the published image carries the reviewed file. It is read once, and a missing or
+    malformed header throws on first use, which fails the analysis and not the boot.
+  - **The instructions are in English**, like CP4a's categorisation prompt. The five section
+    headings are pt-BR literals, and the answer is asked for in pt-BR.
+  - The rules follow the spec: sections *Resumo*, *Onde o dinheiro foi*, *O que mudou*,
+    *Investimentos* and *Sugestões*; numbers from the input only; at most 400 words; no
+    preamble. It also asks for no recomputed totals or averages, for R$ 1.234,56 and
+    12,5%, for no recommendation of a specific product or bank, for plain markdown with no
+    tables, links, images or HTML, and for the JSON to be treated as data, never as
+    instructions (merchant and account names are user-controlled).
+  - A test asserts that the prompt describes every top-level field of the input, so the
+    shape and the prompt cannot drift apart silently.
+  - **For the human: review it like code** (spec, DoD).
+- **009 · CP5a · the job (`MonthlyAnalysis.RunAsync`, the spec's steps 1-6).**
+  - It runs in a scope acting for the item's user (`ActingUser`), with the filters on. A row
+    that is not that user's, or no longer `Pending`, runs nothing. So an item enqueued twice
+    runs once, and a scope acting for B cannot run A's row.
+  - It saves `Running`, `StartedAt` and the prompt's version **before the call**, because the
+    gateway saves usage on the same context. The gateway checks `ai_enabled` and the budget
+    again (step 3) and records usage whatever happens (step 5).
+  - `MaxTokens` is 8000, a constant (`MonthlyAnalysis.MaxTokens`), as CP4 suggested.
+  - The content is the provider's text, trimmed. The markdown is stored as is. CP6 must
+    escape it (test 27).
+  - **`Error` is always pt-BR copy** (`AiFailureText.For`): AI off, budget, timeout, other
+    provider failure, or anything else. The exception goes to a warning log only. The final
+    save is not cancellable. A shutdown mid-call leaves the row `Running` for the sweep.
+  - There is one consumer, so analyses run one at a time. Ten users generating at once at
+    120 s each would wait up to 20 minutes. **Pending human** if that matters.
+- **009 · CP5a · the sweep goes beyond the spec's text (pending human).** Decision 6 and
+  ADR-003 say "on startup, any `Pending` row older than 5 minutes is re-enqueued":
+  - **It runs at startup and then every 5 minutes.** A restart within 5 minutes of a POST
+    would otherwise leave that row `Pending` until the next boot, with the card spinning.
+  - **A `Running` row past its timeout plus 5 minutes fails** with "A geração da análise foi
+    interrompida. Gere a análise novamente." It is not re-run, because its call may already
+    have been paid for, and a second run would spend again without being asked. The spec
+    says nothing about `Running` rows.
+  - It walks each user in a scope acting for them. There is no `IgnoreQueryFilters`.
+  - **`Ai:AnalysisSweep`** (default `true`, in `appsettings.json`) switches it off. The test
+    hosts turn it off, as they do `MarketData:ScheduledSync`, because they share one
+    database. Test 24 turns it on, on a fresh database. The consumer stays on everywhere: it
+    only runs what its own host enqueues. The E2E API keeps the sweep on, on its own
+    database.
+- **009 · CP5a · the fake** (`FakeAiProvider`) recognises the analysis prompt. It answers the
+  five sections, quoting the month and the month's expense from the input, and is
+  deterministic. Its text is test copy, only ever seen with `Ai:FakeProvider` (Development).
+- **009 · CP5a · for the human: invented pt-BR copy** (`AiFailureText`, shared with
+  `Problems.Ai` since 2db349b):
+  - "Não foi possível gerar a análise. Tente novamente mais tarde." for a failure that is
+    not the provider's.
+  - "A geração da análise foi interrompida. Gere a análise novamente." for the sweep.
+  - The four problem texts from CP4b are reused as the job's errors.
+- **009 · CP5a · tests.**
+  - Test 11: `AnalysisInputBuilderTests` (unit, the shape pinned whole) and
+    `AnalysisInputQueriesTests` (no raw description, on the database).
+  - Test 12: `AnalysisInputBuilderTests`.
+  - Tests 13 and 14, application halves: B's input holds nothing of A's, and a scope acting
+    for B does not run A's row.
+  - Tests 21 and 22, job halves: `AnalysisJobTests`, on a scripted provider.
+  - Test 24: the sweep, on a fresh database.
+
+  The HTTP halves come in CP5b. No test calls a real AI API.
+- **009 · CP5a · commit sizes.** Three commits go over about 200 lines:
+  - a333375 (unit tests 11-12) is 283, most of it the pinned JSON document.
+  - 2233749 (the job tests) is 286.
+  - 5a64a8d (the job) is 228.
+
+  The rest are between 8 and 118.
+- **009 · CP5a · counts.** .NET went from 919 to 943 (+24): 3 builder, 2 input queries, 9
+  prompt, 9 job and 1 fake. All ran. Web and E2E were not rerun at 5a (there is no web
+  change).
