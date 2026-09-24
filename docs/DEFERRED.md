@@ -2262,3 +2262,145 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
     "portfolio summary from 007", and the out-of-scope list rules out "any AI on the
     investments side beyond the summary line". `ReturnsQueries.PortfolioAsync` could add TWR
     and XIRR in one call. **Pending human.**
+
+## 009 · checkpoint 2
+
+- **009 · CP2 · decided by the user: AI prices are in USD.** The config keys are now
+  `Ai:Pricing:<model>:InputPerMTokUsd` and `…OutputPerMTokUsd`, holding the providers' USD
+  list prices. A call is converted to BRL at the latest `USDBRL` benchmark, or at `Ai:UsdBrl`
+  when none is stored. Test 4 and the fallback stay as the spec wrote them. This was option (a)
+  of CP1's question. The spec's key names got a one-line note in their own commit (2d85ecc).
+  ARCHITECTURE names only `Ai:Pricing:<model>:*`, so it needed no edit.
+- **009 · CP2 · decided by the user: the monthly analysis does not see 008's returns.** It
+  gets only 007's portfolio summary (decision 7). This is for CP5. `ReturnsQueries` is not
+  called.
+- **009 · CP2 · the ADR check found no conflict.** The layers:
+  - `Domain/Ai/AiCost` is pure: the cost, the rate choice and the month.
+  - `Application/Ai/` holds `AiOptions`, `IAiProvider` (the spec's shape, verbatim),
+    `BudgetGuard`, `AiPricing` and `AiGateway`, all on `AppDbContext` directly (ADR-016).
+  - `Infrastructure/Ai/` holds `AiSetup` and `FakeAiProvider`.
+  - There is no Repository and no MediatR. Every money value is `decimal`, and CP1's scan of
+    the three AI namespaces still passes.
+- **009 · CP2 · handoff defaults, taken as suggested:**
+  - **A usage row's `Month` is read on a fixed UTC-3 clock** (`AiCost.MonthOf`), the same
+    offset as the brapi adapter. A call at 23:30 on the 31st in Brazil counts against that
+    month. The container timezone is still pending from 006. This clock ignores it.
+  - **The fake's switch is `Ai:FakeProvider`.** It fails the boot outside Development
+    (`AiSetup.RefuseFakeProviderOutsideDevelopment`), tested for Production and Staging as
+    006 did. `verify-e2e.sh` now starts the E2E API with `Ai__FakeProvider=true`.
+  - **A configured model with no price fails the boot**, with the key named
+    (`AiOptions.RefuseInvalid`). The boot also refuses a price of zero or less, an unknown
+    `Ai:Provider`, an empty model, a negative budget and an `Ai:UsdBrl` of zero or less. A
+    budget of 0 is allowed: it refuses every call.
+  - **Keys stay empty in `appsettings.json`,** with a test (006's pattern).
+- **009 · CP2 · for the human: the model ids, prices and fallback rate in `appsettings.json`.**
+  The spec leaves them to configuration, and I picked them:
+  - Categorisation uses `claude-haiku-4-5` at USD 1 / 5 per million tokens (input / output).
+  - Analysis uses `claude-opus-5` at USD 5 / 25.
+  - The prices are Anthropic's list prices from my reference (cached June 2026), not checked
+    against the console. A 40k-token analysis costs about R$ 1.2, in line with ARCHITECTURE's
+    "~R$1 per run".
+  - `Ai:UsdBrl` is `5.40`, an assumed rate.
+  - No OpenAI model is configured. Switching to `openai` means setting both models and their
+    prices. The boot checks that each model has a price, but not that the model belongs to
+    the provider.
+  - **Confirm all of these, or overwrite them in the environment.**
+- **009 · CP2 · cost.** The formula is `(input × inUsd + output × outUsd) × rate / 1e6`,
+  computed in full and rounded once:
+  - It rounds to the column's 4 places, half away from zero (as PostgreSQL's `numeric`
+    rounds), with the scale fixed at 4.
+  - A call of 50 tokens at USD 1 costs 0.0001, not 0.
+  - The rate is the `USDBRL` row with the latest `Date`, with no limit on its age. A value of
+    zero or less falls back to `Ai:UsdBrl`.
+  - Under the E2E fakes USDBRL is 0.05, so E2E costs are about 100 times too small, as noted
+    in CP1.
+- **009 · CP2 · the budget.** `BudgetGuard.Allows` refuses at `spent >= budget` (tests 1 and
+  2).
+  - `EnsureWithinBudgetAsync(userId, month)` keeps the spec's signature. It sums
+    `CostBrl` through the query filter and the user id, failed calls included.
+  - The check comes before the call, so a month can end over the budget by one call's cost.
+    That is ADR-008's "cut-off before every call".
+  - `AiBudgetExceededException` carries the amount spent and the budget, for CP4's `402`.
+- **009 · CP2 · `AiGateway`, a name the spec does not use.** It is the "middleware" of
+  decision 3 and ARCHITECTURE's cost-control block. It is the one path to `IAiProvider`, and
+  each call runs these steps:
+  1. **`ai_enabled`.** It throws `AiDisabledException` (CP4's `403`) before anything else.
+     This goes beyond the spec, which gates at the endpoints. It also stops a job whose user
+     turned AI off after `POST`.
+  2. **The budget.**
+  3. **The call.** The model comes from the purpose: `Ai:Categorisation:Model` or
+     `Ai:Analysis:Model`.
+  4. **One usage row, success or failure.**
+
+  The user comes from `ICurrentUser`, not from a parameter. That is the request's user, or the
+  user a job's scope acts for (`ActingUser`, 007's pattern, with the filters on). A caller
+  therefore cannot price another user's month.
+- **009 · CP2 · usage on failure (decision 3).** A provider signals failure with
+  `AiProviderException(message, inputTokens, outputTokens)`.
+  - When it reports tokens, those are recorded. `0` means nothing was billed.
+  - When it reports nothing, `null`, or when any other exception escapes, the input is
+    **estimated at 4 characters a token, rounded up**, and the output is 0. This is rough and
+    it errs toward refusing. **For the human:** a failed call that billed nothing still costs
+    its estimate unless the adapter says `0`.
+  - The row is saved with no cancellation token: the tokens were spent even if the caller
+    left. The original exception is then re-thrown unchanged.
+  - The row is saved on the scope's `AppDbContext`, so **callers (CP4, CP5) must not hold
+    unsaved changes** when they call.
+  - `AiUsage.Provider` is `fake` for the fake, and otherwise the lower-cased `Ai:Provider`.
+- **009 · CP2 · pt-BR.** The exceptions carry English messages for logs. None of them is
+  rendered: CP4 writes the pt-BR problem details for 402, 403 and 504. **CP5 must write a
+  pt-BR `AiAnalysis.Error`, not an exception message,** if the card shows it.
+- **009 · CP2 · the fake.** `FakeAiProvider` returns one fixed pt-BR markdown answer
+  (`## Resumo …`) for every purpose. Its tokens are 4 characters each, rounded up, so usage
+  rows get plausible numbers. **CP4 and CP7 must shape it:** categorisation needs a
+  `{ rowId: categoryId }` answer built from the request. Without the switch, resolving
+  `IAiProvider` throws "Ai:Provider … has no adapter yet". No real call can happen in CP2, and
+  `AiFakeProviderTests.Without_the_switch_the_fake_is_not_what_answers` asserts this. CP3
+  changes it to assert the configured adapter.
+- **009 · CP2 · tests.** Unit tests 1–4 are in `AiCostTests`. Their database halves (1, 2 and
+  4) and decision 3 are in `AiGatewayTests`, which runs on the job path and swaps in a
+  scripted provider. No test calls a real AI API.
+  - `AiGatewayTests` uses a fresh database per test, because `Benchmarks` is shared and
+    other tests store USDBRL.
+  - It also uses two hosts, because a `FakeTimeProvider` host issues session cookies with
+    expiry dates relative to its frozen clock, and the cookie container drops them once
+    those dates are past. Users sign in on a real-clock host. The gateway runs on the
+    fake-clock host.
+- **009 · CP2 · a flaky 006 test (not fixed, out of scope).**
+  `MarketDataFakeProvidersTests.With_the_switch_a_manual_sync_succeeds_on_fakes_and_can_run_again_at_once`
+  failed once in the full suite and once in 5 runs on its own. The failing call gets a 429.
+  `ManualMarketDataSync.RunAsync` writes the run's final status, then rebuilds snapshots,
+  then releases the gate. The test sees "not Running" and posts again while the gate is still
+  held. The rerun and the E2E runs were green. I queued a separate task for it.
+- **009 · CP2 · commit sizes.** Two commits went over about 200 lines. 1445ad2, the settings
+  tests, has 221. 7ad6332, the gateway, has 281 changed lines, because it includes moving
+  the gateway tests onto two hosts. I split the rest: the port in 7231f36, and the gateway
+  tests in 098002f and 30e6f85.
+- **009 · CP2 · counts.** .NET went from 775 to 815 (+40), web stayed at 145 and E2E at 22.
+  There is no migration and no schema change.
+- **009 · CP2 · handoff to CP3.** CP3 builds the Anthropic and OpenAI adapters against
+  hand-written fixtures:
+  - **Where they go.** Put each adapter in `Infrastructure/Ai/` as a typed `HttpClient`.
+    Replace the throwing delegate in `AiSetup.AddAi` with a choice by `Ai:Provider` when the
+    fake is off. Flip `Without_the_switch_the_fake_is_not_what_answers` to assert that type.
+  - **Keys (ADR-015, 006's pattern).** Send them in headers only: `x-api-key` for Anthropic,
+    `Authorization: Bearer` for OpenAI. Keep them out of URLs and logs. An empty key should
+    fail the call clearly, not the boot: AI is off by default, and dev and test hosts have no
+    key.
+  - **Base URLs.** They need settings the spec does not list (`Ai:Anthropic:BaseUrl`,
+    `Ai:OpenAi:BaseUrl`), as 006 has.
+  - **Timeouts.** Categorisation gets 30 s (decision 4). The analysis runs in the background,
+    so a longer timeout is reasonable. CP4 needs to tell a timeout apart (its `504`), for
+    example with an `AiProviderException` subtype or flag.
+  - **Retries.** Every attempt spends tokens, but the gateway records one row per call. So
+    either don't retry, or sum the tokens of all attempts into the exception or completion
+    you return. Never retry a 4xx.
+  - **Failures.** Map them to `AiProviderException`. Use `InputTokens = 0` where nothing was
+    billed (401, 403, 400 before inference, 429). Leave it `null` when unknown (a timeout, a
+    dropped connection). Read `usage` from an error body where the provider sends one.
+  - **Fixtures.** They are hand-written, like 006's, so a human must check them against real
+    responses. Record them for the Messages API (`usage.input_tokens` / `output_tokens`, the
+    `content[]` text) and the chat completions shape (`usage.prompt_tokens` /
+    `completion_tokens`). Cover a refusal or empty content, and a `max_tokens` stop.
+  - **Wrong model or provider.** The boot does not check that a model belongs to
+    `Ai:Provider`. Give a bad model id a clear error message.
