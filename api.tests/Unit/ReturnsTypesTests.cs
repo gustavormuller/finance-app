@@ -37,9 +37,12 @@ public sealed partial class ReturnsTypesTests
     public void No_returns_source_file_mentions_a_floating_point_type_outside_comments()
     {
         var files = Folders.SelectMany(folder =>
-            Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "api", folder), "*.cs", SearchOption.AllDirectories)).ToList();
+                Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "api", folder), "*.cs", SearchOption.AllDirectories))
+            .Append(Path.Combine(RepositoryRoot(), "api", "Endpoints", "ReturnsEndpoints.cs"))
+            .ToList();
 
         Assert.Contains(files, file => file.EndsWith("DecimalMath.cs", StringComparison.Ordinal));
+        Assert.Contains(files, file => file.EndsWith("ReturnsQueries.cs", StringComparison.Ordinal));
         var offenders = files
             .SelectMany(file => File.ReadLines(file).Select((line, number) => (file, number, code: Comment().Replace(line, ""))))
             .Where(line => FloatingPoint().IsMatch(line.code))
