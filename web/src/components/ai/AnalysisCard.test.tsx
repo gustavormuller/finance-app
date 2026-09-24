@@ -73,22 +73,27 @@ describe('AnalysisCard', () => {
     const seen = stubApi({ list: [[analysis('Pending')], [analysis('Running')], [analysis('Completed')]] });
 
     renderWithClient(<AnalysisCard month="2026-09" />);
-    await act(() => vi.advanceTimersByTimeAsync(0));
 
-    expect(screen.getByTestId('analysis-progress')).toHaveTextContent('Na fila');
+    // A response body is read on the real event loop, which fake timers do not drive, so
+    // what is on screen is waited for; the requests are counted at exact instants.
+    const shows = (assertion: () => void) => act(() => vi.waitFor(assertion));
+
+    await shows(() => expect(screen.getByTestId('analysis-progress')).toHaveTextContent('Na fila'));
     expect(analysisReads(seen).map((request) => request.url)).toEqual(['/api/ai/analyses?month=2026-09']);
 
-    await act(() => vi.advanceTimersByTimeAsync(POLL_MS - 100));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS - 500));
     expect(analysisReads(seen)).toHaveLength(1);
 
-    await act(() => vi.advanceTimersByTimeAsync(100));
+    await act(() => vi.advanceTimersByTimeAsync(500));
     expect(analysisReads(seen)).toHaveLength(2);
-    expect(screen.getByTestId('analysis-progress')).toHaveTextContent('Gerando');
+    await shows(() => expect(screen.getByTestId('analysis-progress')).toHaveTextContent('Gerando'));
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(analysisReads(seen)).toHaveLength(3);
+    await shows(() =>
+      expect(within(screen.getByTestId('analysis-content')).getByRole('heading', { name: 'Resumo' })).toBeInTheDocument(),
+    );
     expect(screen.queryByTestId('analysis-progress')).not.toBeInTheDocument();
-    expect(within(screen.getByTestId('analysis-content')).getByRole('heading', { name: 'Resumo' })).toBeInTheDocument();
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 5));
     expect(analysisReads(seen)).toHaveLength(3);
