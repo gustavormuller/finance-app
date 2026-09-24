@@ -91,5 +91,100 @@ public sealed class AnthropicAiProviderTests
         Assert.Equal((90, 7), (error.InputTokens, error.OutputTokens));
     }
 
+    /// <summary>A 4xx is refused before inference, so nothing was billed; a 5xx is unknown and estimated.</summary>
+    [Theory]
+    [InlineData(400, "invalid_request_error", 0)]
+    [InlineData(401, "authentication_error", 0)]
+    [InlineData(402, "billing_error", 0)]
+    [InlineData(403, "permission_error", 0)]
+    [InlineData(404, "not_found_error", 0)]
+    [InlineData(429, "rate_limit_error", 0)]
+    [InlineData(500, "api_error", null)]
+    [InlineData(529, "overloaded_error", null)]
+    public async Task An_error_status_fails_with_its_type_and_no_key(int status, string type, int? inputTokens)
+    {
+        var handler = new AiHttpHandler((HttpStatusCode)status,
+            $$"""{"type":"error","error":{"type":"{{type}}","message":"echo {{AnthropicKey}}"},"request_id":"req_011"}""");
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() => Provider(handler).CompleteAsync(Request(), TestContext.Current.CancellationToken));
+
+        Assert.Equal((inputTokens, 0), (error.InputTokens, error.OutputTokens));
+        Assert.Contains(type, error.Message);
+        Assert.Contains(status.ToString(System.Globalization.CultureInfo.InvariantCulture), error.Message);
+        Assert.DoesNotContain(AnthropicKey, error.Message);
+    }
+
+    [Fact]
+    public async Task A_404_names_the_model_so_a_wrong_id_is_plain()
+    {
+        var handler = new AiHttpHandler(HttpStatusCode.NotFound,
+            """{"type":"error","error":{"type":"not_found_error","message":"model: gpt-4o"}}""");
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() => Provider(handler).CompleteAsync(Request("gpt-4o"), TestContext.Current.CancellationToken));
+
+        Assert.Contains("'gpt-4o'", error.Message);
+        Assert.Contains("Ai:Provider", error.Message);
+    }
+
+    [Fact]
+    public async Task An_error_that_is_not_json_still_fails_as_a_provider_error()
+    {
+        var handler = new AiHttpHandler(HttpStatusCode.BadGateway, "<html>502 Bad Gateway</html>");
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() => Provider(handler).CompleteAsync(Request(), TestContext.Current.CancellationToken));
+
+        Assert.Null(error.InputTokens);
+        Assert.Contains("502", error.Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("{\"content\":[")]
+    [InlineData("{}")]
+    [InlineData("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn"}""")]
+    [InlineData("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":"1","output_tokens":2}}""")]
+    public async Task A_200_that_cannot_be_read_fails_with_unknown_tokens(string body)
+    {
+        var handler = new AiHttpHandler(HttpStatusCode.OK, body);
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() => Provider(handler).CompleteAsync(Request(), TestContext.Current.CancellationToken));
+
+        Assert.Null(error.InputTokens);
+    }
+
+    [Fact]
+    public async Task An_empty_key_fails_the_call_before_any_request_and_bills_nothing()
+    {
+        var handler = new AiHttpHandler(HttpStatusCode.OK, Fixture("anthropic-messages-end-turn.json"));
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() =>
+            new AnthropicAiProvider(handler.Client(), Options(anthropicKey: "")).CompleteAsync(Request(), TestContext.Current.CancellationToken));
+
+        Assert.Empty(handler.Requests);
+        Assert.Equal(0, error.InputTokens);
+        Assert.Contains("Ai:Anthropic:ApiKey", error.Message);
+    }
+
+    [Fact]
+    public async Task A_dropped_connection_fails_with_unknown_tokens()
+    {
+        var handler = new AiHttpHandler(() => throw new HttpRequestException("Connection reset by peer"));
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() => Provider(handler).CompleteAsync(Request(), TestContext.Current.CancellationToken));
+
+        Assert.Null(error.InputTokens);
+        Assert.IsType<HttpRequestException>(error.InnerException);
+    }
+
+    /// <summary>The gateway tells its own timeout from the caller's cancellation, so the adapter leaves both alone.</summary>
+    [Fact]
+    public async Task A_cancelled_call_stays_cancelled()
+    {
+        var handler = new AiHttpHandler(HttpStatusCode.OK, Fixture("anthropic-messages-end-turn.json"));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            Provider(handler).CompleteAsync(Request(), new CancellationToken(canceled: true)));
+    }
+
     private static AnthropicAiProvider Provider(AiHttpHandler handler) => new(handler.Client(), Options());
 }
