@@ -28,13 +28,14 @@ public sealed class BcbSgsProviderTests
     }
 
     [Theory]
-    [InlineData("en-US")]
-    [InlineData("pt-BR")]
-    [InlineData("de-DE")]
-    public async Task Dates_are_dd_MM_yyyy_and_values_invariant_whatever_the_current_culture(string culture)
+    [InlineData("MM/dd/yyyy", ".")]
+    [InlineData("dd/MM/yyyy", ",")]
+    [InlineData("yyyy-MM-dd", ",")]
+    public async Task Dates_are_dd_MM_yyyy_and_values_invariant_whatever_the_current_culture(
+        string shortDatePattern, string decimalSeparator)
     {
         var previous = CultureInfo.CurrentCulture;
-        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+        CultureInfo.CurrentCulture = Hostile(shortDatePattern, decimalSeparator);
         try
         {
             var handler = new FakeHttpHandler(HttpStatusCode.OK, Fixture("bcb-sgs-12-cdi.json"));
@@ -117,6 +118,20 @@ public sealed class BcbSgsProviderTests
             () => Provider(handler).GetSeriesAsync("CDI", From, To, CancellationToken.None));
 
         Assert.Equal("BcbSgs", error.Provider);
+    }
+
+    /// <summary>
+    /// A current culture that misreads BCB's text if the parser consulted it: month-first
+    /// dates like en-US, a decimal comma like pt-BR. Built from the invariant culture
+    /// because test hosts may run in globalization-invariant mode, with no named cultures.
+    /// </summary>
+    private static CultureInfo Hostile(string shortDatePattern, string decimalSeparator)
+    {
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.DateTimeFormat.ShortDatePattern = shortDatePattern;
+        culture.NumberFormat.NumberDecimalSeparator = decimalSeparator;
+        culture.NumberFormat.NumberGroupSeparator = decimalSeparator == "," ? "." : ",";
+        return culture;
     }
 
     private static BcbSgsProvider Provider(FakeHttpHandler handler) =>
