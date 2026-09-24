@@ -2103,3 +2103,162 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
   - The config names differ from ARCHITECTURE's environment block.
   - USDBRL is 0.05 under the E2E fakes, so AI cost in E2E is off by about 100 times.
   - Decide whether the analysis sees 008's returns.
+
+## 009 · checkpoint 1
+
+- **009 · CP1 · the ADR check found no conflict to stop on.** I checked the spec against the
+  ADRs, what 005–008 built, and CLAUDE.md's rules:
+  - `AiUsage` and `AiAnalysis` implement `IUserOwned` and get their query filter from the loop
+    in `AppDbContext`. A test asserts each one declares it. Both cascade from `AspNetUsers`.
+  - 009 adds no shared data. It will read `Benchmarks` (USDBRL) for pricing, and that is
+    already shared.
+  - `CostBrl` is `decimal` in `numeric(10,4)`. A reflection scan covers `Domain.Ai`,
+    `Application.Ai` and `Infrastructure.Ai`, so a `double` fails as soon as it is written.
+  - `Domain/Ai/` holds POCOs and enums only, with no EF and no `HttpClient`. `IAiProvider` goes
+    in `Application/Ai/` (spec) and its adapters in `Infrastructure/Ai/`. There is no
+    Repository and no MediatR.
+  - ADR-008 (a hard cut-off before every call), ADR-010 (`ai_enabled`, default false since
+    002), ADR-012 (AI as the last rung) and ADR-015 (two real adapters, Anthropic and OpenAI)
+    all hold as the spec is written.
+  - Secrets: `Ai:Anthropic:ApiKey` and `Ai:OpenAi:ApiKey` stay empty in `appsettings.json`
+    (CP2 adds them, with a test like 006's).
+  - pt-BR: the prompt output, the 402/403/504 problem details and the disclosure text are all
+    pt-BR. They land in CP4–CP6.
+- **009 · CP1 · ADR-003 amended to its final form (99030b0, a docs-only commit).** The spec's
+  "Correction to existing docs" asks for this. Scheduled jobs use `BackgroundService` + Cronos
+  (006). On-demand jobs use `BackgroundService` + `Channel<T>`, with the row as durable state
+  and `Pending` rows re-enqueued at startup after 5 minutes (009). Hangfire is not adopted.
+  The stack table's jobs row now says the same. **For the human:** review the wording.
+- **009 · CP1 · ARCHITECTURE's names now follow the spec (814a501).** Three changes:
+  - The environment block's `AI_PROVIDER`, `AI_API_KEY` and `AI_MONTHLY_BUDGET_BRL` are now
+    `Ai__Provider`, `Ai__MonthlyBudgetBrl`, `Ai__Anthropic__ApiKey`, `Ai__OpenAi__ApiKey` and
+    `Ai__UsdBrl`, with a pointer to the spec for model ids and prices.
+  - The cost-control block lists `AiUsage` and `AiAnalyses` with the spec's columns, and says
+    that a failed call is recorded too.
+  - §7's port sketch uses `CompleteAsync(AiRequest, CancellationToken)`.
+- **009 · CP1 · for the human: ARCHITECTURE contradicts the spec in substance.** These are not
+  ADRs and not naming, so I left them unedited:
+  - **The doc says the monthly analysis is scheduled. The spec makes it on demand.** The doc
+    says so in the stack table ("scheduled monthly analysis"), in §5's jobs table
+    (`monthly | monthly-analysis`), in the AI module and in Phase 5. The spec has only
+    `POST /api/ai/analyses` (decision 6) and no schedule, so none will be built. Regenerating
+    replaces the month's row but spends again. Only the budget bounds that, not "1×/month".
+  - §5 lists `categorize-batch` as an on-demand job. Decision 4 makes it synchronous in the
+    request, with a 30 s timeout.
+  - The AI module says "Cache by normalized description". Decision 5 says no cache is needed.
+  - Principle 6 ("external data … never in a user request") is written about market data. The
+    suggest call is an external call inside a request, by decision 4.
+  - The environment block's market-data names (`BRAPI_TOKEN`, `COINGECKO_DEMO_KEY`,
+    `TWELVEDATA_KEY`) are stale against 006's `MarketData:*` settings. That is not 009's to
+    fix.
+  - The repository tree shows `Domain/Analysis/`. 009's types live in `Domain/Ai/`, next to
+    the spec's `Application/Ai/` and `Infrastructure/Ai/`.
+- **009 · CP1 · NEEDS A HUMAN BEFORE CP2: which currency are the configured prices in?** The
+  spec contradicts itself:
+  - The configuration names `Ai:Pricing:<model>:InputPerMTokBrl` and `…OutputPerMTokBrl`,
+    so the prices are in BRL.
+  - The next sentence says "prices in BRL derived from USD list prices at the latest `USDBRL`
+    benchmark, or the fallback". Test 4 says "cost uses the latest `USDBRL` when present,
+    fallback otherwise". `Ai:UsdBrl` exists only for that conversion.
+
+  With BRL prices, test 4 and `Ai:UsdBrl` have no purpose. With USD prices, the key names are
+  wrong. The budget cap is the one non-optional control (ADR-008), and at 5.4 BRL per USD a
+  wrong guess moves every cost by about 5×. CP1 does not depend on the answer: `CostBrl` is
+  BRL either way. The options:
+  - **(a), recommended:** rename the keys `InputPerMTokUsd` and `OutputPerMTokUsd`, hold the
+    provider's USD list prices there, and convert at the latest USDBRL or `Ai:UsdBrl`. This
+    keeps the text, test 4 and the fallback, and the spec's key names get a one-line fix.
+  - **(b):** keep the spec's key names but read them as USD. This needs no spec edit, but the
+    names mislead.
+  - **(c):** read them as BRL, as named, with no FX. Test 4 and `Ai:UsdBrl` would be dropped
+    from the spec.
+
+  Under (a) or (b), E2E costs are about 100 times too small, because the fake USDBRL is 0.05.
+  E2E 28 and 29 assert shapes, not amounts.
+- **009 · CP1 · `StagedTransaction.CategorySource`, a column the spec does not list.** Staged
+  rows do not record which rung chose their category. `CategoryId` holds the history pick, the
+  sign default or the user's correction, all alike. Test 18 ("rows with history suggestions
+  are not sent; default rows are") and the preview's "came from AI" marker both need to know.
+  Recomputing at suggest time would misread a row the user set to "Outros" by hand, and it
+  would lose the marker on reload. So the column went into `AddAi`, the spec's one migration:
+  - The enum is `None = 0`, `History = 1`, `Default = 2`, `Ai = 3`, `User = 4`.
+  - The column is `NOT NULL DEFAULT 0`, so rows staged before 009 read `None` and are never
+    sent. At most one batch per user is open. **For the human:** re-upload that batch to use
+    the AI on it.
+  - Nothing writes it yet. CP4 makes staging write `History` or `Default`, the preview's
+    category PATCH write `User`, and the suggest write `Ai`.
+- **009 · CP1 · names, types and indexes.** Choices the spec leaves open:
+  - Tables are `AiUsage` (singular, set explicitly, the spec's name) and `AiAnalyses`. The
+    DbSets are `AiUsage` and `AiAnalyses`.
+  - `Month` is a `string` in `char(7)`, as the spec says. It always holds exactly 7
+    characters, so `char`'s padding never shows. There is no CHECK on its format, the same as
+    007: the endpoint and job validate it (CP4/CP5).
+  - Enums are stored as `int` with their values written down: `AiPurpose` is
+    `Categorisation = 0`, `Analysis = 1`, and `AiAnalysisStatus` is `Pending = 0` to
+    `Failed = 3`. There is no database default for `Status`.
+  - The indexes are `(UserId, Month)` on `AiUsage` (spec, for the budget's sum) and unique
+    `(UserId, Month)` on `AiAnalyses` (spec).
+  - There is no index for the startup sweep (`Status = Pending AND CreatedAt < now - 5 min`).
+    The table holds one row per user per month, and the sweep runs once per boot.
+- **009 · CP1 · commit order.** I followed 007's order: entities unmapped (116aa3c), then two
+  failing test commits (e590b82, 67acb5b), then the mapping. Against the unmapped model, 8 of
+  the 10 new cases failed. The two type scans passed from the start, because they are guards.
+  EF 10 refuses to migrate a model with pending changes. So the red test reached
+  `CategorySource` by name through `Entry(row).Property<CategorySource>("CategorySource")`,
+  and the property was added with its mapping. The mapping commit (8dafe5b) switched the test
+  to the property.
+- **009 · CP1 · migration SQL** (`dotnet ef migrations script AddInvestments AddAi`, also in
+  `docs/migrations/009-AddAi.sql`):
+
+  ```sql
+  ALTER TABLE "StagedTransactions" ADD "CategorySource" integer NOT NULL DEFAULT 0;
+  CREATE TABLE "AiAnalyses" (
+      "Id" uuid NOT NULL, "UserId" uuid NOT NULL, "Month" char(7) NOT NULL,
+      "Status" integer NOT NULL, "Content" text, "Error" character varying(500),
+      "PromptVersion" character varying(20) NOT NULL,
+      "CreatedAt" timestamp with time zone NOT NULL,
+      "StartedAt" timestamp with time zone, "CompletedAt" timestamp with time zone,
+      CONSTRAINT "PK_AiAnalyses" PRIMARY KEY ("Id"),
+      CONSTRAINT "FK_AiAnalyses_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+  );
+  CREATE TABLE "AiUsage" (
+      "Id" uuid NOT NULL, "UserId" uuid NOT NULL, "Month" char(7) NOT NULL,
+      "Purpose" integer NOT NULL, "Provider" character varying(20) NOT NULL,
+      "Model" character varying(100) NOT NULL,
+      "InputTokens" integer NOT NULL, "OutputTokens" integer NOT NULL,
+      "CostBrl" numeric(10,4) NOT NULL, "Succeeded" boolean NOT NULL,
+      "CreatedAt" timestamp with time zone NOT NULL,
+      CONSTRAINT "PK_AiUsage" PRIMARY KEY ("Id"),
+      CONSTRAINT "FK_AiUsage_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+  );
+  CREATE UNIQUE INDEX "IX_AiAnalyses_UserId_Month" ON "AiAnalyses" ("UserId", "Month");
+  CREATE INDEX "IX_AiUsage_UserId_Month" ON "AiUsage" ("UserId", "Month");
+  ```
+- **009 · CP1 · counts.** .NET went from 765 to 775: eight persistence cases in
+  `AiPersistenceTests` and two in `AiTypesTests`. Web is 145 and E2E is 22. `verify-e2e.sh`
+  applied `AddAi` to `financas_e2e`.
+- **009 · CP1 · handoff to CP2** (settings, the fake, cost and budget; tests 1–4):
+  - **Get the pricing answer above first.** Tests 3 and 4 depend on it.
+  - **Which clock sets a usage row's `Month`?** A call at 22:00 on the 31st in Brazil falls in
+    the next month in UTC. 006's container timezone is still pending a human. I suggest
+    `TimeProvider` at a fixed UTC-3, as the brapi adapter does (006 · CP2), and saying so.
+  - **Refuse the boot when a configured model has no `Ai:Pricing` entry.** A missing price
+    would price every call at 0 and bypass the budget. A model id containing `:` cannot be a
+    configuration key, so `Ai:Pricing:<model>` would not bind. The Anthropic and OpenAI ids
+    in use today have no colon.
+  - **The budget refuses at `spent >= budget`** (tests 1 and 2), checked before the call. One
+    call can still overshoot by its own cost. That is ADR-008's "cut-off before every call",
+    and the handoff should say so.
+  - **The job has no signed-in user,** so the filter would hide every row. Open a scope with
+    `ActingUser` set to the analysis's user (007's pattern) and keep the filter on. Do not use
+    `IgnoreQueryFilters`.
+  - **The fake goes behind a switch.** The spec does not name it. I suggest `Ai:FakeProvider`,
+    refused outside Development like
+    `MarketDataSetup.RefuseFakeProvidersOutsideDevelopment`. The E2E API turns it on the way
+    it turns on `MarketData:FakeProviders`.
+  - **Keys stay empty in `appsettings.json`, with a test** (006's pattern). The adapters (CP3)
+    send them in headers, never in URLs.
+  - **Does the analysis see 008's returns?** My default for CP5 is no. Decision 7 says
+    "portfolio summary from 007", and the out-of-scope list rules out "any AI on the
+    investments side beyond the summary line". `ReturnsQueries.PortfolioAsync` could add TWR
+    and XIRR in one call. **Pending human.**
