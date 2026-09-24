@@ -33,7 +33,7 @@ public static class ReturnSeries
     {
         var rates = fxRates.OrderBy(rate => rate.Date).ToList();
         return Build(rows, row => row.ValueBrl, movements, (movement, amount) =>
-            new Money(amount * RateOn(currency, rates, movement.Date), SnapshotBuilder.BaseCurrency).Amount);
+            MovementCash.InBrl(currency, rates, movement.Date, amount));
     }
 
     /// <summary>Values are <c>Quantity x Price</c> and flows stay in the asset's currency.</summary>
@@ -60,17 +60,15 @@ public static class ReturnSeries
         foreach (var movement in movements.Where(movement => movement.Date <= last))
         {
             var date = movement.Date < first ? first : movement.Date;
-            switch (movement.Kind)
+            var (inflow, received) = MovementCash.Of(movement);
+            if (inflow != 0m)
             {
-                case MovementKind.Buy:
-                    Add(flow, date, cash(movement, movement.Quantity * movement.UnitPrice + movement.Fees));
-                    break;
-                case MovementKind.Sell:
-                    Add(flow, date, -cash(movement, movement.Quantity * movement.UnitPrice - movement.Fees));
-                    break;
-                case MovementKind.Dividend or MovementKind.Jcp:
-                    Add(income, date, cash(movement, movement.Amount - movement.Fees));
-                    break;
+                Add(flow, date, cash(movement, inflow));
+            }
+
+            if (received != 0m)
+            {
+                Add(income, date, cash(movement, received));
             }
         }
 
@@ -81,20 +79,4 @@ public static class ReturnSeries
 
     private static void Add(Dictionary<DateOnly, decimal> sums, DateOnly date, decimal amount) =>
         sums[date] = sums.GetValueOrDefault(date) + amount;
-
-    private static decimal RateOn(string currency, List<DailyPoint> rates, DateOnly date)
-    {
-        if (currency == SnapshotBuilder.BaseCurrency)
-        {
-            return 1m;
-        }
-
-        if (rates.Count == 0)
-        {
-            throw new InvalidOperationException($"No BRL rate for {currency} to convert a flow on {date}.");
-        }
-
-        var onOrBefore = rates.FindLastIndex(rate => rate.Date <= date);
-        return rates[onOrBefore < 0 ? 0 : onOrBefore].Value;
-    }
 }
