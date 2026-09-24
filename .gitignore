@@ -44,3 +44,4 @@ Thumbs.db
 
 # Deploy: the Vite build Caddy serves (deploy.sh writes it)
 deploy/webdist/
+deploy/webdist.next/
