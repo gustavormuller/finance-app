@@ -6,6 +6,7 @@ using Finance.Api.Application.Investments;
 using Finance.Api.Application.Returns;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
+using Finance.Api.Infrastructure.Ai;
 using Finance.Api.Infrastructure.MarketData;
 using Microsoft.EntityFrameworkCore;
 
@@ -53,6 +54,9 @@ builder.Services.AddScoped<MovementCommands>();
 // 008's returns: the benchmarks they compare with, and the reads behind /api/returns.
 builder.Services.AddOptions<ReturnsOptions>().BindConfiguration(ReturnsOptions.Section);
 builder.Services.AddScoped<ReturnsQueries>();
+
+// 009's AI settings, the provider port, the budget and the gateway every call goes through.
+builder.Services.AddAi();
 
 var app = builder.Build();
 

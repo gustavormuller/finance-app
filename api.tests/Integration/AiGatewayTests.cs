@@ -34,16 +34,15 @@ public sealed partial class AiGatewayTests(PostgresFixture postgres)
         var ct = TestContext.Current.CancellationToken;
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-09-01T02:30:00Z"));
         var provider = new ScriptedAiProvider(_ => new AiCompletion("## Resumo", 30_000, 800));
-        var (factory, connection) = await HostAsync(provider, clock, ct);
-        await using var _ = factory;
-        var user = await EnabledUserAsync(factory, connection, ct);
+        await using var host = await HostAsync(provider, clock, ct);
+        var user = await EnabledUserAsync(host, ct);
 
-        var completion = await CallAsync(factory, user, AiPurpose.Analysis, ct);
+        var completion = await CallAsync(host, user, AiPurpose.Analysis, ct);
 
         Assert.Equal("## Resumo", completion.Text);
         var request = Assert.Single(provider.Requests);
         Assert.Equal(("test-better", "sistema", "dados", 1000), (request.Model, request.System, request.User, request.MaxTokens));
-        var row = Assert.Single(await UsageAsync(connection, user, ct));
+        var row = Assert.Single(await UsageAsync(host.Connection, user, ct));
         Assert.Equal(
             ("2026-08", AiPurpose.Analysis, "anthropic", "test-better", 30_000, 800, 0.9180m, true, clock.GetUtcNow()),
             (row.Month, row.Purpose, row.Provider, row.Model, row.InputTokens, row.OutputTokens, row.CostBrl, row.Succeeded, row.CreatedAt));
@@ -55,10 +54,9 @@ public sealed partial class AiGatewayTests(PostgresFixture postgres)
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new ScriptedAiProvider(_ => new AiCompletion("ok", 30_000, 800));
-        var (factory, connection) = await HostAsync(provider, Clock(), ct);
-        await using var _ = factory;
-        var user = await EnabledUserAsync(factory, connection, ct);
-        await using (var context = TransactionsFixtures.ContextFor(connection, null))
+        await using var host = await HostAsync(provider, Clock(), ct);
+        var user = await EnabledUserAsync(host, ct);
+        await using (var context = TransactionsFixtures.ContextFor(host.Connection, null))
         {
             context.Benchmarks.AddRange(
                 new Benchmark { Code = "USDBRL", Date = new DateOnly(2026, 9, 14), Value = 5.00m },
@@ -67,9 +65,9 @@ public sealed partial class AiGatewayTests(PostgresFixture postgres)
             await context.SaveChangesAsync(ct);
         }
 
-        await CallAsync(factory, user, AiPurpose.Analysis, ct);
+        await CallAsync(host, user, AiPurpose.Analysis, ct);
 
-        Assert.Equal(0.8500m, Assert.Single(await UsageAsync(connection, user, ct)).CostBrl); // 170000 * 5.00 / 1e6
+        Assert.Equal(0.8500m, Assert.Single(await UsageAsync(host.Connection, user, ct)).CostBrl); // 170000 * 5.00 / 1e6
     }
 
     /// <summary>Spec test 17's core: a failed call is recorded, with the input tokens the provider reported.</summary>
@@ -78,14 +76,13 @@ public sealed partial class AiGatewayTests(PostgresFixture postgres)
     {
         var ct = TestContext.Current.CancellationToken;
         var failure = new AiProviderException("provider error", inputTokens: 1234);
-        var (factory, connection) = await HostAsync(new ScriptedAiProvider(_ => throw failure), Clock(), ct);
-        await using var _ = factory;
-        var user = await EnabledUserAsync(factory, connection, ct);
+        await using var host = await HostAsync(new ScriptedAiProvider(_ => throw failure), Clock(), ct);
+        var user = await EnabledUserAsync(host, ct);
 
-        var thrown = await Assert.ThrowsAsync<AiProviderException>(() => CallAsync(factory, user, AiPurpose.Categorisation, ct));
+        var thrown = await Assert.ThrowsAsync<AiProviderException>(() => CallAsync(host, user, AiPurpose.Categorisation, ct));
 
         Assert.Same(failure, thrown);
-        var row = Assert.Single(await UsageAsync(connection, user, ct));
+        var row = Assert.Single(await UsageAsync(host.Connection, user, ct));
         Assert.Equal(
             (false, "test-cheap", AiPurpose.Categorisation, 1234, 0, 0.0067m), // 1234 * 1 * 5.40 / 1e6 = 0.0066636
             (row.Succeeded, row.Model, row.Purpose, row.InputTokens, row.OutputTokens, row.CostBrl));
@@ -96,43 +93,49 @@ public sealed partial class AiGatewayTests(PostgresFixture postgres)
     public async Task A_failure_that_reports_no_tokens_records_an_estimate_of_the_input()
     {
         var ct = TestContext.Current.CancellationToken;
-        var (factory, connection) = await HostAsync(new ScriptedAiProvider(_ => throw new TimeoutException()), Clock(), ct);
-        await using var _ = factory;
-        var user = await EnabledUserAsync(factory, connection, ct);
+        await using var host = await HostAsync(new ScriptedAiProvider(_ => throw new TimeoutException()), Clock(), ct);
+        var user = await EnabledUserAsync(host, ct);
 
         await Assert.ThrowsAsync<TimeoutException>(() =>
-            CallAsync(factory, user, AiPurpose.Analysis, ct, system: new string('s', 4000), prompt: new string('u', 3999)));
+            CallAsync(host, user, AiPurpose.Analysis, ct, system: new string('s', 4000), prompt: new string('u', 3999)));
 
-        var row = Assert.Single(await UsageAsync(connection, user, ct));
+        var row = Assert.Single(await UsageAsync(host.Connection, user, ct));
         Assert.Equal((false, 2000, 0, 0.0540m), (row.Succeeded, row.InputTokens, row.OutputTokens, row.CostBrl));
     }
 
     private static FakeTimeProvider Clock() => new(DateTimeOffset.Parse("2026-09-15T12:00:00Z"));
 
-    private async Task<(IdentityApiFactory, string)> HostAsync(IAiProvider provider, TimeProvider clock, CancellationToken ct)
+    /// <summary>
+    /// Two hosts on one fresh database: users sign in on a real clock (the fake one would
+    /// hand out a session cookie that has already expired), and the gateway runs on the
+    /// fake clock and the scripted provider. A fresh database, because <c>Benchmarks</c> is
+    /// shared and other tests store <c>USDBRL</c>.
+    /// </summary>
+    private async Task<Host> HostAsync(IAiProvider provider, TimeProvider clock, CancellationToken ct)
     {
         var connection = await postgres.CreateEmptyDatabaseAsync(ct);
-        var factory = new IdentityApiFactory(connection, settings: Settings, services: services =>
+        var users = new IdentityApiFactory(connection, settings: Settings);
+        await users.MigrateAsync(ct);
+        var gateway = new IdentityApiFactory(connection, settings: Settings, services: services =>
         {
             services.AddSingleton(provider);
             services.AddSingleton(clock);
         });
-        await factory.MigrateAsync(ct);
-        return (factory, connection);
+        return new Host(gateway, users, connection);
     }
 
-    private static async Task<Guid> EnabledUserAsync(IdentityApiFactory factory, string connection, CancellationToken ct)
+    private static async Task<Guid> EnabledUserAsync(Host host, CancellationToken ct)
     {
-        var id = (await factory.SignInNewUserAsync("ai-on", ct)).Id;
-        await using var context = TransactionsFixtures.ContextFor(connection, null);
+        var id = (await host.Users.SignInNewUserAsync("ai-on", ct)).Id;
+        await using var context = TransactionsFixtures.ContextFor(host.Connection, null);
         await context.Users.Where(user => user.Id == id).ExecuteUpdateAsync(set => set.SetProperty(user => user.AiEnabled, true), ct);
         return id;
     }
 
     private static async Task<AiCompletion> CallAsync(
-        IdentityApiFactory factory, Guid user, AiPurpose purpose, CancellationToken ct, string system = "sistema", string prompt = "dados")
+        Host host, Guid user, AiPurpose purpose, CancellationToken ct, string system = "sistema", string prompt = "dados")
     {
-        await using var scope = factory.Services.CreateAsyncScope();
+        await using var scope = host.Gateway.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ActingUser>().ActAs(user);
         return await scope.ServiceProvider.GetRequiredService<AiGateway>().CompleteAsync(purpose, system, prompt, 1000, ct);
     }
@@ -154,6 +157,15 @@ public sealed partial class AiGatewayTests(PostgresFixture postgres)
         }
 
         await context.SaveChangesAsync();
+    }
+
+    private sealed record Host(IdentityApiFactory Gateway, IdentityApiFactory Users, string Connection) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await Gateway.DisposeAsync();
+            await Users.DisposeAsync();
+        }
     }
 
     private sealed class ScriptedAiProvider(Func<AiRequest, AiCompletion> answer) : IAiProvider
