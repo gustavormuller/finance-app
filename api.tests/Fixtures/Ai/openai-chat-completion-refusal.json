@@ -1,0 +1,33 @@
+{
+  "id": "chatcmpl-D7kWm2Qp9sLr4Tx8Vb3NcHj6Ye1",
+  "object": "chat.completion",
+  "created": 1790000120,
+  "model": "gpt-4o-mini-2024-07-18",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "refusal": "I'm sorry, I can't help with that.",
+        "annotations": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1402,
+    "completion_tokens": 10,
+    "total_tokens": 1412,
+    "prompt_tokens_details": { "cached_tokens": 0, "audio_tokens": 0 },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "service_tier": "default",
+  "system_fingerprint": null
+}

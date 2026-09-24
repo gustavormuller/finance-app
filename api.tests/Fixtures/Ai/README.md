@@ -17,6 +17,9 @@ key) and update this table.
 | `anthropic-messages-end-turn.json` | Anthropic · `POST v1/messages` | an empty `thinking` block (adaptive thinking on `claude-opus-5`) and two `text` blocks, `end_turn`, `usage.input_tokens` / `output_tokens` | hand-written from docs |
 | `anthropic-messages-max-tokens.json` | Anthropic · `POST v1/messages` | a truncated answer, `stop_reason: max_tokens` | hand-written from docs |
 | `anthropic-messages-refusal.json` | Anthropic · `POST v1/messages` | an HTTP 200 with `stop_reason: refusal` and its usage | hand-written from docs |
+| `openai-chat-completion-stop.json` | OpenAI · `POST v1/chat/completions` | `finish_reason: stop`, `usage.prompt_tokens` / `completion_tokens` | hand-written from docs |
+| `openai-chat-completion-length.json` | OpenAI · `POST v1/chat/completions` | a truncated answer, `finish_reason: length` | hand-written from docs |
+| `openai-chat-completion-refusal.json` | OpenAI · `POST v1/chat/completions` | `message.content: null` with `message.refusal` set | hand-written from docs |
 
 Error bodies (`{"type":"error","error":{...}}` for Anthropic, `{"error":{...}}` for
 OpenAI) and malformed bodies are inline strings in the tests, not files.
