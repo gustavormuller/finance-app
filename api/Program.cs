@@ -148,6 +148,7 @@ app.MapDashboardEndpoints();
 app.MapMarketDataEndpoints();
 app.MapInvestmentEndpoints();
 app.MapReturnsEndpoints();
+app.MapAiEndpoints();
 
 app.Run();
 

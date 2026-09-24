@@ -22,6 +22,7 @@ public static class AiSetup
         // The monthly analysis: a channel, the run in a scope acting for the user, and the job.
         services.AddSingleton<AnalysisQueue>();
         services.AddScoped<MonthlyAnalysis>();
+        services.AddScoped<AnalysisCommands>();
         services.AddHostedService<AnalysisJob>();
 
         // No resilience handler: every attempt spends tokens and the gateway records one
