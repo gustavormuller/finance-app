@@ -3,6 +3,7 @@ using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Finance.Api.Tests.Integration;
 
@@ -13,6 +14,10 @@ namespace Finance.Api.Tests.Integration;
 [Collection(nameof(PostgresCollection))]
 public sealed class InvestmentsPersistenceTests(PostgresFixture postgres)
 {
+    private const string UniqueViolation = "23505";
+
+    private const string ForeignKeyViolation = "23503";
+
     private static readonly DateOnly Day = new(2026, 9, 1);
 
     public static TheoryData<Type> UserOwnedTypes => [typeof(Asset), typeof(Movement), typeof(PortfolioDaily)];
@@ -64,6 +69,146 @@ public sealed class InvestmentsPersistenceTests(PostgresFixture postgres)
         var entityType = context.Model.FindEntityType(type);
         Assert.NotNull(entityType);
         Assert.NotEmpty(entityType.GetDeclaredQueryFilters());
+    }
+
+    /// <summary>Spec integration test 23, at the constraint.</summary>
+    [Fact]
+    public async Task A_user_holds_a_market_asset_once_and_another_user_may_hold_it_too()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (userA, userB) = await TwoUsersAsync(cancellationToken);
+        var asset = await HeldAssetAsync(userA, cancellationToken);
+
+        await using (var asUserA = Context(userA))
+        {
+            asUserA.Set<Asset>().Add(AnAsset(userA, asset.MarketAssetId));
+
+            var failure = await Assert.ThrowsAsync<DbUpdateException>(() => asUserA.SaveChangesAsync(cancellationToken));
+            Assert.Equal(UniqueViolation, Assert.IsType<PostgresException>(failure.InnerException).SqlState);
+        }
+
+        await using (var asUserB = Context(userB))
+        {
+            asUserB.Set<Asset>().Add(AnAsset(userB, asset.MarketAssetId));
+            await asUserB.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>Spec integration test 24, at the constraint: RESTRICT, not CASCADE.</summary>
+    [Fact]
+    public async Task An_asset_with_movements_cannot_be_deleted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (user, _) = await TwoUsersAsync(cancellationToken);
+        var asset = await HeldAssetAsync(user, cancellationToken);
+
+        await using (var context = Context(user))
+        {
+            context.Set<Movement>().Add(ABuy(asset));
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        await using (var context = Context(user))
+        {
+            context.Set<Asset>().Remove(await context.Set<Asset>().SingleAsync(cancellationToken));
+
+            var failure = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(cancellationToken));
+            Assert.Equal(ForeignKeyViolation, Assert.IsType<PostgresException>(failure.InnerException).SqlState);
+        }
+    }
+
+    /// <summary>A held instrument keeps its catalogue row, and with it the price series.</summary>
+    [Fact]
+    public async Task A_market_asset_someone_holds_cannot_be_deleted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (user, _) = await TwoUsersAsync(cancellationToken);
+        var asset = await HeldAssetAsync(user, cancellationToken);
+
+        await using var context = Context(null);
+        context.Set<MarketAsset>().Remove(
+            await context.Set<MarketAsset>().SingleAsync(entity => entity.Id == asset.MarketAssetId, cancellationToken));
+
+        var failure = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(cancellationToken));
+        Assert.Equal(ForeignKeyViolation, Assert.IsType<PostgresException>(failure.InnerException).SqlState);
+    }
+
+    /// <summary>
+    /// Daily rows are derived (ADR-011): they never hold their asset in place. An asset
+    /// with movements is already refused above, so this is the rows of a rebuild left
+    /// behind by a movement that has since been deleted.
+    /// </summary>
+    [Fact]
+    public async Task Deleting_an_asset_deletes_its_daily_rows()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (user, _) = await TwoUsersAsync(cancellationToken);
+        var asset = await HeldAssetAsync(user, cancellationToken);
+
+        await using (var context = Context(user))
+        {
+            context.Set<PortfolioDaily>().AddRange(ADailyRow(asset, Day), ADailyRow(asset, Day.AddDays(1)));
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        await using (var context = Context(user))
+        {
+            context.Set<Asset>().Remove(await context.Set<Asset>().SingleAsync(cancellationToken));
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        await using (var context = Context(user))
+        {
+            Assert.Empty(await context.Set<PortfolioDaily>().ToListAsync(cancellationToken));
+        }
+    }
+
+    /// <summary>
+    /// <c>numeric(18,8)</c> for quantities, prices, average cost and FX; <c>numeric(18,2)</c>
+    /// for cash and BRL totals. Every value at the edge of its column comes back exact.
+    /// </summary>
+    [Fact]
+    public async Task Quantities_prices_and_cash_round_trip_at_their_column_precision()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (user, _) = await TwoUsersAsync(cancellationToken);
+        var asset = await HeldAssetAsync(user, cancellationToken);
+
+        var movement = ABuy(asset);
+        movement.Quantity = 1234567890.12345678m;
+        movement.UnitPrice = 0.00012345m;
+        movement.Amount = 9999999999999999.99m;
+        movement.Fees = 0.01m;
+        movement.Notes = "nota de corretagem 123";
+
+        var row = ADailyRow(asset, Day);
+        row.Quantity = 0.00000001m;
+        row.AverageCost = 0.12345678m;
+        row.Price = 9999999999.99999999m;
+        row.PriceDate = Day.AddDays(-3);
+        row.FxRate = 5.43210987m;
+        row.ValueBrl = 9999999999999999.99m;
+        row.CostBasisBrl = 0.01m;
+
+        await using (var context = Context(user))
+        {
+            context.Set<Movement>().Add(movement);
+            context.Set<PortfolioDaily>().Add(row);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        await using (var context = Context(user))
+        {
+            var storedMovement = await context.Set<Movement>().SingleAsync(cancellationToken);
+            Assert.Equal(
+                (movement.Quantity, movement.UnitPrice, movement.Amount, movement.Fees, movement.Currency, movement.Notes, movement.Kind, movement.Date),
+                (storedMovement.Quantity, storedMovement.UnitPrice, storedMovement.Amount, storedMovement.Fees, storedMovement.Currency, storedMovement.Notes, storedMovement.Kind, storedMovement.Date));
+
+            var storedRow = await context.Set<PortfolioDaily>().SingleAsync(cancellationToken);
+            Assert.Equal(
+                (row.Quantity, row.AverageCost, row.Price, row.PriceDate, row.FxRate, row.ValueBrl, row.CostBasisBrl),
+                (storedRow.Quantity, storedRow.AverageCost, storedRow.Price, storedRow.PriceDate, storedRow.FxRate, storedRow.ValueBrl, storedRow.CostBasisBrl));
+        }
     }
 
     private async Task<(Guid, Guid)> TwoUsersAsync(CancellationToken cancellationToken)
