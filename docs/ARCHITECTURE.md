@@ -31,7 +31,7 @@
 | ORM | EF Core | good migrations, typed LINQ, global query filters |
 | Auth | ASP.NET Core Identity + Google OAuth | native to the framework, R$0, scales to SaaS |
 | Database | PostgreSQL 16 (container) | R$0, relational, good with time series |
-| Jobs | hosted `BackgroundService` + Cronos (decided in 006, ADR-003) | runs in the API process on the existing Postgres, zero extra services |
+| Jobs | hosted `BackgroundService` + Cronos for scheduled jobs (006), + `Channel<T>` with a row as state for on-demand jobs (009); ADR-003 | runs in the API process on the existing Postgres, zero extra services |
 | Frontend | Vite + React + TanStack Router | SPA, no SSR needed |
 | UI | shadcn/ui + Tailwind | ready-made components, no Figma |
 | Charts | Recharts | enough for dashboard and series |
@@ -806,10 +806,15 @@ Reverted from the previous plan, which prioritised delivery speed for a SaaS. Wi
 *Correction:* memory consumption was used as an argument in an earlier revision; with 12 GB on Oracle, it stopped being a factor.
 *Trade-off:* loses shared types. The TS client is hand-written; the integration tests declare the same shapes independently and fail when the endpoints drift. Generating it from OpenAPI was the original plan and may still happen, but the build machinery is not set up and nothing depends on it.
 
-### ADR-003 — In-process jobs on the existing Postgres, not BullMQ + Redis *(amended in 004 and 006)*
+### ADR-003 — In-process jobs on the existing Postgres, not BullMQ + Redis *(amended in 004 and 006; final form in 009)*
 BullMQ requires Redis, one more service to run and pay for. The job runner uses the existing Postgres instead.
 **Amendment.** The original text named pg-boss. pg-boss is a Node.js library and cannot run inside the .NET process that ADR-004 requires, so it was never a valid choice here. Background jobs will be Hangfire or a hosted `BackgroundService`, decided in 009 — the first feature that needs a scheduler. 004's import is synchronous, in the request, and needs no job at all.
 **Amendment (006).** Decided by 006, the first feature that needs a scheduler: a **hosted `BackgroundService` with Cronos** computing the next occurrence of a cron expression from configuration. No Hangfire: one nightly job does not justify its ten tables and a dashboard, and re-hosting under Hangfire later is trivial because the job is a method. Job state is the `sync_runs` table — the "jobs table with status" below.
+**Amendment (009) — final form.** Two kinds of job, one mechanism each, both in the API process:
+- **Scheduled** jobs use a hosted `BackgroundService` + Cronos (006: the nightly market-data sync and the snapshot rebuild after it).
+- **On-demand** jobs use a hosted `BackgroundService` consuming an in-process `Channel<T>`, with a database row as the durable state (009: the monthly AI analysis). The request writes a `Pending` row and enqueues it; the job moves the row through `Running` to `Completed` or `Failed`; on startup, any `Pending` row older than 5 minutes is re-enqueued. The channel is only a wake-up; the row is the state, so a restart loses nothing but a few minutes.
+
+Hangfire is not adopted. *Revisit only if* a job needs retries with backoff across process restarts.
 *Trade-off:* no Bull Board. A jobs table with status solves it.
 
 ### ADR-004 — Jobs in the same process as the API
