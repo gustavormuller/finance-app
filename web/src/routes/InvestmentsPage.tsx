@@ -1,3 +1,4 @@
+import AddAsset from '@/components/investments/AddAsset';
 import Positions from '@/components/investments/Positions';
 
 /** `/investments` (007): what the user holds, valued by the latest daily row. */
@@ -7,6 +8,7 @@ export default function InvestmentsPage() {
       <h2 className="text-2xl font-semibold tracking-tight">Investimentos</h2>
 
       <Positions />
+      <AddAsset />
     </section>
   );
 }
