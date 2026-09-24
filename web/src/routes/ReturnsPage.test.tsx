@@ -209,3 +209,77 @@ describe('ReturnsPage', () => {
     expect(screen.queryByText('One or more validation errors occurred.')).not.toBeInTheDocument();
   });
 });
+
+describe('ReturnsPage: comparison', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const line = (container: HTMLElement, name: string) => container.querySelector(`path.recharts-line-curve[name="${name}"]`);
+
+  /** Spec web unit test 34. */
+  it('hides and shows each benchmark on the chart with its toggle', async () => {
+    stubReturns(() => ({ body: halfYear }));
+    const { container } = renderAt('/investments/returns');
+
+    const chart = await screen.findByTestId('comparison-chart');
+    const toggles = within(chart).getByRole('group', { name: 'Referências no gráfico' });
+    // Every benchmark that could anchor, in the spec's order; IPCA + 6% had no data.
+    expect(within(toggles).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'CDI',
+      'SELIC',
+      'Dólar',
+      'S&P 500 (IVVB11)',
+    ]);
+    await vi.waitFor(() => expect(line(container, 'Carteira')).not.toBeNull());
+    expect(line(container, 'CDI')).not.toBeNull();
+    expect(line(container, 'Dólar')).not.toBeNull();
+
+    const cdi = within(toggles).getByRole('button', { name: 'CDI' });
+    expect(cdi).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(cdi);
+
+    expect(cdi).toHaveAttribute('aria-pressed', 'false');
+    await vi.waitFor(() => expect(line(container, 'CDI')).toBeNull());
+    expect(line(container, 'Carteira')).not.toBeNull();
+    expect(line(container, 'Dólar')).not.toBeNull();
+
+    await userEvent.click(cdi);
+
+    expect(cdi).toHaveAttribute('aria-pressed', 'true');
+    await vi.waitFor(() => expect(line(container, 'CDI')).not.toBeNull());
+  });
+
+  it('compares each benchmark\'s return with the portfolio\'s, the difference in points', async () => {
+    stubReturns(() => ({ body: halfYear }));
+    renderAt('/investments/returns');
+
+    const portfolio = await screen.findByTestId('benchmark-row-portfolio');
+    expect(plain(portfolio)).toContain('Carteira');
+    expect(plain(portfolio)).toContain('+5,12%');
+
+    const cdi = screen.getByTestId('benchmark-row-CDI');
+    expect(plain(cdi)).toContain('+3,21%');
+    expect(plain(cdi)).toContain('+1,91 p.p.');
+    const dollar = screen.getByTestId('benchmark-row-USDBRL');
+    expect(dollar).toHaveTextContent('Dólar');
+    expect(plain(dollar)).toContain('-2,15%');
+    expect(plain(dollar)).toContain('+7,27 p.p.');
+    expect(screen.getByTestId('benchmark-row-IPCA6')).toHaveTextContent('IPCA + 6%Sem dadosSem dados');
+
+    // A year or less: totals only.
+    expect(within(screen.getByTestId('benchmarks-table')).queryByText('Ao ano')).not.toBeInTheDocument();
+    expect(plain(cdi)).not.toContain('6,47%');
+  });
+
+  it('adds each annualised return past a year', async () => {
+    stubReturns(() => ({ body: threeYears }));
+    renderAt('/investments/returns');
+
+    const cdi = await screen.findByTestId('benchmark-row-CDI');
+    expect(within(screen.getByTestId('benchmarks-table')).getByText('Ao ano')).toBeInTheDocument();
+    expect(plain(cdi)).toContain('+6,47%');
+    expect(plain(screen.getByTestId('benchmark-row-portfolio'))).toContain('+10,00%');
+    expect(plain(cdi)).toContain('+29,89 p.p.');
+  });
+});
