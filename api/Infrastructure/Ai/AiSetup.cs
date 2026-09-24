@@ -15,6 +15,7 @@ public static class AiSetup
         services.AddScoped<BudgetGuard>();
         services.AddScoped<AiPricing>();
         services.AddScoped<AiGateway>();
+        services.AddScoped<CategorisationCascade>();
 
         // No resilience handler: every attempt spends tokens and the gateway records one
         // usage row per call, so a failure is returned, never retried. No client timeout
