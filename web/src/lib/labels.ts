@@ -4,8 +4,12 @@ import type {
   CategoryKind,
   ImportBatchStatus,
   ImportSource,
+  MarketAssetClass,
+  ProviderKind,
   SignMode,
   StagedRowStatus,
+  SyncRunStatus,
+  SyncTrigger,
 } from '@/api/finance';
 
 /**
@@ -73,6 +77,46 @@ export const accountTypes: AccountType[] = [
   'Cash',
   'Investment',
 ];
+
+export const marketAssetClassLabels: Record<MarketAssetClass, string> = {
+  StockBr: 'Ação (B3)',
+  Fii: 'Fundo imobiliário',
+  EtfBr: 'ETF (B3)',
+  Bdr: 'BDR',
+  StockUs: 'Ação (EUA)',
+  Crypto: 'Criptomoeda',
+};
+
+export const marketAssetClasses: MarketAssetClass[] = ['StockBr', 'Fii', 'EtfBr', 'Bdr', 'StockUs', 'Crypto'];
+
+/** Provider names are brands, written as each writes itself. */
+export const providerKindLabels: Record<ProviderKind, string> = {
+  Brapi: 'brapi',
+  CoinGecko: 'CoinGecko',
+  TwelveData: 'Twelve Data',
+};
+
+export const providerKinds: ProviderKind[] = ['Brapi', 'CoinGecko', 'TwelveData'];
+
+/**
+ * A key of a sync run's summary: a `ProviderKind` member, or `Bcb` for the benchmark
+ * series. An unknown key is shown as sent rather than hidden.
+ */
+export function syncProviderLabel(key: string): string {
+  return key === 'Bcb' ? 'Banco Central (SGS)' : (providerKindLabels[key as ProviderKind] ?? key);
+}
+
+export const syncTriggerLabels: Record<SyncTrigger, string> = {
+  Scheduled: 'Agendada',
+  Manual: 'Manual',
+};
+
+export const syncRunStatusLabels: Record<SyncRunStatus, string> = {
+  Running: 'Em andamento',
+  Succeeded: 'Concluída',
+  PartialFailure: 'Concluída com falhas',
+  Failed: 'Falhou',
+};
 
 /**
  * `2026-09-13` as `13/09/2026`.

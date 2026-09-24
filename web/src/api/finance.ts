@@ -274,6 +274,64 @@ export interface CategoryTotal {
 /** The kinds the breakdown accepts; a Transfer is neither and the API refuses it. */
 export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
 
+// ---- 006: market data -----------------------------------------------------------
+
+export type MarketAssetClass = 'StockBr' | 'Fii' | 'EtfBr' | 'Bdr' | 'StockUs' | 'Crypto';
+
+export type ProviderKind = 'Brapi' | 'CoinGecko' | 'TwelveData';
+
+export type SyncTrigger = 'Scheduled' | 'Manual';
+
+export type SyncRunStatus = 'Running' | 'Succeeded' | 'PartialFailure' | 'Failed';
+
+/** A shared catalogue entry: every user sees and registers into the same one. */
+export interface MarketAsset {
+  id: string;
+  ticker: string;
+  name: string;
+  class: MarketAssetClass;
+  currency: string;
+  provider: ProviderKind;
+  providerSymbol: string;
+  isActive: boolean;
+  lastSyncedAt: string | null;
+  createdAt: string;
+}
+
+export interface MarketAssetInput {
+  ticker: string;
+  /** Omitted or blank, the API uses the ticker. */
+  name?: string;
+  class: MarketAssetClass;
+  provider: ProviderKind;
+  providerSymbol: string;
+  currency: string;
+}
+
+/** An item that failed, and why; `error` is already pt-BR. */
+export interface SyncFailure {
+  item: string;
+  error: string;
+}
+
+export interface ProviderSyncSummary {
+  rowsWritten: number;
+  itemsSynced: number;
+  itemsFailed: number;
+  error: string | null;
+  failures: SyncFailure[];
+}
+
+export interface SyncRun {
+  id: string;
+  startedAt: string;
+  finishedAt: string | null;
+  trigger: SyncTrigger;
+  status: SyncRunStatus;
+  /** Keyed by provider name: a `ProviderKind` member, or `Bcb` for the benchmark series. */
+  summary: Record<string, ProviderSyncSummary>;
+}
+
 /**
  * A refusal from the API, with the offending fields a 400 names and, for the 409 an
  * upload gets while another import is open, the id of that import.
@@ -421,6 +479,16 @@ export const api = {
 
   dashboardByCategory: (month: string, kind: BreakdownKind) =>
     request<CategoryTotal[]>(`/api/dashboard/by-category?${searchParams({ month, kind })}`),
+
+  searchMarketAssets: (q: string) => request<MarketAsset[]>(`/api/market-data/assets?${searchParams({ q })}`),
+
+  registerMarketAsset: (input: MarketAssetInput) =>
+    request<MarketAsset>('/api/market-data/assets', { method: 'POST', body: JSON.stringify(input) }),
+
+  listSyncRuns: () => request<SyncRun[]>('/api/market-data/sync-runs'),
+
+  triggerSync: () =>
+    request<{ syncRunId: string }>('/api/market-data/sync', { method: 'POST', body: JSON.stringify({}) }),
 
   listCsvTemplates: () => request<CsvTemplate[]>('/api/csv-templates'),
 
