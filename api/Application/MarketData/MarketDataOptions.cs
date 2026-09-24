@@ -12,6 +12,12 @@ public sealed class MarketDataOptions
     /// <summary>Cron expression, server local time.</summary>
     public string Schedule { get; set; } = "";
 
+    /// <summary>
+    /// Whether the nightly job runs at all. <c>true</c> in <c>appsettings.json</c>; the test
+    /// hosts and the E2E run switch it off, so no test ever syncs against the network.
+    /// </summary>
+    public bool ScheduledSync { get; set; }
+
     /// <summary>How far back the first sync of an asset or series reaches.</summary>
     public int BackfillYears { get; set; }
 
