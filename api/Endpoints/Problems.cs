@@ -1,4 +1,5 @@
-﻿using Finance.Api.Domain.Transactions;
+﻿using Finance.Api.Application.Ai;
+using Finance.Api.Domain.Transactions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -69,6 +70,36 @@ internal static class Problems
             detail: reason,
             statusCode: StatusCodes.Status429TooManyRequests);
     }
+
+    /// <summary>Whether <see cref="Ai"/> has an answer for this failure.</summary>
+    public static bool IsAiFailure(Exception exception) =>
+        exception is AiDisabledException or AiBudgetExceededException or AiProviderException;
+
+    /// <summary>
+    /// 009: an AI gate or provider failure as the pt-BR problem its status stands for: 403
+    /// AI off, 402 budget spent, 504 timed out, 502 any other provider failure. Never the
+    /// exception's message, which is English and may name the model.
+    /// </summary>
+    public static IResult Ai(Exception exception) => exception switch
+    {
+        AiDisabledException => Results.Problem(
+            title: "IA desligada",
+            detail: "A IA está desligada na sua conta. Ligue-a nas configurações para usar este recurso.",
+            statusCode: StatusCodes.Status403Forbidden),
+        AiBudgetExceededException => Results.Problem(
+            title: "Limite de IA atingido",
+            detail: "Você atingiu o limite mensal de gastos com IA. O limite renova no próximo mês.",
+            statusCode: StatusCodes.Status402PaymentRequired),
+        AiProviderTimeoutException => Results.Problem(
+            title: "A IA demorou demais",
+            detail: "O serviço de IA não respondeu a tempo. Tente novamente em instantes.",
+            statusCode: StatusCodes.Status504GatewayTimeout),
+        AiProviderException => Results.Problem(
+            title: "Falha no serviço de IA",
+            detail: "O serviço de IA não conseguiu responder agora. Tente novamente mais tarde.",
+            statusCode: StatusCodes.Status502BadGateway),
+        _ => throw new ArgumentException("Not an AI failure.", nameof(exception), exception),
+    };
 
     /// <summary>
     /// Turns a unique-index violation into the 409 it is. Caught rather than
