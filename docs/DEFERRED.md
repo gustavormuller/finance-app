@@ -2538,3 +2538,199 @@ Full handoff: `docs/handoffs/008.md`. **008 is complete in code; these steps nee
     is right for "garbage → `suggested: 0`" (test 20).
   - **`PATCH /api/auth/me { aiEnabled }`** is the only way to turn AI on from the app. The
     gateway already refuses a user with it off.
+
+## 009 · checkpoint 4a
+
+- **009 · CP4a · the ADR check found no conflict.** The layers:
+  - `Domain/Import/AiCategorisation` is pure: the parser, the request, the system prompt,
+    the batch size and the answer ceiling. It uses `System.Text.Json` only, with no EF Core
+    and no `HttpClient`.
+  - `Application/Ai/CategorisationCascade` (the spec's name) runs rung 3 on `AppDbContext` and
+    `AiGateway` directly (ADR-016). There is no Repository and no MediatR.
+  - There is no migration: `CategorySource` came with `AddAi` in CP1. No money is computed.
+    Amounts stay `decimal` and are only compared with zero. CP1's `decimal` scan still
+    passes.
+  - ADR-012 holds: the AI is the last rung. It only sees rows the sign default filed, and it
+    only suggests. Rule 3 is applied to every pair it answers, and the row stays staged until
+    the user commits.
+- **009 · CP4a · tolerant parsing (unit tests 5–10, `AiCategorisationParseTests`, 24 cases).**
+  The answer is untrusted text, and nothing in it throws. It is read in this order:
+  1. The text as it is.
+  2. The inside of the first code fence.
+  3. The span from the first `{` to the last `}`, for prose around the object.
+
+  The first reading that is a JSON **object** wins. Trailing commas and comments are
+  tolerated, and ids are read in any case. A pair is kept only when:
+  - the row was sent in this batch,
+  - the value is a string holding the id of a category the user owns, and
+  - its kind passes `TransactionRules.ValidateSign` (rule 3).
+
+  Everything else is dropped pair by pair: a non-string value, an array, a wrapped object
+  such as `{ "rows": { … } }`, or a truncated object.
+
+  Spec-silent choices:
+  - **When a row is answered twice, its first answer is kept.**
+  - **A Transfer category is kept on either sign.** This is rule 3 as amended in 005. The
+    spec says "ignore mismatched kind against the row's sign", and I read that through rule
+    3, the same way `CategorySuggester` keeps a remembered transfer. **Pending human** if AI
+    transfers should be refused.
+- **009 · CP4a · what is sent (spec-silent details).** The user message is one JSON document:
+  - `categories`: `{ id, name, kind }`. Every category the user has is listed, the defaults
+    and Transfer included. A child is named `Parent > Child`. The list is sorted by name,
+    ordinal.
+  - `rows`: `{ rowId, description, kind }`. The spec lists `rowId` and `description`.
+    **`kind` is my addition** (`Expense` for a debit, `Income` for a credit), so the model
+    knows which categories rule 3 will accept. **No amount, date, account or raw text is
+    sent.**
+  - **The description is `NormalizedDescription`, not the raw text.** It is upper-cased,
+    without accents, and with digit runs removed, so CPFs, CNPJs, card and account numbers
+    and dates never leave. Names in PIX descriptions still do. **CP6's disclosure text must
+    say this.**
+  - The JSON keeps accents unescaped, which costs fewer tokens.
+  - **Ids are the real GUIDs**, as the spec's `{ rowId: categoryId }` reads. **For the
+    human:** short aliases (`r1`, `c3`), mapped back on parse, would cut output tokens about
+    three times and remove GUID copying errors. With aliases, test 8's "not owned" case
+    would become "unknown alias".
+- **009 · CP4a · the system prompt is a constant, `AiCategorisation.System`, in English.**
+  Decision 8's prompt files are about the monthly analysis. This prompt is short, is not
+  shown to anyone, and a unit test pins its key phrases. It asks for a bare
+  `{ rowId: categoryId }` object with no prose and no fence. It asks the model to leave out
+  rows that fit no better than a generic category. **For the human:** review it like code,
+  as decision 8 asks of the analysis prompt. Moving it to
+  `Infrastructure/Ai/Prompts/categorisation.md` is easy if you prefer.
+- **009 · CP4a · `MaxTokens` and batches (the CP3 handoff).**
+  - **Batch size: 40 rows** (`AiCategorisation.BatchSize`). Each batch is one gateway call,
+    so each is ai_enabled-checked, budgeted, timed out at 30 s and recorded on its own.
+  - **The answer ceiling is `256 + 64 × rows`**, which is 2816 for a full batch. A pair is two
+    GUIDs and punctuation, about 50 tokens. The ceiling errs high because an answer cut at
+    the ceiling fails in the adapter (CP3), and only the tokens used are billed.
+    `MaxTokensFor` refuses 0 rows and more than one batch.
+  - **Batches run in sequence, in the one request.** 200 default rows make 5 calls. At worst
+    that is 5 × 30 s, which is longer than decision 4's 30 s promise per call. **Pending
+    human:** check Caddy's and the browser's timeouts against a real statement (manual step
+    3), and lower the batch size or send batches in parallel if needed.
+  - **Each batch's suggestions are saved before the next call.** The gateway saves its usage
+    row on the same context (CP2's note). A later batch that fails (402, 502 or 504) keeps
+    what earlier ones suggested. Asking again sends only the rows still on `Default`.
+- **009 · CP4a · the counts (spec-silent).** `suggested` is the number of rows whose category
+  the AI changed. Those rows become `CategorySource.Ai`. An answer equal to the row's
+  current default is not a suggestion: the row stays `Default` and counts as skipped.
+  `skipped` is the rows sent minus `suggested`. Rows not sent (History, User, Ai, None) are
+  in neither count.
+- **009 · CP4a · the cascade checks `ai_enabled` first**, before the batch lookup and even
+  when there is nothing to send. So a disabled user always gets the 403 (test 15), whatever
+  the batch holds. The gateway checks it again for each call.
+- **009 · CP4a · staging writes `CategorySource`** (`ImportStaging`):
+  - `History` when the chosen category is the remembered one. This includes a remembered
+    "Outros": history chose it, so it is never sent.
+  - `Default` when the sign default was chosen.
+  - `None` when nothing was chosen. Invalid rows are `None` too, since the cascade never
+    touches them.
+
+  Rows staged before this change read `None` (CP1) and are never sent.
+- **009 · CP4a · tests.**
+  - Unit: `AiCategorisationParseTests` (24 cases, tests 5–10 and the tolerances) and
+    `AiCategorisationRequestTests` (7).
+  - Integration: `AiCategorisationTests` (6) on the job path with a scripted provider. It
+    covers the staging sources and the application halves of tests 18–20. It also covers
+    batching with a failure on the second batch and the retry that sends only the rest, AI
+    off with nothing to send, another user's batch (NotFound, through the filter), and a
+    committed batch (WrongStatus).
+- **009 · CP4a · commit sizes.** 10fbe6c (the rung-3 integration tests) is 242 lines. Most of
+  it is the test fixture, a batch with history and a child category. The rest are between 6
+  and 153.
+- **009 · CP4a · counts.** .NET went from 869 to 906 (+37: 24 + 7 unit, 6 integration). I
+  counted that from the added cases. The full scripts ran once, at the end of 4b, below.
+  Web and E2E are unchanged.
+
+## 009 · checkpoint 4b
+
+- **009 · CP4b · the ADR check found no conflict.** The endpoints stay thin over
+  `CategorisationCascade`. The status map lives once, in `Problems.Ai`. ADR-008 (the cut-off
+  before every call, now per batch) and ADR-010 (the user's own flag) hold. There is no
+  migration.
+- **009 · CP4b · `PATCH /api/auth/me { aiEnabled }`.**
+  - It saves through `UserManager.UpdateAsync` and only ever touches the signed-in user.
+  - **It answers with the whole of `GET /api/auth/me`** (`id`, `email`, `displayName`,
+    `aiEnabled`), which is a superset of the spec's `{ aiEnabled }`, so the web can reuse
+    one shape.
+  - A body without `aiEnabled` is a 400 naming the field: "Informe se a IA deve ficar ligada
+    ou desligada."
+  - Signed out, it is a 401. It needs the Origin header, like every other mutating route.
+- **009 · CP4b · the preview's row shows its rung.** `RowResponse` gains `categorySource`
+  (`None`, `History`, `Default`, `Ai`, `User`, as enum strings). Choosing a category in the
+  row PATCH now writes `User`, even when it is the same category. CP6 maps the values in
+  `labels.ts` and shows the "came from AI" marker for `Ai`.
+- **009 · CP4b · `POST /api/imports/{id}/suggest`** (integration tests 15–20,
+  `AiSuggestEndpointTests`, 7 cases):
+  - It answers `200 { suggested, skipped }`.
+  - **403** when AI is off (checked before the batch lookup, so it says nothing about the
+    id).
+  - **402** when over the budget, with no provider call.
+  - **504** on `AiProviderTimeoutException`, caught before its base class.
+  - **502** on any other `AiProviderException`. This status is not in the spec (CP3's
+    suggestion).
+  - **404** for another user's batch (query filter).
+  - **409** for a committed one.
+
+  None of the bodies echoes the exception's message. A test asserts this with a message
+  holding "secret". The reason goes to a warning log instead.
+- **009 · CP4b · for the human: invented pt-BR copy** (`Problems.Ai`):
+  - 403, "IA desligada": "A IA está desligada na sua conta. Ligue-a nas configurações para
+    usar este recurso."
+  - 402, "Limite de IA atingido": "Você atingiu o limite mensal de gastos com IA. O limite
+    renova no próximo mês." It shows no amounts.
+  - 504, "A IA demorou demais": "O serviço de IA não respondeu a tempo. Tente novamente em
+    instantes."
+  - 502, "Falha no serviço de IA": "O serviço de IA não conseguiu responder agora. Tente
+    novamente mais tarde."
+  - 409 reuses the preview's "Este lote já foi confirmado e não pode mais ser editado."
+- **009 · CP4b · there is no rate limit on suggest.** The spec names none, and the budget is
+  the bound (ADR-008). Each click re-sends only the rows still on `Default`. **Pending
+  human** if a per-minute limit like 006's is wanted.
+- **009 · CP4b · the fake, shaped for tests 18–20 and E2E 28.** `FakeAiProvider` recognises
+  a categorisation request by rung 3's system prompt. For each row it answers the first
+  category of the row's kind, in the order sent, that is not a sign default. With the
+  seeded categories, debits get "Alimentação" and credits get "Salário". A row whose
+  description holds `FakeAiProvider.GarbageMarker` (`GARBAGE`) makes the whole answer the
+  fixed markdown, which is test 20's garbage. Every other request still gets the fixed
+  markdown, and CP7 shapes it for the analysis. The fake is still refused outside
+  Development.
+- **009 · CP4b · test 17 over HTTP.** A provider failure reporting 1234 input tokens gives a
+  502 and one usage row with `Succeeded = false` and 1234 tokens. The timeout case gives a
+  504 and a failed row. Test 15's analysis half, and tests 13 and 14 over HTTP, are CP5's.
+- **009 · CP4b · the flaky 006 test** (CP2,
+  `MarketDataFakeProvidersTests.With_the_switch_a_manual_sync_succeeds_on_fakes_and_can_run_again_at_once`)
+  failed again in the first `verify.sh` run with the same 429. The rerun was green, with no
+  change. The separate task queued in CP2 still stands.
+- **009 · CP4b · commit sizes.** 113a76f (the integration tests 15–20) is 216 lines. The rest
+  are between 35 and 82.
+- **009 · CP4b · counts.** .NET went from 906 to 919 (+13: 4 toggle and preview, 2 fake, 7
+  suggest), so CP4 as a whole went from 869 to 919. Web stayed at 145 and E2E at 22. The
+  web does not yet read `categorySource` or call suggest (CP6).
+- **009 · CP4b · handoff to CP5** (the analysis: `AnalysisInputBuilder`, the versioned
+  prompt, `AnalysisJob` on a `Channel<T>` with the startup sweep, `/api/ai/analyses` and
+  `/api/ai/usage`; tests 11–14 and 21–24, likely as 5a and 5b):
+  - **Reuse `Problems.IsAiFailure` / `Problems.Ai`** for `POST /api/ai/analyses`. Check
+    `ai_enabled` (403) and the budget (402, `BudgetGuard.EnsureWithinBudgetAsync`) **at POST
+    time, before creating the `Pending` row**. Otherwise a disabled or broke user gets a 202
+    and a row that fails later. The job goes through the gateway, which checks both again.
+    Test 15's analysis half asserts no usage row.
+  - **The job's failures go to `AiAnalysis.Error` in pt-BR**, never the exception message
+    (CP2). The four texts in `Problems.Ai` could become shared strings.
+  - **Size `MaxTokens` for the analysis.** Opus 5's adaptive thinking counts against it, and
+    a `max_tokens` stop fails (CP3). 400 words is about 700 tokens of output, so leave room
+    for the thinking: something like 8000, as a constant or a setting.
+  - **Run the job in a scope acting for the user** (`ActingUser`, 007's pattern), with the
+    filters on and no `IgnoreQueryFilters`. The gateway saves usage on that scope's context,
+    so save the `Running` status before the call.
+  - **The fake answers any non-categorisation request with its fixed `## Resumo` markdown.**
+    That is enough for tests 21–23. A test for the job's failure (22) can swap in a scripted
+    provider, as `AiSuggestEndpointTests` does.
+  - **For CP6 (web):**
+    - `PATCH /api/auth/me` and `GET /api/ai/usage` back the `/settings` toggle.
+    - The suggest button posts to `/api/imports/{id}/suggest`, reloads the rows, and renders
+    a problem's `detail` verbatim.
+    - `categorySource` labels go in `labels.ts`.
+    - **The disclosure must say** that categorisation sends normalized descriptions, each
+    row's debit or credit and the category names, and no amounts, dates or accounts.
