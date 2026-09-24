@@ -300,3 +300,118 @@ Every entry: spec · checkpoint · what · why deferred · what was done instead
     `IVVB11`, with unit `Level`.
   - Benchmark codes to sync are the keys of `MarketData:Bcb:Series`. An unconfigured code
     throws `InvalidOperationException` before any request.
+
+## 006 · checkpoint 3
+
+- **006 · CP3 · sync tests 10–14 are integration tests, not unit tests.** The spec files
+  them under `Unit`. But the sync reads and writes through `AppDbContext` (ADR-016, no
+  repository to fake), and the upsert is PostgreSQL SQL (`unnest`, `ON CONFLICT`). So they
+  run against the Testcontainers database with fake providers
+  (`api.tests/Integration/MarketDataSync*.cs`). The sync reads every active asset in a
+  shared catalogue, so each test migrates a database of its own. Tests 15, 16, 23 and 24
+  stay unit tests.
+- **006 · CP3 · the date range.** `to` is yesterday **in UTC**. A UTC day ends after both
+  B3 (about 21:00 UTC) and the US markets (20:00–21:00 UTC) close, and CoinGecko dates its
+  points by UTC day, so every stored close is final, whatever time a manual sync runs.
+  `from` is the day after the latest stored row. When there is none, it is `today (UTC) −
+  BackfillYears`, as the spec says (not `to − BackfillYears`). A series already stored
+  through yesterday makes no request and counts as synced.
+- **006 · CP3 · `LastSyncedAt`** is set only after the asset is current, whether that took
+  a fetch and upsert or no request at all. A failed asset keeps its old value. It is
+  written with `ExecuteUpdate`, not change tracking, so a failure in one asset never leaves
+  tracked state behind for the next.
+- **006 · CP3 · summary shape.** `SyncRun.Summary` is a JSON object keyed by provider name:
+  `Brapi`, `CoinGecko`, `TwelveData` (the `ProviderKind` name) and `Bcb` for the benchmark
+  port. Each value is `{ rowsWritten, itemsSynced, itemsFailed, error, failures: [{ item,
+  error }] }`. `item` is the ticker or the benchmark code, and `error` is the first
+  failure's text. IVVB11 counts under `Brapi`. A provider with nothing to sync is absent.
+  `SyncSummaryJson` reads and writes it (camelCase), so CP4's endpoint and CP5's screen
+  share one shape.
+- **006 · CP3 · status.** `Succeeded` when no item failed, which includes a run with
+  nothing to sync. `Failed` when none succeeded. `PartialFailure` otherwise. An item is
+  one asset or one benchmark series, so "one provider failing" (test 13) is every item of
+  that provider failing.
+- **006 · CP3 · failures reported in pt-BR.** `SyncErrorText.For(exception)` maps the
+  exception type to fixed pt-BR text: rate limit, unreadable response, key refused
+  (401/403), communication failure (other `HttpRequestException`), timeout
+  (`TaskCanceledException`, Polly `TimeoutRejectedException`), circuit open
+  (`BrokenCircuitException`), not configured (`InvalidOperationException`: no provider
+  registered, unknown SGS code), and a generic fallback. The exception itself goes to the
+  log with its English message. Referencing Polly's exception types from `Application/`
+  is a small leak of the resilience library into the core. It is accepted because those
+  types are what the ports surface. `InvalidOperationException` is broad: an EF Core
+  failure of that type would read as "sem configuração".
+- **006 · CP3 · a `429` stops its provider for the rest of the run.** The provider's
+  remaining assets are recorded as failed with the rate-limit text and are not requested.
+  The resilience handler neither retries a 429 nor counts it toward the circuit: it is
+  the provider asking for less, not a fault. `RetryAfter` is not otherwise used, because
+  the next attempt is the next run.
+- **006 · CP3 · a run that stops mid-way** (shutdown cancellation, or a database failure
+  outside any item) is marked `Failed` with whatever summary it had, on a best-effort
+  basis, and the exception propagates. A row can still stay `Running` if the process dies
+  outright, as `SyncRun`'s doc comment already says.
+- **006 · CP3 · IVVB11 is configuration.** `MarketData:PriceBenchmarks:IVVB11 = { Provider:
+  Brapi, Symbol: IVVB11, Unit: Level }`. The sync reads it through brapi's `IPriceProvider`
+  and upserts it into `Benchmarks` under `IVVB11`. The BCB codes synced are the keys of
+  `MarketData:Bcb:Series`, in ordinal order, after the assets and price benchmarks.
+- **006 · CP3 · resilience.** Every provider's typed client gets `AddResilienceHandler`,
+  including BCB's. From the outside in: a total timeout (3 min), then retry (3 retries,
+  exponential from 2 s with jitter, for 5xx/408/network/timeout, and it honours
+  `Retry-After`), then the circuit breaker, then a per-attempt timeout (30 s). All values
+  are under `MarketData:Resilience`. `HttpClient.Timeout` is switched off, because at 100
+  s it would cut the retries short. Polly v8 has no "N consecutive failures" breaker, so
+  "five consecutive failures" (test 24) is `FailureRatio = 1.0` with `MinimumThroughput =
+  5` over a 5-minute window: every attempt in the window failed, and there were at least
+  five. The retry sits outside the breaker, so each attempt counts: a failing call makes
+  four attempts, and the circuit opens during the second failing call. The pipeline is
+  keyed by the typed client's name, so each provider has its own circuit. It lives in a
+  singleton registry, so it outlives each transient client. It is in-process state and a
+  restart closes it.
+- **006 · CP3 · the job.** `Infrastructure/Jobs/MarketDataSyncJob` computes the next
+  occurrence with Cronos in `TimeProvider.LocalTimeZone` and waits on the injected
+  `TimeProvider`, one day at most per `Task.Delay`, which refuses anything past about 49
+  days. The 26-hour startup check uses the latest `SyncRun.StartedAt` of any trigger, so a
+  recent manual run counts. A cron that does not parse fails the boot, in `StartAsync`.
+  A failed run is logged and the loop goes on. If the latest run cannot be read at
+  startup, the job waits for the schedule. **For the human:** "server local time" is the
+  container's zone, and a stock .NET image is UTC. There, `0 3 * * *` runs at 00:00 in
+  São Paulo. Set `TZ=America/Sao_Paulo` in the production container (none exists yet;
+  only `deploy/docker-compose.dev.yml`), or write the cron in UTC.
+- **006 · CP3 · keeping tests off the network.** `MarketData:ScheduledSync` defaults to
+  `false` in the options class and is `true` in `appsettings.json`. Both
+  `WebApplicationFactory` subclasses (`IdentityApiFactory`, `HealthApiFactory`) and
+  `verify-e2e.sh` (`MarketData__ScheduledSync=false`) switch it off. Otherwise every
+  host would run a sync at boot, because there is no run in the last 26 hours. A test
+  asserts both factories keep it off. **A new test host must set it too.**
+- **006 · CP3 · no schema change**, so no migration. `MarketDataStore` is now registered
+  (scoped), with `MarketDataSync` beside it (`AddMarketDataSync()`).
+- **006 · CP3 · not prevented: overlapping runs.** Nothing stops a scheduled run and a
+  manual one (CP4) from running at the same time. Both would upsert the same rows, which
+  is idempotent, so the cost is wasted calls and two `SyncRun` rows. CP4 owns the gate.
+- **006 · CP3 · diff sizes.** `41d2c5f` (sync tests 10/11, 214 lines of test) and
+  `1dd20e7` (the sync, 207 insertions) are slightly over ~200. The others are under.
+- **006 · CP3 · handoff to CP4** (endpoints, manual trigger, tests 19–22).
+  - `MarketDataSync.RunAsync(SyncTrigger.Manual, ct)` writes the `Running` row, runs to
+    the end, and returns the finished `SyncRun`. `POST /api/market-data/sync` answers `202
+    { syncRunId }`, so the id is needed before the run ends. Either split `RunAsync` into
+    "create the row" and "run it", or start it in the background with **a new scope and
+    not the request's `CancellationToken`**. The request's context is disposed when the
+    response ends.
+  - The 10-minute limit is global and survives restarts only if it reads the database:
+    the latest `SyncRun.StartedAt` of any trigger (index `StartedAt DESC` exists). ASP.NET's
+    rate limiter is per-process and in-memory. Two simultaneous requests can both pass a
+    database check, so pair it with a process-wide gate (a singleton `SemaphoreSlim`, or a
+    PostgreSQL advisory lock), which also stops a manual run overlapping the nightly one.
+    Decide whether a scheduled run within 10 minutes also yields `429`; the spec says "if
+    one ran".
+  - Tests 20–22 in the integration suite: swap `IPriceProviderRegistry` and
+    `IBenchmarkProvider` in the factory's `ConfigureServices` for the fakes in
+    `api.tests/Integration/MarketDataSyncFakes.cs`. The rate limit is global and the test
+    database is shared, so these tests need a database of their own, as
+    `MarketDataSyncTests` does. Otherwise one test's run makes another's POST a `429`.
+  - `sync-runs` can return `Summary` parsed with `SyncSummaryJson.Read`. Its text is
+    already pt-BR, so problem-details messages are the only new text needed.
+  - From CP2: a CoinGecko asset's `Currency` should match `MarketData:CoinGecko:VsCurrency`.
+  - For CP5's E2E (test 26): the E2E API is a real process. "Fake providers in the test
+    host" needs either a Development-only switch that registers fakes, or the providers'
+    `BaseUrl`s pointed at a local stub. Keep `ScheduledSync` off there.
