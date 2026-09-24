@@ -52,6 +52,7 @@ public static class TransactionRules
             new RuleViolation(AmountField, "Uma categoria de receita exige um valor positivo."),
         CategoryKind.Expense when amount > 0m =>
             new RuleViolation(AmountField, "Uma categoria de despesa exige um valor negativo."),
+        CategoryKind.Transfer => throw new NotImplementedException(),
         _ => null,
     };
 

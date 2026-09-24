@@ -10,6 +10,7 @@ public sealed class CategorySuggesterTests
     private static readonly CategoryChoice Salary = new(Guid.NewGuid(), CategoryKind.Income);
     private static readonly CategoryChoice Outros = new(Guid.NewGuid(), CategoryKind.Expense);
     private static readonly CategoryChoice OutrasReceitas = new(Guid.NewGuid(), CategoryKind.Income);
+    private static readonly CategoryChoice Transferencia = new(Guid.NewGuid(), CategoryKind.Transfer);
 
     /// <summary>Spec unit test 33.</summary>
     [Fact]
@@ -58,4 +59,23 @@ public sealed class CategorySuggesterTests
     [Fact]
     public void Zero_gets_no_suggestion() =>
         Assert.Null(CategorySuggester.Suggest(0m, Food, Outros, OutrasReceitas));
+
+    /// <summary>
+    /// 005 amendment 2. "PAGAMENTO FATURA" filed once as a transfer is a transfer next
+    /// time, whichever side of it the statement shows.
+    /// </summary>
+    [Fact]
+    public void A_transfer_history_match_is_kept_for_either_sign()
+    {
+        Assert.Equal(Transferencia.Id, CategorySuggester.Suggest(-1500m, Transferencia, Outros, OutrasReceitas));
+        Assert.Equal(Transferencia.Id, CategorySuggester.Suggest(1500m, Transferencia, Outros, OutrasReceitas));
+    }
+
+    /// <summary>005 amendment 2. The sign default never lands on a transfer category.</summary>
+    [Fact]
+    public void The_sign_default_never_picks_a_transfer()
+    {
+        Assert.Null(CategorySuggester.Suggest(-1m, null, defaultExpense: Transferencia, defaultIncome: OutrasReceitas));
+        Assert.Null(CategorySuggester.Suggest(1m, null, defaultExpense: Outros, defaultIncome: Transferencia));
+    }
 }

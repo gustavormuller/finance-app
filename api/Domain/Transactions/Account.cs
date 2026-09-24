@@ -30,5 +30,7 @@ public sealed class Account : IUserOwned
     /// </summary>
     public string Currency { get; set; } = DefaultCurrency;
 
+    public decimal OpeningBalance { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }

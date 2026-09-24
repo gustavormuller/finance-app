@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace Finance.Api.Tests.Integration;
 
@@ -186,5 +187,129 @@ public sealed class AccountEndpointTests(PostgresFixture postgres)
 
         Assert.Equal(HttpStatusCode.NotFound, edit.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
+    }
+
+    /// <summary>
+    /// 005 amendment 3. The opening balance is how the dashboard total can match the
+    /// bank's; it is set on create, changed on update, and kept when an update omits it.
+    /// </summary>
+    [Fact]
+    public async Task The_opening_balance_is_set_on_create_and_changed_on_update()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("account-opening", cancellationToken);
+
+        using var created = await user.Client.SendAsync(
+            TransactionsFixtures.Post("/api/accounts", new
+            {
+                name = "Itaú",
+                type = "Checking",
+                currency = "BRL",
+                openingBalance = 1000.50m,
+            }),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var body = await created.Content.ReadFromJsonAsync<TransactionsFixtures.AccountItem>(cancellationToken);
+        Assert.Equal(1000.50m, body!.OpeningBalance);
+
+        // A card starts in debt, so a negative opening balance is ordinary.
+        using var edited = await user.Client.SendAsync(
+            TransactionsFixtures.Put($"/api/accounts/{body.Id}", new
+            {
+                name = "Itaú",
+                type = "CreditCard",
+                currency = "BRL",
+                openingBalance = -250.75m,
+            }),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+
+        using var renamed = await user.Client.SendAsync(
+            TransactionsFixtures.Put($"/api/accounts/{body.Id}", new
+            {
+                name = "Itaú cartão",
+                type = "CreditCard",
+                currency = "BRL",
+            }),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+
+        var only = Assert.Single((await user.Client.GetFromJsonAsync<List<TransactionsFixtures.AccountItem>>(
+            "/api/accounts", cancellationToken))!);
+
+        Assert.Equal("Itaú cartão", only.Name);
+        Assert.Equal(-250.75m, only.OpeningBalance);
+
+        await using var context = TransactionsFixtures.ContextFor(postgres.ConnectionString, user.Id);
+        var stored = await context.Accounts.SingleAsync(cancellationToken);
+        Assert.Equal(-250.75m, stored.OpeningBalance);
+    }
+
+    /// <summary>005 amendment 3: omitted on create means zero.</summary>
+    [Fact]
+    public async Task The_opening_balance_defaults_to_zero()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("account-opening-zero", cancellationToken);
+
+        await user.CreateAccountAsync("Nubank", cancellationToken);
+
+        var only = Assert.Single((await user.Client.GetFromJsonAsync<List<TransactionsFixtures.AccountItem>>(
+            "/api/accounts", cancellationToken))!);
+
+        Assert.Equal(0m, only.OpeningBalance);
+    }
+
+    /// <summary>
+    /// Isolation: another user cannot set the opening balance of an account that is not
+    /// theirs, and the owner still can, so the 404 is not a missing route.
+    /// </summary>
+    [Fact]
+    public async Task Another_user_cannot_change_your_opening_balance()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var owner = await factory.SignInNewUserAsync("opening-owner", cancellationToken);
+        var other = await factory.SignInNewUserAsync("opening-other", cancellationToken);
+
+        var accountId = await owner.CreateAccountAsync("Private", cancellationToken);
+
+        using var hijack = await other.Client.SendAsync(
+            TransactionsFixtures.Put($"/api/accounts/{accountId}", new
+            {
+                name = "Private",
+                type = "Checking",
+                currency = "BRL",
+                openingBalance = 999999m,
+            }),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, hijack.StatusCode);
+
+        using var own = await owner.Client.SendAsync(
+            TransactionsFixtures.Put($"/api/accounts/{accountId}", new
+            {
+                name = "Private",
+                type = "Checking",
+                currency = "BRL",
+                openingBalance = 10m,
+            }),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, own.StatusCode);
+
+        var only = Assert.Single((await owner.Client.GetFromJsonAsync<List<TransactionsFixtures.AccountItem>>(
+            "/api/accounts", cancellationToken))!);
+
+        Assert.Equal(10m, only.OpeningBalance);
     }
 }

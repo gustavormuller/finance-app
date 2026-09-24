@@ -136,7 +136,13 @@ internal static class TransactionsFixtures
     /// endpoints: a test that reuses the production DTO cannot notice the endpoint
     /// renaming a field.
     /// </summary>
-    public sealed record AccountItem(Guid Id, string Name, string Type, string Currency, DateTimeOffset CreatedAt);
+    public sealed record AccountItem(
+        Guid Id,
+        string Name,
+        string Type,
+        string Currency,
+        DateTimeOffset CreatedAt,
+        decimal OpeningBalance = 0m);
 
     public sealed record CategoryItem(Guid Id, string Name, string Kind, Guid? ParentId);
 

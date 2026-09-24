@@ -41,6 +41,9 @@ internal static class TransactionsModel
             // Two accounts called "Nubank" under one user is a mistake every time.
             // Scoped to the user, so it says nothing about anyone else's names.
             account.HasIndex(entity => new { entity.UserId, entity.Name }).IsUnique();
+
+            // Stub until the AddDashboard migration (005 checkpoint 1).
+            account.Ignore(entity => entity.OpeningBalance);
         });
 
         modelBuilder.Entity<Category>(category =>

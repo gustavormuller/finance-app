@@ -34,6 +34,11 @@ public static class CategorySuggester
             return null;
         }
 
+        if (history is { Kind: CategoryKind.Transfer })
+        {
+            throw new NotImplementedException();
+        }
+
         var kind = amount < 0m ? CategoryKind.Expense : CategoryKind.Income;
 
         if (history is { } remembered && remembered.Kind == kind)
