@@ -77,6 +77,11 @@ public sealed class FieldParserTests
     [InlineData("R$", PtBr)]
     [InlineData("--5,00", PtBr)]
     [InlineData("1 234,56", PtBr)]
+    [InlineData("1234.56", PtBr)]
+    [InlineData("-58.00", PtBr)]
+    [InlineData("1234,56", EnUs)]
+    [InlineData("1.23.456,00", PtBr)]
+    [InlineData("12.34", PtBr)]
     public void Wrong_culture_or_garbage_is_a_failure_not_a_wrong_number(string? text, string culture)
     {
         Assert.False(AmountParser.TryParse(text, culture, out var amount));

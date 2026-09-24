@@ -60,7 +60,39 @@ public static class AmountParser
             return false;
         }
 
-        return decimal.TryParse(text.Trim(), Styles, format, out amount);
+        var trimmed = text.Trim();
+
+        if (!IsGroupedCorrectly(trimmed, format))
+        {
+            amount = 0m;
+            return false;
+        }
+
+        return decimal.TryParse(trimmed, Styles, format, out amount);
+    }
+
+    /// <summary>
+    /// <see cref="decimal.TryParse(string, NumberStyles, IFormatProvider, out decimal)"/>
+    /// skips a group separator wherever it appears in the integer part, so under
+    /// <c>pt-BR</c> an American <c>-58.00</c> would become <c>-5800</c>. A separator is
+    /// only accepted where it groups thousands: one to three digits, then groups of
+    /// exactly three. The web's live preview applies the same rule.
+    /// </summary>
+    private static bool IsGroupedCorrectly(string text, NumberFormatInfo format)
+    {
+        var separator = format.NumberGroupSeparator;
+        var decimalAt = text.IndexOf(format.NumberDecimalSeparator, StringComparison.Ordinal);
+        var integerPart = decimalAt < 0 ? text : text[..decimalAt];
+
+        if (!integerPart.Contains(separator, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var groups = new string(integerPart.Where(c => char.IsAsciiDigit(c) || separator.Contains(c)).ToArray())
+            .Split(separator);
+
+        return groups[0].Length is >= 1 and <= 3 && groups.Skip(1).All(group => group.Length == 3);
     }
 
     private static NumberFormatInfo Format(string decimalSeparator, string groupSeparator, string currencySymbol)
