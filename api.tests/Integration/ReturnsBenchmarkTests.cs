@@ -55,7 +55,8 @@ public sealed class ReturnsBenchmarkTests(PostgresFixture postgres)
         Assert.Null(body.Benchmarks["SELIC"]);
 
         Assert.Equal(45, body.Series.Count);
-        Assert.Equal(["date", "portfolio", "CDI", "IPCA6", "USDBRL", "IVVB11"], body.Series[0].Keys);
+        // Benchmarks follow the portfolio in code order; configuration binding keeps no file order.
+        Assert.Equal(["date", "portfolio", "CDI", "IPCA6", "IVVB11", "USDBRL"], body.Series[0].Keys);
         Assert.All(body.Series[0].Values.Skip(1), value => Assert.Equal(100m, value.GetDecimal()));
         var last = body.Series[^1];
         Assert.Equal(Today, last["date"].GetDateOnly());
