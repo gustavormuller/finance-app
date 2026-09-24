@@ -495,3 +495,108 @@ Every entry: spec · checkpoint · what · why deferred · what was done instead
   - The E2E database is shared across the E2E run and the 10-minute limit is global, so
     only one E2E test can trigger a sync per run, unless the suite truncates `SyncRuns`
     first or the switch also shortens the window.
+
+## 006 · checkpoint 5
+
+- **006 · CP5 · no ADR conflict, no migration.** The screen and the E2E read the CP4 routes
+  as they are. No schema change.
+- **006 · CP5 · fake providers in the E2E API: `MarketData:FakeProviders`.** A boolean on
+  `MarketDataOptions`, default `false`, absent from every `appsettings*.json`, set only by
+  `verify-e2e.sh` (`MarketData__FakeProviders=true`). When on, `IPriceProviderRegistry` and
+  `IBenchmarkProvider` resolve to `Infrastructure/MarketData/FakeMarketDataProviders`: every
+  series answers one value dated `to` (close `10`, benchmark `0.05`), so a run writes a row
+  per item and always ends `Succeeded`. The choice is made when the service is resolved, not
+  when it is registered, because the test hosts' configuration is merged only at `Build()`
+  (Program.cs says as much). The real adapters stay registered either way.
+- **006 · CP5 · the switch cannot reach production.** `Program.cs` calls
+  `MarketDataSetup.RefuseFakeProvidersOutsideDevelopment` next to the `Require` checks,
+  before the migration: the switch on in any environment but Development fails the boot
+  with a message naming it. Tested for `Production` and `Staging`. The fakes are in the
+  production assembly (the E2E API is a real process, and `api.tests` is not loaded there),
+  as CP4's handoff asked.
+- **006 · CP5 · the 10-minute limit in E2E: the switch shortens the window to zero.** Of the
+  three options CP4 left, this is the least invasive that is also correct:
+  - *Clearing `SyncRuns` in setup* needs the script or Playwright to reach into the
+    database. `verify-e2e.sh` does not know the connection string (it lives in the user
+    secrets), and on a developer machine that database may be the dev one, whose run
+    history would be deleted on every E2E run.
+  - *Only one test triggers a sync* is true (test 26 is the only one), but it is not enough:
+    the E2E database is kept between runs (`docker compose down` keeps the volume), so a
+    second `verify-e2e.sh` within ten minutes would get a 429. So would a Playwright retry
+    in CI.
+  - *The switch shortens the window* is one line in `ManualMarketDataSync` (`Window` is
+    `MinimumInterval`, or zero under the switch), and it cannot be on in production. The gate
+    still refuses a run while another is going. Tests 21 and the other 429 tests run without
+    the switch and still hold the 10 minutes. Two back-to-back `verify-e2e.sh` runs passed.
+  Only one E2E test triggers a sync anyway, so no two tests race for the gate under
+  `fullyParallel`.
+- **006 · CP5 · `IdentityApiFactory` gained a `settings` dictionary**, added over its default
+  configuration, for the switch's tests (`MarketDataFakeProvidersTests`).
+- **006 · CP5 · the screen.** `/market-data` (`routes/MarketDataPage.tsx`), under the
+  protected layout and not in the navigation (spec: "reachable from settings later").
+  Two sections in `components/market-data/`:
+  - `SyncRuns` lists the last 20 runs: start (browser's local time, pt-BR short date and
+    time), trigger, status, and one line per summary key with rows written, items synced,
+    items failed and each failure as `item: error`. The `error` texts are the API's pt-BR,
+    shown as they come. "Sincronizar agora" posts, then refetches; while the newest run is
+    `Running` the list is polled every 2 s, and the button is disabled. A refusal (429) is
+    the problem's `detail`, shown verbatim in an alert.
+  - `AssetCatalogue` is the register form (ticker, optional name, class, provider, symbol at
+    the provider, BRL/USD) and a search that runs on submit, not as you type. Without a query
+    it shows the API's first 50. A 400 is shown under the field it names; a 409 is the
+    API's `detail`.
+  - Labels in `lib/labels.ts`: class, provider (brand spelling: brapi, CoinGecko, Twelve
+    Data), trigger, status, and `syncProviderLabel` for summary keys (`Bcb` → "Banco Central
+    (SGS)"; an unknown key is shown as sent).
+- **006 · CP5 · polling a stuck run.** Only the newest run is watched, but if the process died
+  mid-run (a `Running` row that never ends, CP3), the open screen polls every 2 s and keeps
+  the button disabled. The API would refuse a manual run for 10 minutes after that row's
+  start anyway, then accept one. Not handled further.
+- **006 · CP5 · tests.** Web test 25 is `routes/MarketDataPage.test.tsx` (rendered through
+  the real route tree), with the empty state, the trigger and polling, and a verbatim 429.
+  `components/market-data/AssetCatalogue.test.tsx` covers search, registration, a 400 under
+  its field and a 409. E2E test 26 is `e2e/market-data.spec.ts`: a registered ticker, then a
+  manual sync whose run (found by the `syncRunId` of the 202) turns `Concluída` with brapi
+  and BCB in its breakdown and no failure. A second E2E test registers, searches and gets the
+  409 on a repeat. It asserts the API's sentence exactly, so rewording that 409 breaks it.
+  Counts: .NET 535 → 539, web 67 → 74, E2E 16 → 18. The vitest files were committed failing
+  before the screen; the E2E spec was written after the screen and failed once on an
+  ambiguous label ("Provedor" also matches "Símbolo no provedor") before passing.
+- **006 · CP5 · diff sizes.** Every commit is under ~200 lines; the largest is
+  `2efcef2` (the catalogue, 194).
+
+## 006 · handoff
+
+Full handoff: `docs/handoffs/006.md`. **006 is complete in code; these steps need a human.**
+
+- **Provider keys.** None is committed. Set them as user secrets in development and as
+  environment variables in production: `MarketData:Brapi:Token`,
+  `MarketData:CoinGecko:DemoKey`, `MarketData:TwelveData:Key`. BCB needs none. Plans
+  matter: brapi's free plan may not serve 5-year ranges, and CoinGecko's demo plan serves
+  365 days (`MaxHistoryDays: 365`), so manual step 4's "~1800 rows for BTC" needs a paid
+  plan and a raised cap (CP2).
+- **SGS codes (manual step 1).** Check CDI 12, SELIC 11, IPCA 433 and USDBRL 1 on
+  `https://www3.bcb.gov.br/sgspub/` and their units (percent per day, percent per day,
+  percent per month, level) against `MarketData:Bcb:Series` in `api/appsettings.json`.
+  Step 5 of the spec shows a wrong code as values of the wrong magnitude.
+- **Fixtures.** All five files in `api.tests/Fixtures/MarketData/` are hand-written from
+  documentation; the egress proxy blocked every provider. Capture one real response per
+  provider under the same file names, update that folder's README, and fix any adapter
+  whose tests then break. Decision 9 ("captured once") is not met until then. The
+  behaviours listed under 006 · CP2 (BCB 404 as empty, brapi ranges, CoinGecko daily
+  points, Twelve Data error bodies) are also unverified.
+- **Container time zone for the cron.** `0 3 * * *` is read in the container's zone, and a
+  stock .NET image is UTC, so it would run at 00:00 in São Paulo. Set
+  `TZ=America/Sao_Paulo` in the production container (010 writes the compose file), or write
+  the cron in UTC.
+- **Manual steps 2–7** of the spec, with real keys, including the overnight `Scheduled` run.
+- **CLAUDE.md.** Its exception list names `prices` and `benchmarks`; `market_assets` and
+  `sync_runs` are shared too (006 · CP1). A one-line edit for the human.
+- **Starting spec 007.** Read `specs/007-investments.md`, `docs/handoffs/006.md` (forward
+  notes) and the 006 entries above. Plan the checkpoints in STATUS.md as 005 and 006 did.
+  From the baseline .NET 539, web 74, E2E 18. 007's `Asset` hangs off `MarketAssets` (FK,
+  `RESTRICT`); its `POST /api/investments/assets` registering a missing catalogue entry
+  should reuse the CP4 validation in `Endpoints/MarketDataEndpoints.cs` rather than copy
+  it; its nightly rebuild goes after the sync in `MarketDataSyncJob` and takes the same
+  `MarketDataSyncGate`. Its E2E runs on `MarketData:FakeProviders`, where every close is
+  `10` and dated yesterday (UTC).
