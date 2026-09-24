@@ -3183,3 +3183,170 @@ need a human.** Nothing has called a real AI API yet.
   - The production `.env` needs the AI key, and no fake switch.
   - The prompt is embedded, so publish carries it.
   - Check suggest's multi-batch requests against Caddy's and Cloudflare's timeouts.
+
+## 010 · checkpoint 1
+
+- **010 · CP1 · no ADR conflict, no migration.** No model change. Swagger is not present,
+  so there is nothing to switch off in Production.
+- **010 · CP1 · the spec's reason for `ForwardedHeaders` is off for this codebase (spec not
+  edited).** The session cookie is already `SecurePolicy.Always` (002), so it is `Secure`
+  whatever the scheme. What `X-Forwarded-Proto` actually fixes is the **Google
+  `redirect_uri`**: it is built from `Request.Scheme`, and without the header it is `http://`
+  and never matches the console. Google's correlation cookie depends on the scheme as well. Test 4
+  (`ForwardedHeadersTests`) asserts both, from a trusted and from an untrusted peer.
+- **010 · CP1 · how "trusting the Docker network" is configured (spec silent, pending
+  human).** `ForwardedHeaders:KnownNetworks` (CIDR list) is added to the loopback default.
+  It is empty everywhere except the production compose file, which pins `172.30.0.0/24`.
+  - `X-Forwarded-For` is honoured as well as the proto, with no forward limit. Otherwise
+    ADR-010's per-IP sign-in limit would count Caddy, and ten sign-ins a minute would be the
+    whole site's allowance. Tested.
+- **010 · CP1 · decision 2 needed a code change, and the spec's migrate command cannot run
+  (pending human).**
+  - `Program.cs` migrated on every boot by default. `appsettings.Production.json` now sets
+    `Database:MigrateOnStartup` to false. Development, E2E and the test hosts still migrate
+    on startup.
+  - The spec's `docker compose run --rm api dotnet ef database update` needs the SDK and
+    `dotnet-ef`, and the runtime image has neither. The published app now takes a `migrate`
+    argument that applies the migrations and exits before serving: `docker compose run --rm
+    api migrate`. It runs the same `MigrateAsync` as Development. An EF migration bundle
+    was the alternative, but it is a second artifact whose tool version must match.
+- **010 · CP1 · `Google:*` and `DataProtection:*` from `__` environment variables: no new
+  code or test.** `WebApplication.CreateBuilder` already reads them. A test that sets
+  process-wide environment variables would race the parallel suite. The container boot
+  proves it instead: the boot refuses to start without either, and CP2's container started
+  with both coming only from the env file.
+- **010 · CP1 · counts.** .NET 957 → 962, web 173. `verify.sh` green first time.
+- **010 · CP1 · commit size.** a79f260 (the two test files) is 220 lines, over ~200.
+
+## 010 · checkpoint 2
+
+- **010 · CP2 · no ADR conflict.** ADR-001 (one machine, built on the server), ADR-004 (one
+  process) and ADR-005 (Tunnel, no port published) are unchanged.
+- **010 · CP2 · deviations from the spec's text (pending human):**
+  - **Caddyfile:** a global `servers { trusted_proxies static private_ranges }` was added.
+    Without it, Caddy overwrites cloudflared's `X-Forwarded-Proto: https` with its own
+    `http`, and CP1's fix never sees https. The rest is the spec's block.
+  - **`webdist` is a bind mount of `deploy/webdist`, not a named volume.** A named volume
+    cannot receive the host's build without an extra copy container. `deploy/webdist/` is
+    git-ignored.
+  - **Health check:** it uses bash's `/dev/tcp` instead of curl. The runtime image has no
+    HTTP client, and `apt` would add a layer (in this sandbox, `apt` cannot reach the
+    plain-HTTP mirrors at all).
+  - `DataProtection__KeysPath=/keys` and the known network are **pinned in the compose
+    file**, over `.env`, so a typo in `.env` cannot move the key ring off the volume.
+- **010 · CP2 · spec-silent choices (pending human):**
+  - Compose project `name: finance` and network `172.30.0.0/24`. Pick another if the
+    instance already uses that range.
+  - `cloudflare/cloudflared:latest` is not pinned, as in ARCHITECTURE. Pin a version once
+    it works.
+  - `.dockerignore` lives next to the Dockerfile (`Dockerfile.api.dockerignore`, a BuildKit
+    feature, the default builder since Docker 23).
+- **010 · CP2 · `deploy/.env.example` (placeholders only).**
+  - It follows the spec's `.env`: database and user `finance`. Dev and ARCHITECTURE use
+    `financas`/`dev`.
+  - Additions:
+    - `GSS Encryption Mode=Disable`: Npgsql probes for `libgssapi_krb5`, which the image
+      lacks, and logs an error.
+    - `Ai__Provider=anthropic` instead of empty: an empty value fails the boot.
+    - `AGE_PUBLIC_KEY` for backup.sh.
+  - It lists the two fake switches as must-be-absent.
+- **010 · CP2 · timeouts on the suggest path (009's note; pending human, nothing changed).**
+  - Caddy's `reverse_proxy` has no response timeout by default.
+  - Cloudflare's proxy read timeout is **100 s** (error 524), and it cannot be raised below
+    Enterprise.
+  - A 200-row suggest is up to 5 batches × 30 s = 150 s in the worst case. Real batches
+    should take seconds, but a worst case gives a 524, and the web shows 003's English
+    "Request failed (524)".
+  - Options: accept it, cap the rows per request, or make suggest a job like the analysis.
+    Check through the tunnel in 009's manual step 3.
+- **010 · CP2 · container timezone still unset (006, pending human).** The containers run in
+  UTC, so the nightly sync's `0 3 * * *` fires at 00:00 in Brasília. Set `TZ` on `api`, or
+  rewrite the cron in UTC. The first boot runs a sync at once (no run in 26 h), by 006's
+  design.
+- **010 · CP2 · validated locally (Docker 29.3, amd64):**
+  - The image builds for amd64. It also builds for **arm64** under QEMU (4 min), after
+    mounting `binfmt_misc` and registering `qemu-aarch64` in this sandbox. That arm64 image
+    boots on aarch64.
+  - Sandbox only, with the Dockerfile unchanged: the sandbox's TLS-intercepting egress
+    needed `--build-context` to swap the SDK base for a copy trusting its CA, plus
+    `--network host`. Docker Hub answered 429 for `caddy`, `node` and `binfmt`, so they came
+    from `mirror.gcr.io` and were tagged locally.
+  - The stack came up with postgres, api and caddy. cloudflared was never started, since
+    there is no tunnel.
+  - What was checked on it: the migrate step, `https` redirect_uri through Caddy, non-root
+    `app` user, keys on the volume kept across a restart, memory limits enforced (1 GiB,
+    512 MiB), no published port, and both fake switches refusing the boot (exit 255 with the
+    message).
+- **010 · CP2 · commit size.** afec144 is 210 lines, over ~200.
+
+## 010 · checkpoint 3
+
+- **010 · CP3 · `deploy.sh` departs from the spec's sketch (pending human):**
+  - **The web is built in a `node:22-alpine` container.** The runbook installs only Docker,
+    so the spec's host `npm ci` would fail at step 7.
+  - The build goes to `webdist.next`, and is **published only after `up -d`**. A failed
+    migration then leaves the old web and the old API serving together. It is published in
+    place (emptied and refilled), because Caddy bind-mounts the directory.
+  - **`git pull --ff-only` only on a branch.** Decision 8's rollback checks out a tag, which
+    is a detached HEAD, where the spec's unconditional pull fails.
+  - **It re-executes the freshly checked-out `deploy.sh`** after the git step. Otherwise
+    the steps after git run the old copy of the script.
+  - Guards: the env file must be `chmod 600`, set no fake switch, and have `App__Origin`.
+  - `compose build --pull`, then `docker image prune` at the end.
+  - Smoke runs against `App__Origin`, which is the whole Cloudflare → Caddy → API chain. If
+    Cloudflare's bot protection challenges curl, the smoke fails there.
+- **010 · CP3 · `smoke.sh`.**
+  - It first waits up to 60 s for `/health` (`SMOKE_WAIT_SECONDS`).
+  - The dev-login POST carries `Origin: <base>`, so the origin check passes and routing
+    answers the 404.
+  - Checked against the local production stack (passes), and against a Development API
+    and a dead port (fail).
+- **010 · CP3 · `backup.sh` (pending human):**
+  - **The spec says to put the public key in `backup.sh`.** It reads `AGE_PUBLIC_KEY` from
+    the environment or `.env` instead. Editing a tracked script on the server would dirty
+    the checkout and block `git pull`.
+  - Remote `backup:finance-backup` (the runbook's), with `daily/`, `weekly/` (Sundays) and
+    `monthly/` (the 1st), in UTC. Pruned with `--min-age 7d`, `4w` and `6M`, only after
+    the day's upload succeeded. No local copy is kept (ARCHITECTURE's sketch kept 2 days in
+    `/tmp`).
+  - Runbook step 10's path becomes `backup:finance-backup/daily/<latest>`. Add
+    **`--no-owner`** to its `pg_restore`: the dump's owner role `finance` does not exist in a
+    bare `postgres` container.
+  - The cron user must be in the `docker` group, and `/var/log/finance-backup.log` must be
+    writable by it.
+- **010 · CP3 · `scripts/verify-deploy.sh` (added; the spec has no such script).** It is a
+  repeatable local check of test plan 1–2, not run by `verify.sh`.
+  - It checks the migrate step, the smoke, the fake switches and the key ring across a
+    restart.
+  - It also runs a backup with rclone stubbed and a throwaway age key, decrypts it, and
+    restores it into a scratch database with the same 8 migrations.
+  - `VERIFY_API_IMAGE` takes a prebuilt image. Do not run it on the server, because it pins
+    the same subnet.
+  - Green twice here, with the sandbox-built image.
+- **010 · CP3 · `deploy.sh` was dry-run, not run for real.** The runs were in a scratch
+  clone with a logging `docker` shim. They covered both guards, the branch and the tag,
+  the re-exec, a failed migrate stopping before `up -d` with the old web still live, and
+  the web published in the same inode.
+  - Its real Docker commands are the ones `verify-deploy.sh` runs, except
+    `build --pull` and the Node container build.
+  - The Node build ran on its own in a clone. It needed sandbox proxy settings to reach
+    npm; on the server it needs none.
+- **010 · CP3 · lint.** `bash -n` and shellcheck 0.11 (installed in the scratchpad, not
+  committed) are clean on all four scripts.
+
+## 010 · handoff
+
+Full handoff: `docs/handoffs/010.md`. **010 is complete in code (automated test plan 1–5
+covered); nothing has been deployed.** These need a human:
+
+- **Runbook steps 1–12** on the real instance, including the required restore drill (step
+  10, with `--no-owner` and the `daily/` path). Changes from the spec's text are listed in the
+  handoff.
+- **Confirm or overturn** the CP1–CP3 decisions above: the `migrate` argument, Caddy's
+  `trusted_proxies`, `X-Forwarded-For`, the subnet, the bind-mounted `webdist`, the Node
+  container build, the deploy order, the key in `.env`, and the backup layout.
+- **Open:** the container `TZ` (from 006), and suggest's worst case against Cloudflare's
+  100 s (from 009).
+- **ARCHITECTURE.md's deploy text** needs updating once it has shipped (a DoD item; flagged,
+  not edited).
+- **The whole run 005–010:** see the handoff's last section.
