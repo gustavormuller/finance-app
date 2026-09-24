@@ -8,6 +8,8 @@
  * independently and assert against the real endpoints.
  */
 
+import type { AuthenticatedUser } from '@/auth/useMe';
+
 export type AccountType = 'Checking' | 'Savings' | 'CreditCard' | 'Cash' | 'Investment';
 
 /** `Transfer` (005) moves money between the user's own accounts: any sign, never income or expense. */
@@ -103,6 +105,13 @@ export type StagedRowStatus = 'Ready' | 'Duplicate' | 'Invalid';
 
 export type SignMode = 'Signed' | 'SignedInverted' | 'DebitCredit';
 
+/**
+ * Which rung of the cascade chose a staged row's category (009): `Default` is the sign
+ * default, the only rows "Sugerir com IA" sends; `Ai` came from that; `User` was picked
+ * by hand in the preview.
+ */
+export type CategorySource = 'None' | 'History' | 'Default' | 'Ai' | 'User';
+
 /** The cultures the API's amount parser knows. Case-sensitive, stored as written. */
 export type AmountCulture = 'pt-BR' | 'en-US';
 
@@ -182,6 +191,7 @@ export interface StagedRow {
   rawDescription: string;
   externalId: string | null;
   categoryId: string | null;
+  categorySource: CategorySource;
   status: StagedRowStatus;
   included: boolean;
   issues: string[];
@@ -225,6 +235,12 @@ export interface CommitResult {
 
 export interface UndoResult {
   deleted: number;
+}
+
+/** `suggested`: rows the AI moved off the default; `skipped`: rows sent and left as they were. */
+export interface SuggestResult {
+  suggested: number;
+  skipped: number;
 }
 
 // ---- 005: dashboard -----------------------------------------------------------
@@ -464,6 +480,34 @@ export interface AssetReturns extends Returns {
   fx: FxSplit | null;
 }
 
+// ---- 009: AI -------------------------------------------------------------------
+
+export type AnalysisStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
+
+/**
+ * One month's analysis. `content` is the provider's markdown, only when `Completed`, and
+ * untrusted: render it with `Markdown`, never as HTML. `error` is pt-BR, only when `Failed`.
+ */
+export interface AiAnalysis {
+  id: string;
+  month: string;
+  status: AnalysisStatus;
+  content: string | null;
+  error: string | null;
+  promptVersion: string;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+/** The month's AI spend against the cap. `spentBrl` has up to 4 places; display only. */
+export interface AiUsage {
+  month: string;
+  spentBrl: number;
+  budgetBrl: number;
+  calls: number;
+}
+
 /**
  * A refusal from the API, with the offending fields a 400 names and, for the 409 an
  * upload gets while another import is open, the id of that import.
@@ -602,6 +646,20 @@ export const api = {
   discardImport: (id: string) => request<void>(`/api/imports/${id}`, { method: 'DELETE' }),
 
   undoImport: (id: string) => request<UndoResult>(`/api/imports/${id}/undo`, { method: 'POST' }),
+
+  suggestCategories: (id: string) =>
+    request<SuggestResult>(`/api/imports/${id}/suggest`, { method: 'POST' }),
+
+  /** Answers the whole of `GET /api/auth/me`, so the caller can put it straight in the cache. */
+  updateMe: (input: { aiEnabled: boolean }) =>
+    request<AuthenticatedUser>('/api/auth/me', { method: 'PATCH', body: JSON.stringify(input) }),
+
+  requestAnalysis: (month: string) =>
+    request<{ analysisId: string }>('/api/ai/analyses', { method: 'POST', body: JSON.stringify({ month }) }),
+
+  listAnalyses: (month: string) => request<AiAnalysis[]>(`/api/ai/analyses?${searchParams({ month })}`),
+
+  aiUsage: () => request<AiUsage>('/api/ai/usage'),
 
   dashboardSummary: (month: string) =>
     request<DashboardSummary>(`/api/dashboard/summary?${searchParams({ month })}`),

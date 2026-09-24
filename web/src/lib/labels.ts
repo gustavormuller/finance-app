@@ -1,7 +1,9 @@
 import type {
   AccountType,
   AmountCulture,
+  AnalysisStatus,
   CategoryKind,
+  CategorySource,
   ImportBatchStatus,
   ImportSource,
   MarketAssetClass,
@@ -59,6 +61,22 @@ export const stagedRowStatusLabels: Record<StagedRowStatus, string> = {
   Ready: 'Pronta',
   Duplicate: 'Duplicada',
   Invalid: 'Inválida',
+};
+
+/** Which rung chose a staged row's category (009). The preview only marks `Ai`. */
+export const categorySourceLabels: Record<CategorySource, string> = {
+  None: 'Sem categoria',
+  History: 'Pelo histórico',
+  Default: 'Categoria padrão',
+  Ai: 'Sugerida pela IA',
+  User: 'Escolhida por você',
+};
+
+export const analysisStatusLabels: Record<AnalysisStatus, string> = {
+  Pending: 'Na fila',
+  Running: 'Gerando',
+  Completed: 'Concluída',
+  Failed: 'Falhou',
 };
 
 export const signModeLabels: Record<SignMode, string> = {
