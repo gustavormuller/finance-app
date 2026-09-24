@@ -4,7 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PortfolioSummary, Position } from '@/api/finance';
+import type { MarketAsset, PortfolioSummary, Position } from '@/api/finance';
 import { routeTree } from '@/routeTree';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
@@ -70,6 +70,15 @@ const summary: PortfolioSummary = { totalBrl: 14510, totalCostBrl: 11212.34, unr
 function stubInvestments(positions: () => Position[], extra: (request: SeenRequest, url: URL) => { status?: number; body?: unknown } | undefined = () => undefined) {
   return stubFetch((request) => {
     const url = new URL(request.url, 'http://localhost');
+    const answer = extra(request, url);
+    if (answer) {
+      return answer;
+    }
+
+    // The detail page a successful add opens: nothing recorded yet.
+    if (request.method === 'GET' && /^\/api\/investments\/assets\/[^/]+\/(movements|daily)$/.test(url.pathname)) {
+      return { body: [] };
+    }
 
     switch (`${request.method} ${url.pathname}`) {
       case 'GET /api/auth/me':
@@ -81,7 +90,7 @@ function stubInvestments(positions: () => Position[], extra: (request: SeenReque
       case 'GET /api/market-data/assets':
         return { body: [] };
       default:
-        return extra(request, url);
+        return undefined;
     }
   });
 }
@@ -182,5 +191,138 @@ describe('InvestmentsPage: positions', () => {
     renderAt('/investments');
 
     expect(await screen.findByText('Nenhuma posição em aberto.')).toBeInTheDocument();
+  });
+});
+
+const petr4Market: MarketAsset = {
+  id: 'm-petr4',
+  ticker: 'PETR4',
+  name: 'Petrobras PN',
+  class: 'StockBr',
+  currency: 'BRL',
+  provider: 'Brapi',
+  providerSymbol: 'PETR4',
+  isActive: true,
+  lastSyncedAt: null,
+  createdAt: '2026-09-01T12:00:00Z',
+};
+
+const added: Position = { ...justAdded, assetId: 'a-petr4', ticker: 'PETR4', name: 'Petrobras PN' };
+
+describe('InvestmentsPage: adding an asset', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('adds an asset found in the catalogue and opens it', async () => {
+    let positions: Position[] = [];
+    const seen = stubInvestments(
+      () => positions,
+      (request, url) => {
+        if (request.method === 'GET' && url.pathname === '/api/market-data/assets' && url.searchParams.get('q') === 'petr') {
+          return { body: [petr4Market] };
+        }
+        if (request.method === 'POST' && url.pathname === '/api/investments/assets') {
+          positions = [added];
+          return { status: 201, body: added };
+        }
+        return undefined;
+      },
+    );
+    const router = renderAt('/investments');
+
+    await userEvent.type(await screen.findByLabelText('Buscar no catálogo'), 'petr');
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    const result = await screen.findByTestId('catalogue-result-m-petr4');
+    expect(result).toHaveTextContent('Petrobras PN');
+    expect(result).toHaveTextContent('Ação (B3)');
+
+    await userEvent.click(within(result).getByRole('button', { name: 'Adicionar' }));
+
+    expect(await screen.findByRole('heading', { name: 'PETR4' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/investments/a-petr4');
+    expect(seen.find((request) => request.method === 'POST')?.body).toEqual({ marketAssetId: 'm-petr4' });
+  });
+
+  it('says when the search finds nothing', async () => {
+    stubInvestments(() => []);
+    renderAt('/investments');
+
+    await userEvent.type(await screen.findByLabelText('Buscar no catálogo'), 'xyz');
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+
+    expect(await screen.findByText('Nenhum ativo corresponde a esta busca. Cadastre-o abaixo.')).toBeInTheDocument();
+  });
+
+  it('registers a ticker missing from the catalogue and adds it in one step', async () => {
+    let positions: Position[] = [];
+    const seen = stubInvestments(
+      () => positions,
+      (request, url) => {
+        if (request.method === 'POST' && url.pathname === '/api/investments/assets') {
+          positions = [added];
+          return { status: 201, body: added };
+        }
+        return undefined;
+      },
+    );
+    const router = renderAt('/investments');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Cadastrar novo ativo' }));
+    const form = screen.getByRole('form', { name: 'Cadastrar e adicionar ativo' });
+    await userEvent.type(within(form).getByLabelText('Ticker'), 'PETR4');
+    await userEvent.selectOptions(within(form).getByLabelText('Classe'), 'StockBr');
+    await userEvent.selectOptions(within(form).getByLabelText('Provedor'), 'Brapi');
+    await userEvent.type(within(form).getByLabelText('Símbolo no provedor'), 'PETR4');
+    await userEvent.selectOptions(within(form).getByLabelText('Moeda'), 'BRL');
+    await userEvent.click(within(form).getByRole('button', { name: 'Cadastrar e adicionar' }));
+
+    expect(await screen.findByRole('heading', { name: 'PETR4' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/investments/a-petr4');
+    expect(seen.find((request) => request.method === 'POST')?.body).toEqual({
+      ticker: 'PETR4',
+      name: '',
+      class: 'StockBr',
+      provider: 'Brapi',
+      providerSymbol: 'PETR4',
+      currency: 'BRL',
+    });
+  });
+
+  it('shows a 400 under the field it names and a 409 verbatim', async () => {
+    const currency = 'Ativos do CoinGecko são cotados em USD.';
+    const held = 'Você já possui este ativo na carteira.';
+    let answer: { status: number; body: unknown } = {
+      status: 400,
+      body: { title: 'One or more validation errors occurred.', errors: { currency: [currency] } },
+    };
+    stubInvestments(
+      () => [petr4],
+      (request, url) => {
+        if (request.method === 'GET' && url.pathname === '/api/market-data/assets' && url.searchParams.get('q') === 'petr') {
+          return { body: [petr4Market] };
+        }
+        return request.method === 'POST' && url.pathname === '/api/investments/assets' ? answer : undefined;
+      },
+    );
+    renderAt('/investments');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Cadastrar novo ativo' }));
+    const form = screen.getByRole('form', { name: 'Cadastrar e adicionar ativo' });
+    await userEvent.type(within(form).getByLabelText('Ticker'), 'BTC');
+    await userEvent.selectOptions(within(form).getByLabelText('Provedor'), 'CoinGecko');
+    await userEvent.type(within(form).getByLabelText('Símbolo no provedor'), 'bitcoin');
+    await userEvent.click(within(form).getByRole('button', { name: 'Cadastrar e adicionar' }));
+
+    const currencyField = within(form).getByLabelText('Moeda').closest('div')!;
+    expect(await within(currencyField).findByText(currency)).toBeInTheDocument();
+    expect(screen.queryByText('One or more validation errors occurred.')).not.toBeInTheDocument();
+
+    answer = { status: 409, body: { title: 'Conflict', detail: held } };
+    await userEvent.type(screen.getByLabelText('Buscar no catálogo'), 'petr');
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    await userEvent.click(within(await screen.findByTestId('catalogue-result-m-petr4')).getByRole('button', { name: 'Adicionar' }));
+
+    expect(await screen.findByText(held)).toBeInTheDocument();
   });
 });
