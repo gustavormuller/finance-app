@@ -28,6 +28,34 @@ public sealed class MarketDataOptions
     public CoinGeckoOptions CoinGecko { get; set; } = new();
 
     public TwelveDataOptions TwelveData { get; set; } = new();
+
+    public MarketDataResilienceOptions Resilience { get; set; } = new();
+}
+
+/// <summary>
+/// Each provider's own retry and circuit breaker (006, decision 4). Every provider has its
+/// own instance, so brapi down never opens CoinGecko's circuit.
+/// </summary>
+public sealed class MarketDataResilienceOptions
+{
+    /// <summary>Retries after the first attempt, for a 5xx, a 408, a timeout or a network failure. Never for a 429.</summary>
+    public int RetryAttempts { get; set; } = 3;
+
+    /// <summary>The first retry's delay; each next one doubles it, with jitter.</summary>
+    public TimeSpan RetryBaseDelay { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>Attempts that, all failing inside <see cref="SamplingDuration"/>, open the circuit.</summary>
+    public int FailuresToBreak { get; set; } = 5;
+
+    public TimeSpan SamplingDuration { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>How long an open circuit answers without calling the provider.</summary>
+    public TimeSpan BreakDuration { get; set; } = TimeSpan.FromMinutes(5);
+
+    public TimeSpan AttemptTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>One call, retries included. Replaces <see cref="HttpClient.Timeout"/>, which is switched off.</summary>
+    public TimeSpan TotalTimeout { get; set; } = TimeSpan.FromMinutes(3);
 }
 
 /// <summary>BCB SGS. <see cref="BaseUrl"/> is a prefix the series code is appended to.</summary>
