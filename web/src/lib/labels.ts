@@ -5,6 +5,7 @@ import type {
   ImportBatchStatus,
   ImportSource,
   MarketAssetClass,
+  MovementKind,
   ProviderKind,
   SignMode,
   StagedRowStatus,
@@ -123,6 +124,16 @@ export const syncRunStatusLabels: Record<SyncRunStatus, string> = {
   PartialFailure: 'Concluída com falhas',
   Failed: 'Falhou',
 };
+
+export const movementKindLabels: Record<MovementKind, string> = {
+  Buy: 'Compra',
+  Sell: 'Venda',
+  Dividend: 'Dividendo',
+  Jcp: 'JCP',
+  Split: 'Desdobramento',
+};
+
+export const movementKinds: MovementKind[] = ['Buy', 'Sell', 'Dividend', 'Jcp', 'Split'];
 
 /**
  * `2026-09-13` as `13/09/2026`.

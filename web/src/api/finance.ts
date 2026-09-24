@@ -332,6 +332,80 @@ export interface SyncRun {
   summary: Record<string, ProviderSyncSummary>;
 }
 
+// ---- 007: investments -----------------------------------------------------------
+
+export type MovementKind = 'Buy' | 'Sell' | 'Dividend' | 'Jcp' | 'Split';
+
+/**
+ * One held asset (`GET /api/investments/assets`). Figures are numbers for the reason
+ * `Transaction.amount` gives, and are only displayed. The valuation, `price` through
+ * `unrealisedPct`, is null until the asset has a daily row; `realisedBrl` and
+ * `dividendsBrl` are null for a USD asset while no USDBRL rate exists.
+ */
+export interface Position {
+  assetId: string;
+  ticker: string;
+  name: string;
+  class: MarketAssetClass;
+  currency: string;
+  nickname: string | null;
+  quantity: number;
+  averageCost: number;
+  price: number | null;
+  priceDate: string | null;
+  valueBrl: number | null;
+  costBasisBrl: number | null;
+  unrealisedBrl: number | null;
+  unrealisedPct: number | null;
+  realisedBrl: number | null;
+  dividendsBrl: number | null;
+}
+
+export interface PortfolioSummary {
+  totalBrl: number;
+  totalCostBrl: number;
+  unrealisedBrl: number;
+}
+
+/** Either a catalogue entry already there, or 006's registration body. */
+export type AddAssetInput = { marketAssetId: string } | MarketAssetInput;
+
+export interface Movement {
+  id: string;
+  assetId: string;
+  date: string;
+  kind: MovementKind;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  fees: number;
+  currency: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+/** `currency` is omitted: the API takes the asset's. */
+export interface MovementInput {
+  date: string;
+  kind: MovementKind;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  fees: number;
+  notes: string | null;
+}
+
+export interface DailyRow {
+  date: string;
+  quantity: number;
+  averageCost: number;
+  price: number;
+  priceDate: string;
+  fxRate: number;
+  valueBrl: number;
+  costBasisBrl: number;
+}
+
 /**
  * A refusal from the API, with the offending fields a 400 names and, for the 409 an
  * upload gets while another import is open, the id of that import.
@@ -489,6 +563,27 @@ export const api = {
 
   triggerSync: () =>
     request<{ syncRunId: string }>('/api/market-data/sync', { method: 'POST', body: JSON.stringify({}) }),
+
+  listPositions: () => request<Position[]>('/api/investments/assets'),
+
+  portfolioSummary: () => request<PortfolioSummary>('/api/investments/summary'),
+
+  addAsset: (input: AddAssetInput) =>
+    request<Position>('/api/investments/assets', { method: 'POST', body: JSON.stringify(input) }),
+
+  removeAsset: (id: string) => request<void>(`/api/investments/assets/${id}`, { method: 'DELETE' }),
+
+  listMovements: (assetId: string) => request<Movement[]>(`/api/investments/assets/${assetId}/movements`),
+
+  createMovement: (assetId: string, input: MovementInput) =>
+    request<Movement>(`/api/investments/assets/${assetId}/movements`, { method: 'POST', body: JSON.stringify(input) }),
+
+  updateMovement: (id: string, input: MovementInput) =>
+    request<Movement>(`/api/investments/movements/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  deleteMovement: (id: string) => request<void>(`/api/investments/movements/${id}`, { method: 'DELETE' }),
+
+  listDaily: (assetId: string) => request<DailyRow[]>(`/api/investments/assets/${assetId}/daily`),
 
   listCsvTemplates: () => request<CsvTemplate[]>('/api/csv-templates'),
 
