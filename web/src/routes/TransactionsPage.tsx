@@ -131,6 +131,8 @@ export default function TransactionsPage() {
                     // Shown unsigned: the field never carries a sign, in either
                     // direction.
                     amount: Math.abs(editing.amount).toFixed(2),
+                    // Only read for a Transfer, whose sign the user chose.
+                    direction: editing.amount < 0 ? 'out' : 'in',
                     date: editing.date,
                     description: editing.description,
                   },

@@ -170,7 +170,8 @@ export default function PreviewStep({
 
 /**
  * Only categories whose kind agrees with the row's sign are offered: the API
- * refuses the others (003, rule 3), so there is no point listing them.
+ * refuses the others (003, rule 3), so there is no point listing them. A Transfer
+ * category takes either sign (005), so it is offered on every row.
  */
 function CategoryCell({
   row,
@@ -200,7 +201,7 @@ function CategoryCell({
       onChange={(event) => onPatchRow(row, { categoryId: event.target.value })}
     >
       {categories
-        .filter((category) => category.kind === kind)
+        .filter((category) => category.kind === kind || category.kind === 'Transfer')
         .map((category) => (
           <option key={category.id} value={category.id}>
             {category.name}

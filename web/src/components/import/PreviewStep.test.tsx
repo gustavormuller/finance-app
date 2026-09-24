@@ -123,7 +123,11 @@ describe('PreviewStep', () => {
     expect(onPatchRow).toHaveBeenCalledWith(expect.objectContaining({ id: 'r2' }), { include: true });
   });
 
-  it('offers only categories of the kind that agrees with the sign', () => {
+  /**
+   * A Transfer category takes any sign (005 amendment 1), so Transferência is offered
+   * next to the kind the sign implies, on a leaving row and an arriving one alike.
+   */
+  it('offers only categories of the kind that agrees with the sign, plus Transfer', () => {
     renderStep([
       row({ id: 'r1', rowNumber: 1, status: 'Ready', amount: -10 }),
       row({ id: 'r2', rowNumber: 2, status: 'Ready', amount: 10, categoryId: 'cat-income' }),
@@ -135,28 +139,11 @@ describe('PreviewStep', () => {
     expect(Array.from(expense.querySelectorAll('option')).map((option) => option.textContent)).toEqual([
       'Alimentação',
       'Outros',
+      'Transferência',
     ]);
     expect(Array.from(income.querySelectorAll('option')).map((option) => option.textContent)).toEqual([
       'Outras receitas',
+      'Transferência',
     ]);
-  });
-
-  /**
-   * 005 amendment 1. A transfer takes any sign, so Transferência is offered next to
-   * the kind the sign implies, on a leaving row and an arriving one alike.
-   */
-  it('offers a Transfer category whatever the row sign', () => {
-    renderStep([
-      row({ id: 'r1', rowNumber: 1, status: 'Ready', amount: -3000 }),
-      row({ id: 'r2', rowNumber: 2, status: 'Ready', amount: 3000, categoryId: 'cat-income' }),
-    ]);
-
-    const options = (rowNumber: number) =>
-      [...screen.getByLabelText(`Categoria da linha ${rowNumber}`).querySelectorAll('option')].map(
-        (option) => option.textContent,
-      );
-
-    expect(options(1)).toEqual(['Alimentação', 'Outros', 'Transferência']);
-    expect(options(2)).toEqual(['Outras receitas', 'Transferência']);
   });
 });
