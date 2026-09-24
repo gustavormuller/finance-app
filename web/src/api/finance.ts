@@ -10,7 +10,8 @@
 
 export type AccountType = 'Checking' | 'Savings' | 'CreditCard' | 'Cash' | 'Investment';
 
-export type CategoryKind = 'Income' | 'Expense';
+/** `Transfer` (005) moves money between the user's own accounts: any sign, never income or expense. */
+export type CategoryKind = 'Income' | 'Expense' | 'Transfer';
 
 export interface Account {
   id: string;

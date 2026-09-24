@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { api, type Category, type CategoryInput, type CategoryKind } from '@/api/finance';
 import Alert from '@/components/Alert';
-import { categoryKindLabels, categoryKindPlurals } from '@/lib/labels';
+import { categoryKindLabels, categoryKindPlurals, categoryKinds } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -97,8 +97,11 @@ export default function CategoriesPage() {
               className={selectClasses}
               defaultValue={editing?.kind ?? 'Expense'}
             >
-              <option value="Income">{categoryKindLabels.Income}</option>
-              <option value="Expense">{categoryKindLabels.Expense}</option>
+              {categoryKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {categoryKindLabels[kind]}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -134,7 +137,7 @@ export default function CategoriesPage() {
 
       {failure && <Alert>{failure}</Alert>}
 
-      {(['Income', 'Expense'] as const).map((kind) => (
+      {categoryKinds.map((kind) => (
         <div key={kind} className="mb-8">
           <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-[0.1em] uppercase">
             {categoryKindPlurals[kind]}

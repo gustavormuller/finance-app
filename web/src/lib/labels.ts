@@ -26,13 +26,18 @@ export const accountTypeLabels: Record<AccountType, string> = {
 export const categoryKindLabels: Record<CategoryKind, string> = {
   Income: 'Receita',
   Expense: 'Despesa',
+  Transfer: 'Transferência',
 };
 
 /** Plural, for the headings that group a whole list by kind. */
 export const categoryKindPlurals: Record<CategoryKind, string> = {
   Income: 'Receitas',
   Expense: 'Despesas',
+  Transfer: 'Transferências',
 };
+
+/** The order kinds are offered and grouped in, everywhere a list of them appears. */
+export const categoryKinds: CategoryKind[] = ['Income', 'Expense', 'Transfer'];
 
 export const importSourceLabels: Record<ImportSource, string> = {
   Ofx: 'OFX',
