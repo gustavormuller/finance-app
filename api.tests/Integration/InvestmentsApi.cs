@@ -1,8 +1,10 @@
 using Finance.Api.Application.MarketData;
+using Finance.Api.Application.Returns;
 using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Finance.Api.Tests.Integration;
 
@@ -23,7 +25,10 @@ internal sealed class InvestmentsApi : IAsyncDisposable
             services.AddSingleton<IBenchmarkProvider>(Bcb);
             if (clock is not null)
             {
-                services.AddSingleton(clock);
+                // Only the returns read the fake "today". The host's own clock stays real,
+                // or the session cookie would be issued already expired.
+                services.AddScoped(provider => new ReturnsQueries(
+                    provider.GetRequiredService<AppDbContext>(), clock, provider.GetRequiredService<IOptions<ReturnsOptions>>()));
             }
         });
     }
@@ -39,7 +44,7 @@ internal sealed class InvestmentsApi : IAsyncDisposable
 
     public FakeBenchmarkProvider Bcb { get; } = new();
 
-    /// <summary>A database of its own, migrated by booting the host; <paramref name="clock"/> replaces the API's.</summary>
+    /// <summary>A database of its own, migrated by booting the host; <paramref name="clock"/> is the returns' "today".</summary>
     public static async Task<InvestmentsApi> StartAsync(
         PostgresFixture postgres, CancellationToken cancellationToken, TimeProvider? clock = null)
     {
