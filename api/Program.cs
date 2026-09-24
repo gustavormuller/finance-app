@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Finance.Api.Application;
 using Finance.Api.Application.Dashboard;
+using Finance.Api.Application.Investments;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
 using Finance.Api.Infrastructure.MarketData;
@@ -40,6 +41,9 @@ builder.Services.AddScoped<DashboardQueries>();
 // nightly job (MarketData:ScheduledSync switches the job off).
 builder.Services.AddMarketDataProviders();
 builder.Services.AddMarketDataSync();
+
+// 007's snapshot rebuild, run by every movement write, POST /rebuild and after the sync.
+builder.Services.AddScoped<SnapshotRebuild>();
 
 var app = builder.Build();
 
