@@ -196,12 +196,12 @@ public sealed class AiPersistenceTests(PostgresFixture postgres)
 
         var suggested = ImportFixtures.AStagedRow(user, batch.Id, rowNumber: 1);
         suggested.CategoryId = categoryId;
+        suggested.CategorySource = CategorySource.Ai;
         var unsourced = ImportFixtures.AStagedRow(user, batch.Id, rowNumber: 2);
 
         await using (var context = Context(user))
         {
             context.StagedTransactions.AddRange(suggested, unsourced);
-            SourceOf(context, suggested).CurrentValue = CategorySource.Ai;
             await context.SaveChangesAsync(cancellationToken);
         }
 
@@ -210,15 +210,9 @@ public sealed class AiPersistenceTests(PostgresFixture postgres)
             var rows = await context.StagedTransactions.OrderBy(row => row.RowNumber).ToListAsync(cancellationToken);
             Assert.Equal(
                 [CategorySource.Ai, CategorySource.None],
-                rows.Select(row => SourceOf(context, row).CurrentValue));
+                rows.Select(row => row.CategorySource));
         }
     }
-
-    // Reached by name until the property is mapped, so the rest of the suite still migrates.
-    private static Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry<StagedTransaction, CategorySource> SourceOf(
-        AppDbContext context,
-        StagedTransaction row) =>
-        context.Entry(row).Property<CategorySource>("CategorySource");
 
     private async Task<(Guid, Guid)> TwoUsersAsync(CancellationToken cancellationToken)
     {

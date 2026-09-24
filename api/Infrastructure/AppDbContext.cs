@@ -1,6 +1,7 @@
 using System.Reflection;
 using Finance.Api.Application;
 using Finance.Api.Domain;
+using Finance.Api.Domain.Ai;
 using Finance.Api.Domain.Identity;
 using Finance.Api.Domain.Import;
 using Finance.Api.Domain.Investments;
@@ -67,6 +68,10 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
 
     public DbSet<PortfolioDaily> PortfolioDaily => Set<PortfolioDaily>();
 
+    public DbSet<AiUsage> AiUsage => Set<AiUsage>();
+
+    public DbSet<AiAnalysis> AiAnalyses => Set<AiAnalysis>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -91,6 +96,7 @@ public class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
         modelBuilder.ConfigureImport();
         modelBuilder.ConfigureMarketData();
         modelBuilder.ConfigureInvestments();
+        modelBuilder.ConfigureAi();
 
         // ADR-007, the part that matters: one loop, not one line per entity. A new
         // user-owned entity is isolated because it implements IUserOwned, not because
