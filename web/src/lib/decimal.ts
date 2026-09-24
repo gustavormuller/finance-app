@@ -98,3 +98,25 @@ export function movementTotal(kind: MovementKind, figures: MovementFigures): big
 
   return divideToEven(total, (SCALE * SCALE) / 100n);
 }
+
+/**
+ * A rate from 008's returns API as a `bigint` of ten-billionths.
+ *
+ * The API rounds every rate to ten places, and JSON hands it over as float64. That
+ * float is within half a ten-billionth of the decimal the API wrote, so `toFixed(10)`
+ * gives that decimal back exactly, and never in exponent form (`String(1.5e-7)` is).
+ */
+export function rateUnits(rate: number): bigint {
+  return BigInt(rate.toFixed(RATE_PLACES).replace('.', ''));
+}
+
+const RATE_PLACES = 10;
+
+/**
+ * `a - b` in hundredths of a percentage point, rounded once, half to even: the
+ * difference column of 008's benchmark table. Exact, where `0.3 - 0.1` in float64 is not.
+ */
+export function pointsDifference(a: number, b: number): bigint {
+  // One percentage point is 1e-2 of a rate, so a hundredth of one is 1e-4: 10^6 units.
+  return divideToEven(rateUnits(a) - rateUnits(b), 10n ** BigInt(RATE_PLACES - 4));
+}

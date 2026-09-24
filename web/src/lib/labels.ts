@@ -7,6 +7,7 @@ import type {
   MarketAssetClass,
   MovementKind,
   ProviderKind,
+  ReturnsPeriodKind,
   SignMode,
   StagedRowStatus,
   SyncRunStatus,
@@ -134,6 +135,35 @@ export const movementKindLabels: Record<MovementKind, string> = {
 };
 
 export const movementKinds: MovementKind[] = ['Buy', 'Sell', 'Dividend', 'Jcp', 'Split'];
+
+/**
+ * 008's benchmarks, keyed by the code the returns API sends (DEFERRED, 008 · CP3 and
+ * CP4). The names are the spec's configuration labels.
+ */
+const benchmarkLabels: Record<string, string> = {
+  CDI: 'CDI',
+  SELIC: 'SELIC',
+  IPCA6: 'IPCA + 6%',
+  USDBRL: 'Dólar',
+  IVVB11: 'S&P 500 (IVVB11)',
+};
+
+/** The order benchmarks are listed and drawn in: the spec's configuration order. */
+export const benchmarkCodes = ['CDI', 'SELIC', 'IPCA6', 'USDBRL', 'IVVB11'];
+
+/** A benchmark's name on screen; an unknown code is shown as sent rather than hidden. */
+export function benchmarkLabel(code: string): string {
+  return benchmarkLabels[code] ?? code;
+}
+
+export const returnsPeriodLabels: Record<ReturnsPeriodKind, string> = {
+  inception: 'Desde o início',
+  ytd: 'No ano',
+  '12m': '12 meses',
+  custom: 'Personalizado',
+};
+
+export const returnsPeriods: ReturnsPeriodKind[] = ['inception', 'ytd', '12m', 'custom'];
 
 /**
  * `2026-09-13` as `13/09/2026`.

@@ -406,6 +406,64 @@ export interface DailyRow {
   costBasisBrl: number;
 }
 
+// ---- 008: returns ---------------------------------------------------------------
+
+/** The `period` query value; `custom` takes `from`/`to` (`YYYY-MM-DD`). */
+export type ReturnsPeriodKind = 'inception' | 'ytd' | '12m' | 'custom';
+
+export interface ReturnsQuery {
+  period: ReturnsPeriodKind;
+  from?: string;
+  to?: string;
+}
+
+/** `days` runs from the base day (base 100) to `to`. */
+export interface ReturnsPeriod {
+  from: string;
+  to: string;
+  days: number;
+}
+
+/** Rates are fractions (`0.1234` is 12,34%). `annualised` is null past `decimal`'s range. */
+export interface PeriodReturn {
+  total: number;
+  annualised: number | null;
+}
+
+export interface FxSplit {
+  native: number;
+  fx: number;
+  total: number;
+}
+
+/**
+ * One point of the base-100 chart: `date`, `portfolio`, and a key per benchmark code
+ * that could anchor. A benchmark that is null in `benchmarks` has no key here.
+ */
+export interface ReturnsPoint {
+  date: string;
+  portfolio: number;
+  [code: string]: number | string;
+}
+
+/**
+ * `GET /api/returns/portfolio`. Everything but `benchmarks` and `series` is null when
+ * nothing was held in the period. `benchmarks` is keyed by code, ordered by code.
+ */
+export interface Returns {
+  period: ReturnsPeriod | null;
+  twr: PeriodReturn | null;
+  xirr: number | null;
+  timingEffect: number | null;
+  benchmarks: Record<string, PeriodReturn | null>;
+  series: ReturnsPoint[];
+}
+
+/** `GET /api/returns/assets/{id}`: the same, and the FX split, null for a BRL asset. */
+export interface AssetReturns extends Returns {
+  fx: FxSplit | null;
+}
+
 /**
  * A refusal from the API, with the offending fields a 400 names and, for the 409 an
  * upload gets while another import is open, the id of that import.
@@ -584,6 +642,11 @@ export const api = {
   deleteMovement: (id: string) => request<void>(`/api/investments/movements/${id}`, { method: 'DELETE' }),
 
   listDaily: (assetId: string) => request<DailyRow[]>(`/api/investments/assets/${assetId}/daily`),
+
+  portfolioReturns: (query: ReturnsQuery) => request<Returns>(`/api/returns/portfolio?${searchParams(query)}`),
+
+  assetReturns: (assetId: string, query: ReturnsQuery) =>
+    request<AssetReturns>(`/api/returns/assets/${assetId}?${searchParams(query)}`),
 
   listCsvTemplates: () => request<CsvTemplate[]>('/api/csv-templates'),
 
