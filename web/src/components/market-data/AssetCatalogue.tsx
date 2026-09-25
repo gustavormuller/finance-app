@@ -88,7 +88,7 @@ export default function AssetCatalogue() {
       {assets.isError && <Alert>Não foi possível carregar os ativos.</Alert>}
 
       {assets.data?.length === 0 ? (
-        <p className="text-muted-foreground border-border border-t py-12 text-center text-sm">
+        <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">
           {q ? 'Nenhum ativo corresponde a esta busca.' : 'Nenhum ativo cadastrado ainda.'}
         </p>
       ) : (

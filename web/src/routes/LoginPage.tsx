@@ -17,11 +17,11 @@ export default function LoginPage() {
   const message = error === undefined ? undefined : MESSAGES[error];
 
   return (
-    // Same container as the shell's header, so "Entrar" lines up with the app name
-    // rather than floating in the middle of the page under a left-aligned heading.
-    <section className="mx-auto max-w-5xl px-4 py-16">
-      <div className="max-w-md">
-        <h2 className="text-2xl font-semibold tracking-tight">Entrar</h2>
+    // 012: a single glass card in the middle of the page; the product name stays in
+    // the shell's top bar above it.
+    <section className="px-4 py-10 sm:py-20">
+      <div className="glass mx-auto max-w-md rounded-2xl p-6 sm:p-8">
+        <h2 className="text-3xl font-semibold tracking-tight">Entrar</h2>
 
         <p className="text-muted-foreground mt-2 text-sm">
           Use sua conta Google. Não há senha para criar nem para lembrar.
@@ -30,7 +30,7 @@ export default function LoginPage() {
         {message !== undefined && (
           <p
             role="alert"
-            className="border-destructive/30 bg-destructive/5 text-destructive mt-6 rounded-md border p-3 text-sm"
+            className="border-destructive/30 bg-destructive/5 text-destructive mt-6 rounded-xl border p-3 text-sm"
           >
             {message}
           </p>
@@ -42,7 +42,7 @@ export default function LoginPage() {
         */}
         <a
           href="/api/auth/google"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 mt-6 inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium shadow-xs transition-colors"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 mt-6 inline-flex h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold shadow-sm transition-colors"
         >
           Entrar com o Google
         </a>

@@ -25,7 +25,7 @@ export default function ValueChart({ rows }: { rows: DailyRow[] }) {
       <SectionHeading id="value-heading">Valor ao longo do tempo</SectionHeading>
 
       {rows.length === 0 ? (
-        <p className="border-border text-muted-foreground border-t py-12 text-center text-sm">Sem histórico de valor ainda.</p>
+        <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">Sem histórico de valor ainda.</p>
       ) : (
         <div data-testid="value-chart">
           <div className="h-64 text-xs" aria-hidden="true">

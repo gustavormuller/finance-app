@@ -105,9 +105,9 @@ export default function TransactionsPage() {
     filter.importBatchId !== '';
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Lançamentos</h2>
+    <section className="grid gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-3xl font-semibold tracking-tight">Lançamentos</h2>
 
         {!creating && !editing && (
           <Button onClick={() => setCreating(true)}>Novo lançamento</Button>
@@ -115,7 +115,7 @@ export default function TransactionsPage() {
       </div>
 
       {(creating || editing) && (
-        <div className="border-border mb-8 border-b pb-8">
+        <div className="glass rounded-2xl p-5 sm:p-6">
           <TransactionForm
             accounts={accounts.data ?? []}
             categories={categories.data ?? []}
@@ -143,7 +143,7 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="glass grid grid-cols-2 gap-3 rounded-2xl p-4 sm:grid-cols-4">
         <div className="grid gap-2">
           <Label htmlFor="filter-from">De</Label>
           <Input
@@ -184,7 +184,7 @@ export default function TransactionsPage() {
       </div>
 
       {filter.importBatchId !== '' && (
-        <p className="bg-secondary text-secondary-foreground mb-6 flex items-center justify-between gap-4 rounded-md px-3 py-2 text-sm">
+        <p className="bg-accent text-foreground flex items-center justify-between gap-4 rounded-xl px-4 py-2.5 text-sm">
           <span>Mostrando apenas os lançamentos de uma importação.</span>
           <Link to="/transactions" search={{}} className="underline" onClick={() => page1({ importBatchId: '' })}>
             Mostrar todos
@@ -230,7 +230,7 @@ export default function TransactionsPage() {
                   <Amount value={transaction.amount} />
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-wrap justify-end gap-1">
+                  <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="sm" onClick={() => setEditing(transaction)}>
                       Editar
                     </Button>

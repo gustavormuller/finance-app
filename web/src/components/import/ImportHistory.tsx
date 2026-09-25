@@ -35,12 +35,12 @@ export default function ImportHistory({
 }): React.JSX.Element {
   if (batches.length === 0) {
     return (
-      <p className="text-muted-foreground border-t py-8 text-center text-sm">Nenhuma importação ainda.</p>
+      <p className="text-muted-foreground glass rounded-2xl py-8 text-center text-sm">Nenhuma importação ainda.</p>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -70,7 +70,7 @@ export default function ImportHistory({
               <TableCell className="text-right tabular-nums">{batch.rowCount}</TableCell>
               <TableCell className="text-right tabular-nums">{batch.committedCount ?? '—'}</TableCell>
               <TableCell>
-                <div className="flex flex-wrap justify-end gap-1">
+                <div className="flex justify-end gap-1">
                   {batch.status === 'Staged' ? (
                     <>
                       <Button variant="ghost" size="sm" disabled={busy} onClick={() => onResume(batch)}>

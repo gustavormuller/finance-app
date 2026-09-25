@@ -84,7 +84,7 @@ export default function AddAsset() {
       )}
 
       {results.data && results.data.length > 0 && (
-        <ul className="border-border border-t">
+        <ul className="glass rounded-2xl px-4">
           {results.data.map((asset) => (
             <li key={asset.id} data-testid={`catalogue-result-${asset.id}`} className="border-border flex items-center justify-between gap-4 border-b py-2">
               <span>

@@ -24,7 +24,7 @@ export default function DoneStep({
 }): React.JSX.Element {
   return (
     <div className="grid max-w-xl gap-6">
-      <div className="rounded-lg border p-4">
+      <div className="bg-secondary rounded-xl p-4">
         <p className="text-lg font-semibold" data-testid="commit-summary">
           {result.committed} {result.committed === 1 ? 'lançamento importado' : 'lançamentos importados'}
         </p>

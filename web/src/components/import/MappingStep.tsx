@@ -172,8 +172,8 @@ export default function MappingStep({
             da tabela.
           </p>
         )}
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
+        <div className="overflow-x-auto">
+          <Table bare>
             <TableHeader>
               <TableRow>
                 {columns.map((column) => (
@@ -368,8 +368,8 @@ export default function MappingStep({
 
       <section>
         <h3 className="mb-2 text-base font-semibold">Como será lido</h3>
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
+        <div className="overflow-x-auto">
+          <Table bare>
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>

@@ -85,7 +85,7 @@ export default function Movements({ assetId, currency }: { assetId: string; curr
       {movements.isError && <Alert>Não foi possível carregar as movimentações.</Alert>}
 
       {movements.data?.length === 0 ? (
-        <p className="border-border text-muted-foreground border-t py-12 text-center text-sm">Nenhuma movimentação registrada.</p>
+        <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">Nenhuma movimentação registrada.</p>
       ) : (
         <Table>
           <TableHeader>

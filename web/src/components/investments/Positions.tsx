@@ -40,7 +40,7 @@ export default function Positions() {
 
   if (positions.data.length === 0) {
     return (
-      <p className="border-border text-muted-foreground border-t py-12 text-center text-sm">
+      <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">
         <span className="text-foreground block font-medium">Nenhum ativo na carteira ainda.</span>
         Adicione um ativo abaixo para registrar compras, vendas e proventos.
       </p>
@@ -61,7 +61,7 @@ export default function Positions() {
       )}
 
       {shown.length === 0 ? (
-        <p className="border-border text-muted-foreground border-t py-12 text-center text-sm">Nenhuma posição em aberto.</p>
+        <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">Nenhuma posição em aberto.</p>
       ) : (
         <PositionsTable positions={shown} summary={summary.data} today={today} />
       )}

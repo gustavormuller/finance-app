@@ -307,9 +307,9 @@ export default function ImportPage(): React.JSX.Element {
   );
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Importar</h2>
+    <section className="grid gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-3xl font-semibold tracking-tight">Importar</h2>
         {step.kind !== 'file' && (
           <Button variant="ghost" size="sm" onClick={() => { setFailure(null); setStep({ kind: 'file' }); }}>
             Recomeçar
@@ -317,13 +317,13 @@ export default function ImportPage(): React.JSX.Element {
         )}
       </div>
 
-      <h3 className="text-muted-foreground mb-4 text-sm font-medium tracking-wide uppercase">
+      <h3 className="text-muted-foreground font-sans text-sm font-semibold">
         {STEP_TITLES[step.kind]}
       </h3>
 
       {/* One container for the current step, so its buttons are distinguishable from
           the history's, which offers the same verbs for other batches. */}
-      <div data-testid="import-step">
+      <div data-testid="import-step" className="glass rounded-2xl p-5 sm:p-6">
       {step.kind === 'file' && (
         <FileStep
           accounts={accounts.data ?? []}
@@ -381,8 +381,8 @@ export default function ImportPage(): React.JSX.Element {
       )}
       </div>
 
-      <div className="mt-12">
-        <h3 className="mb-3 text-base font-semibold">Histórico</h3>
+      <div className="grid gap-3">
+        <h3 className="text-lg font-semibold">Histórico</h3>
         <ImportHistory
           batches={history.data ?? []}
           busy={busy}

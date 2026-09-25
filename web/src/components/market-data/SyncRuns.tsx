@@ -54,7 +54,7 @@ export default function SyncRuns() {
       {runs.isError && <Alert>Não foi possível carregar as sincronizações.</Alert>}
 
       {runs.data?.length === 0 ? (
-        <p className="text-muted-foreground border-border border-t py-12 text-center text-sm">
+        <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">
           Nenhuma sincronização ainda.
         </p>
       ) : (

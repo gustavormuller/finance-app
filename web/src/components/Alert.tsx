@@ -10,7 +10,7 @@ export default function Alert({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="border-destructive/30 bg-destructive/5 text-destructive mb-6 rounded-md border p-3 text-sm"
+      className="border-destructive/30 bg-destructive/5 text-destructive mb-6 rounded-xl border p-3 text-sm"
     >
       {children}
     </p>

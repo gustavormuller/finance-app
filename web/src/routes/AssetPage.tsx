@@ -30,14 +30,14 @@ export default function AssetPage() {
   });
 
   return (
-    <section className="mx-auto grid max-w-5xl gap-10 px-4 py-8">
+    <section className="grid gap-6">
       <div>
         <Link to="/investments" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
           ← Investimentos
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">{position?.ticker ?? 'Ativo'}</h2>
+            <h2 className="text-3xl font-semibold tracking-tight">{position?.ticker ?? 'Ativo'}</h2>
             {position && (
               <p className="text-muted-foreground mt-1 text-sm">
                 {position.nickname ?? position.name} · {marketAssetClassLabels[position.class]} · {position.currency}
