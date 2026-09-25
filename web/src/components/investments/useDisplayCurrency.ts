@@ -1,6 +1,6 @@
 import type { UsdBrl } from '@/api/finance';
 import { brlToUsd, useCurrencyChoice, type Currency } from '@/lib/currency';
-import { formatMoney, formatSignedMoney } from '@/lib/money';
+import { formatCompactMoney, formatMoney, formatSignedMoney } from '@/lib/money';
 
 import { usePortfolioSummary } from './queries';
 
@@ -18,6 +18,7 @@ export interface Display {
   convert: (brl: number) => number;
   money: (brl: number) => string;
   signedMoney: (brl: number) => string;
+  compactMoney: (brl: number) => string;
 }
 
 export function displayIn(chosen: Currency, fx: UsdBrl | null, missingRate = false): Display {
@@ -32,6 +33,7 @@ export function displayIn(chosen: Currency, fx: UsdBrl | null, missingRate = fal
     convert,
     money: (brl) => formatMoney(convert(brl), currency),
     signedMoney: (brl) => formatSignedMoney(convert(brl), currency),
+    compactMoney: (brl) => formatCompactMoney(convert(brl), currency),
   };
 }
 

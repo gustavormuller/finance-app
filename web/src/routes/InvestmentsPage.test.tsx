@@ -460,6 +460,101 @@ describe('InvestmentsPage: returns first (016)', () => {
   });
 });
 
+/** A position with a result, for the ranking: its percentage is over its cost. */
+const withResult = (ticker: string, assetClass: Position['class'], unrealisedBrl: number, valueBrl: number): Position => ({
+  ...petr4,
+  assetId: `a-${ticker.toLowerCase()}`,
+  ticker,
+  name: `${ticker} nome`,
+  class: assetClass,
+  valueBrl,
+  costBasisBrl: valueBrl - unrealisedBrl,
+  unrealisedBrl,
+  unrealisedPct: Number((unrealisedBrl / (valueBrl - unrealisedBrl)).toFixed(4)),
+});
+
+/** Ten open positions, a closed one and one not yet valued; MXRF11's loss outweighs four gains. */
+const twelve: Position[] = [
+  withResult('IRFM11', 'EtfBr', 5489.03, 39600),
+  withResult('BTC', 'Crypto', 21145.63, 38790),
+  withResult('IMAB11', 'EtfBr', 5067.15, 38269),
+  withResult('VOO', 'StockUs', 5893.25, 19396),
+  withResult('MXRF11', 'Fii', -3000, 14240),
+  withResult('ITUB4', 'StockBr', 2252.36, 11940),
+  withResult('MSFT', 'StockUs', 2438.93, 10090),
+  withResult('AAPL', 'StockUs', 1773.61, 9350),
+  withResult('BBAS3', 'StockBr', 100, 5000),
+  withResult('WEGE3', 'StockBr', -50, 3000),
+  soldOut,
+  justAdded,
+];
+
+describe('InvestmentsPage: contributions and holdings (016)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Spec 016 web test 8. */
+  it('ranks the eight largest results, gains and losses alike, largest gain first, each linked to its asset', async () => {
+    stubInvestments(() => twelve);
+    renderAt('/investments');
+
+    const card = await screen.findByTestId('contributors');
+    expect(within(card).getByRole('heading', { name: 'O que mais contribuiu' })).toBeInTheDocument();
+    const rows = within(card).getAllByTestId(/^contributor-a-/);
+    expect(rows.map((row) => row.dataset.testid)).toEqual([
+      'contributor-a-btc',
+      'contributor-a-voo',
+      'contributor-a-irfm11',
+      'contributor-a-imab11',
+      'contributor-a-msft',
+      'contributor-a-itub4',
+      'contributor-a-aapl',
+      'contributor-a-mxrf11',
+    ]);
+
+    const btc = within(card).getByTestId('contributor-a-btc');
+    expect(within(btc).getByRole('link', { name: 'BTC' })).toHaveAttribute('href', '/investments/a-btc');
+    expect(btc).toHaveTextContent('Criptomoeda');
+    expect(plain(btc)).toContain('+R$ 21.145,63');
+    expect(plain(btc)).toContain('+119,84% · R$ 39 mil');
+    expect(within(btc).getByTestId('result-bar')).toHaveStyle({ width: '100%' });
+    expect(within(btc).getByText('+R$ 21.145,63')).toHaveClass('text-positive');
+
+    const loss = within(card).getByTestId('contributor-a-mxrf11');
+    expect(within(loss).getByText('-R$ 3.000,00')).toHaveClass('text-negative');
+    expect(plain(loss)).toContain('-17,40% · R$ 14 mil');
+
+    expect(within(card).getByRole('link', { name: 'Todas as 10 posições' })).toHaveAttribute('href', '/investments#posicoes');
+  });
+
+  /** Spec 016 web test 9. */
+  it('shows what is invested, its result over cost, and the allocation by class', async () => {
+    stubInvestments(() => [aapl, petr4]);
+    renderAt('/investments');
+
+    const card = await screen.findByTestId('holdings');
+    expect(within(card).getByRole('heading', { name: 'Patrimônio investido' })).toBeInTheDocument();
+    expect(plain(within(card).getByTestId('holdings-total'))).toBe('R$ 14.510,00');
+    const result = within(card).getByTestId('holdings-result');
+    expect(plain(result)).toBe('+R$ 3.297,66 sobre o custo');
+    expect(result).toHaveClass('text-positive');
+
+    const classes = within(card).getAllByTestId(/^allocation-/);
+    expect(classes.map((item) => plain(item))).toEqual(['Ação (EUA)75,8%R$ 11 mil', 'Ação (B3)24,2%R$ 3,5 mil']);
+    expect(within(card).getByTestId('stacked-allocation').children).toHaveLength(2);
+  });
+
+  it('has neither card while nothing is open', async () => {
+    stubInvestments(() => [soldOut]);
+    renderAt('/investments');
+
+    expect(await screen.findByText('Nenhuma posição em aberto.')).toBeInTheDocument();
+    expect(screen.queryByTestId('contributors')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('holdings')).not.toBeInTheDocument();
+  });
+});
+
 describe('InvestmentsPage: in dollars (016)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -484,6 +579,15 @@ describe('InvestmentsPage: in dollars (016)', () => {
     expect(plain(total)).toContain('US$ 2.638,18');
     expect(plain(total)).toContain('+US$ 599,57');
     expect(plain(screen.getByTestId('currency-note'))).toBe('em dólar · US$ 1 = R$ 5,50 em 23/09');
+
+    const holdings = screen.getByTestId('holdings');
+    expect(plain(within(holdings).getByTestId('holdings-total'))).toBe('US$ 2.638,18');
+    expect(plain(within(holdings).getByTestId('holdings-result'))).toBe('+US$ 599,57 sobre o custo');
+    expect(within(holdings).getAllByTestId(/^allocation-/).map((item) => plain(item))).toEqual([
+      'Ação (EUA)75,8%US$ 2 mil',
+      'Ação (B3)24,2%US$ 638',
+    ]);
+    expect(plain(screen.getByTestId('contributor-a-aapl'))).toContain('+US$ 545,45');
   });
 
   /** Spec 016 web test 5, on the page. */
