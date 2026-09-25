@@ -69,17 +69,19 @@ export default function Movements({ assetId, currency }: { assetId: string; curr
       {failure && <Alert>{failure}</Alert>}
 
       {(creating || editing) && (
-        <MovementForm
-          key={editing?.id ?? 'new'}
-          currency={currency}
-          today={localToday()}
-          movement={editing ?? undefined}
-          errors={errors}
-          pending={save.isPending}
-          submitLabel={editing ? 'Salvar movimentação' : 'Registrar movimentação'}
-          onSubmit={(input) => save.mutate(input)}
-          onCancel={close}
-        />
+        <div className="glass rounded-2xl p-5 sm:p-6">
+          <MovementForm
+            key={editing?.id ?? 'new'}
+            currency={currency}
+            today={localToday()}
+            movement={editing ?? undefined}
+            errors={errors}
+            pending={save.isPending}
+            submitLabel={editing ? 'Salvar movimentação' : 'Registrar movimentação'}
+            onSubmit={(input) => save.mutate(input)}
+            onCancel={close}
+          />
+        </div>
       )}
 
       {movements.isError && <Alert>Não foi possível carregar as movimentações.</Alert>}

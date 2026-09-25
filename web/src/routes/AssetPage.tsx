@@ -102,11 +102,11 @@ function Summary({ position }: { position: Position }) {
   ];
 
   return (
-    <dl data-testid="asset-summary" className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <dl data-testid="asset-summary" className="glass grid grid-cols-2 gap-4 rounded-2xl p-5 sm:grid-cols-4 sm:p-6">
       {items.map(([label, value]) => (
         <div key={label}>
           <dt className="text-muted-foreground text-xs">{label}</dt>
-          <dd className="font-medium tabular-nums">{value}</dd>
+          <dd className="font-display text-lg font-semibold tabular-nums">{value}</dd>
         </div>
       ))}
     </dl>

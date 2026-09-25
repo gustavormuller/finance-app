@@ -52,7 +52,7 @@ export default function AssetCatalogue() {
       <form
         ref={form}
         aria-label="Cadastrar ativo"
-        className="grid gap-4 sm:grid-cols-3"
+        className="glass grid gap-4 rounded-2xl p-5 sm:grid-cols-3 sm:p-6"
         onSubmit={(event) => {
           event.preventDefault();
           register.mutate(readRegistration(event.currentTarget));

@@ -43,13 +43,13 @@ export const showsAnnualised = (period: ReturnsPeriod) => period.days > 365;
 /** A year's rate: `+8,31% a.a.`, or "Sem dados" with no suffix. */
 export const perYear = (rate: number | null) => (rate === null ? formatRate(null) : `${formatRate(rate)} a.a.`);
 
-/** Spec 008 UI: a gain green, a loss the expense colour, zero and no data in ink. */
+/** Spec 008 UI, in 012's tokens: a gain positive, a loss negative, zero and no data in ink. */
 export function signTone(rate: number | null): string | undefined {
   if (rate === null || rate === 0) {
     return undefined;
   }
 
-  return rate > 0 ? 'text-green-700 dark:text-green-500' : 'text-chart-expense';
+  return rate > 0 ? 'text-positive' : 'text-negative';
 }
 
 const indexTick = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });

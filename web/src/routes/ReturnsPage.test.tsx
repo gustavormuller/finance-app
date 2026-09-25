@@ -118,8 +118,8 @@ describe('ReturnsPage', () => {
     expect(timing).toHaveTextContent('Quanto suas decisões de quando aportar ajudaram ou atrapalharam.');
     const value = within(timing).getByTestId('headline-value');
     expect(plain(value)).toBe('-2,12% a.a.');
-    expect(value).toHaveClass('text-chart-expense');
-    expect(value).not.toHaveClass('text-green-700');
+    expect(value).toHaveClass('text-negative');
+    expect(value).not.toHaveClass('text-positive');
   });
 
   /** Spec web unit test 33, a gain from timing. */
@@ -129,8 +129,8 @@ describe('ReturnsPage', () => {
 
     const value = within(await screen.findByTestId('headline-timing')).getByTestId('headline-value');
     expect(plain(value)).toBe('+2,34% a.a.');
-    expect(value).toHaveClass('text-green-700');
-    expect(value).not.toHaveClass('text-chart-expense');
+    expect(value).toHaveClass('text-positive');
+    expect(value).not.toHaveClass('text-negative');
   });
 
   it('shows only the period TWR for a year or less, and XIRR a year\'s rate', async () => {
@@ -169,7 +169,7 @@ describe('ReturnsPage', () => {
     expect(await screen.findByTestId('headline-xirr')).toHaveTextContent('Sem dados');
     const timing = screen.getByTestId('headline-timing');
     expect(timing).toHaveTextContent('Sem dados');
-    expect(within(timing).getByTestId('headline-value')).not.toHaveClass('text-green-700');
+    expect(within(timing).getByTestId('headline-value')).not.toHaveClass('text-positive');
     expect(document.body).not.toHaveTextContent('NaN');
   });
 
