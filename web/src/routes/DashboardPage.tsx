@@ -4,11 +4,13 @@ import { useState } from 'react';
 import type { BreakdownKind } from '@/api/finance';
 import AnalysisCard from '@/components/ai/AnalysisCard';
 import Alert from '@/components/Alert';
+import Card from '@/components/Card';
 import Balances from '@/components/dashboard/Balances';
 import CategoryBreakdown from '@/components/dashboard/CategoryBreakdown';
 import MonthlyChart from '@/components/dashboard/MonthlyChart';
 import MonthTotals from '@/components/dashboard/MonthTotals';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
+import PageHeader from '@/components/PageHeader';
 import { useMonthly, useSummary } from '@/components/dashboard/queries';
 import { currentMonth } from '@/lib/months';
 
@@ -52,34 +54,48 @@ export default function DashboardPage() {
   if (empty) {
     return (
       <Page>
-        <div data-testid="dashboard-empty" className="border-border text-muted-foreground border-t py-16 text-center">
+        <Card as="div" data-testid="dashboard-empty" className="text-muted-foreground py-16 text-center">
           <p className="text-foreground text-sm font-medium">Nada para mostrar ainda</p>
           <p className="mt-1 text-sm">
             O painel se preenche assim que houver contas e lançamentos. Comece por um destes:
           </p>
           <p className="mt-4 flex justify-center gap-4 text-sm">
-            <Link to="/transactions" className="text-foreground underline">
+            <Link to="/transactions" className="text-primary font-semibold hover:underline">
               Registrar um lançamento
             </Link>
-            <Link to="/import" className="text-foreground underline">
+            <Link to="/import" className="text-primary font-semibold hover:underline">
               Importar um extrato
             </Link>
           </p>
-        </div>
+        </Card>
       </Page>
     );
   }
 
   return (
     <Page>
-      <div className="grid gap-10">
-        <Balances summary={summary.data} />
-        <MonthTotals month={month} latest={today} totals={summary.data.month} onMonth={setMonth} />
-        <MonthlyChart series={monthly.data} />
-        <CategoryBreakdown month={month} kind={kind} onKind={setKind} />
-        {/* Keyed by month, so a refusal shown for one month is not carried to the next. */}
-        <AnalysisCard key={month} month={month} />
-        <RecentTransactions />
+      {/* 012: the Obsidiana grid — the hero across, three cards under it, then the
+          chart beside the latest transactions. */}
+      <div className="grid gap-6 lg:grid-cols-6">
+        <div className="lg:col-span-6">
+          <Balances summary={summary.data} />
+        </div>
+        <div className="lg:col-span-2">
+          <MonthTotals month={month} latest={today} totals={summary.data.month} onMonth={setMonth} />
+        </div>
+        <div className="lg:col-span-2">
+          <CategoryBreakdown month={month} kind={kind} onKind={setKind} />
+        </div>
+        <div className="lg:col-span-2">
+          {/* Keyed by month, so a refusal shown for one month is not carried to the next. */}
+          <AnalysisCard key={month} month={month} />
+        </div>
+        <div className="lg:col-span-4">
+          <MonthlyChart series={monthly.data} />
+        </div>
+        <div className="lg:col-span-2">
+          <RecentTransactions />
+        </div>
       </div>
     </Page>
   );
@@ -87,8 +103,8 @@ export default function DashboardPage() {
 
 function Page({ children }: { children: React.ReactNode }) {
   return (
-    <section className="mx-auto max-w-5xl px-4 py-8">
-      <h2 className="mb-6 text-2xl font-semibold tracking-tight">Início</h2>
+    <section className="grid gap-6">
+      <PageHeader title="Início" />
       {children}
     </section>
   );

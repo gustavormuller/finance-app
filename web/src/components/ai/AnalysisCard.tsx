@@ -81,7 +81,7 @@ export default function AnalysisCard({ month }: { month: string }) {
   );
 
   return (
-    <section aria-labelledby="analysis-heading" data-testid="analysis-card" className="grid gap-3">
+    <section aria-labelledby="analysis-heading" data-testid="analysis-card" className="glass grid content-start gap-3 rounded-2xl p-5 sm:p-6">
       <SectionHeading id="analysis-heading">Análise do mês</SectionHeading>
 
       {generate.isError && <Alert>{describe(generate.error)}</Alert>}
@@ -91,7 +91,7 @@ export default function AnalysisCard({ month }: { month: string }) {
       ) : !analyses.data ? (
         <p className="text-muted-foreground text-sm">Carregando…</p>
       ) : !analysis ? (
-        <div className="grid gap-3 rounded-lg border p-4">
+        <div className="grid gap-3 bg-secondary rounded-xl p-4">
           <p className="text-muted-foreground text-sm">
             Nenhuma análise de {formatMonth(month)} ainda. A IA lê os totais do mês e escreve um resumo com
             sugestões.
@@ -102,19 +102,19 @@ export default function AnalysisCard({ month }: { month: string }) {
         <div
           role="status"
           data-testid="analysis-progress"
-          className="text-muted-foreground flex items-center gap-2 rounded-lg border p-4 text-sm"
+          className="text-muted-foreground flex items-center gap-2 bg-secondary rounded-xl p-4 text-sm"
         >
           <Loader2 aria-hidden className="size-4 animate-spin" />
           {analysisStatusLabels[analysis.status]}… a análise de {formatMonth(month)} aparece aqui assim que ficar
           pronta.
         </div>
       ) : analysis.status === 'Failed' ? (
-        <div className="grid gap-3 rounded-lg border p-4">
+        <div className="grid gap-3 bg-secondary rounded-xl p-4">
           <Alert>{analysis.error}</Alert>
           {action('Regenerar')}
         </div>
       ) : (
-        <div className="grid gap-4 rounded-lg border p-4">
+        <div className="grid gap-4 bg-secondary rounded-xl p-4">
           <div data-testid="analysis-content">
             <Markdown source={analysis.content ?? ''} />
           </div>
