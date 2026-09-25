@@ -3362,6 +3362,11 @@ covered); nothing has been deployed.** These need a human:
   "unknown ticker is a 404" only holds with a token. Twelve Data is HTTP 401 without a
   key. CoinGecko works keyless up to 365 days. Four responses are now real captures in
   `api.tests/Fixtures/MarketData/`; the 006 files are still hand-written.
+- **019 · live end-to-end check, 2026-09-25.** The API with real providers against the
+  agent's own E2E database: registering `btcbrl` on Binance stored `BTCBRL`, and a manual
+  sync wrote 1826 closes from 2021-09-25 to 2026-09-24, matching the captured fixture on
+  20–24 Sep. A second run with `BBAS3` on brapi and no token ended `PartialFailure` with
+  "BBAS3: O brapi exige um token para BBAS3. Configure MarketData:Brapi:Token."
 - **019 · no migration.** `ProviderKind.Binance = 3` is stored in the existing `int`
   column, which has no check constraint; `dotnet ef migrations has-pending-model-changes`
   reports no changes.
