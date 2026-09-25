@@ -1,4 +1,5 @@
 ﻿using Finance.Api.Application.Dashboard;
+using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Domain.Transactions;
@@ -126,7 +127,7 @@ public sealed class PositionQueries(AppDbContext db)
         var shares = Shares.Of([.. classes.Select(item => item.Value)]);
 
         var usdBrl = await db.Benchmarks.AsNoTracking()
-            .Where(rate => rate.Code == SnapshotRebuild.UsdBrl)
+            .Where(rate => rate.Code == Benchmark.UsdBrl)
             .OrderByDescending(rate => rate.Date)
             .Select(rate => new UsdBrlView(rate.Value, rate.Date))
             .FirstOrDefaultAsync(cancellationToken);
@@ -176,15 +177,7 @@ public sealed class PositionQueries(AppDbContext db)
     private async Task<List<Benchmark>> RatesAsync(IEnumerable<Movement> movements, CancellationToken cancellationToken)
     {
         var first = movements.Select(movement => (DateOnly?)movement.Date).Min();
-        if (first is null)
-        {
-            return [];
-        }
-
-        var rates = db.Benchmarks.AsNoTracking().Where(rate => rate.Code == SnapshotRebuild.UsdBrl);
-        var anchor = await rates.Where(rate => rate.Date <= first).MaxAsync(rate => (DateOnly?)rate.Date, cancellationToken);
-        return await (anchor is { } start ? rates.Where(rate => rate.Date >= start) : rates)
-            .OrderBy(rate => rate.Date).ToListAsync(cancellationToken);
+        return first is { } date ? await db.UsdBrlRatesAsync(date, last: null, cancellationToken) : [];
     }
 
     private static decimal Brl(decimal amount) => new Money(amount, SnapshotBuilder.BaseCurrency).Amount;

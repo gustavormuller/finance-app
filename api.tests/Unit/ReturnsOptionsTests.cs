@@ -107,19 +107,6 @@ public sealed class ReturnsOptionsTests
 
     private static IConfiguration Bind() =>
         new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(RepositoryRoot(), "api", "appsettings.json"), optional: false, reloadOnChange: false)
+            .AddJsonFile(Path.Combine(TestPaths.RepositoryRoot(), "api", "appsettings.json"), optional: false, reloadOnChange: false)
             .Build();
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "FinanceApp.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("FinanceApp.slnx not found above the test binaries.");
-    }
 }

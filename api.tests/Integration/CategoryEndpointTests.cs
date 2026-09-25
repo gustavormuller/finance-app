@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Finance.Api.Domain.Transactions;
 
 namespace Finance.Api.Tests.Integration;
@@ -202,6 +203,78 @@ public sealed class CategoryEndpointTests(PostgresFixture postgres)
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    /// <summary>
+    /// Every refusal the tree and delete rules give, with its status and its exact pt-BR
+    /// text: the screen renders them verbatim, so the words are part of the contract.
+    /// </summary>
+    [Fact]
+    public async Task Each_category_refusal_keeps_its_status_and_its_words()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("category-words", cancellationToken);
+
+        var parentId = await user.CreateCategoryAsync("Groceries", cancellationToken);
+        var childId = await user.CreateCategoryAsync("Supermarket", "Expense", parentId, cancellationToken);
+        var travelId = await user.CreateCategoryAsync("Travel", cancellationToken);
+        var accountId = await user.CreateAccountAsync("Nubank", cancellationToken);
+        await user.CreateTransactionAsync(TransactionsFixtures.TransactionBody(accountId, travelId), cancellationToken);
+
+        async Task Refused(HttpRequestMessage request, HttpStatusCode status, string field, string words)
+        {
+            using var response = await user.Client.SendAsync(request, cancellationToken);
+            using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+
+            Assert.Equal(status, response.StatusCode);
+            Assert.Equal(
+                words,
+                field.Length == 0
+                    ? problem.RootElement.GetProperty("detail").GetString()
+                    : problem.RootElement.GetProperty("errors").GetProperty(field)[0].GetString());
+        }
+
+        HttpRequestMessage Post(string name, string kind, Guid? parent) =>
+            TransactionsFixtures.Post("/api/categories", new { name, kind, parentId = parent });
+
+        HttpRequestMessage Put(Guid id, string name, Guid? parent) =>
+            TransactionsFixtures.Put($"/api/categories/{id}", new { name, kind = "Expense", parentId = parent });
+
+        await Refused(Post(" ", "Expense", null), HttpStatusCode.BadRequest, "name", "O nome é obrigatório.");
+        await Refused(Post("Orphan", "Expense", Guid.NewGuid()), HttpStatusCode.BadRequest, "parentId", "Categoria não encontrada.");
+        await Refused(
+            Post("Dairy aisle", "Expense", childId),
+            HttpStatusCode.BadRequest,
+            "parentId",
+            "As categorias têm no máximo dois níveis, e essa já é uma subcategoria.");
+        await Refused(
+            Post("Cashback", "Income", parentId),
+            HttpStatusCode.BadRequest,
+            "kind",
+            "Uma subcategoria de 'Groceries' precisa ser do mesmo tipo que ela.");
+        await Refused(Put(travelId, "Travel", travelId), HttpStatusCode.BadRequest, "parentId", "Uma categoria não pode ser mãe de si mesma.");
+        await Refused(
+            Put(parentId, "Groceries", travelId),
+            HttpStatusCode.BadRequest,
+            "parentId",
+            "Essa categoria tem subcategorias, então não pode virar subcategoria.");
+        await Refused(
+            Post("Supermarket", "Expense", parentId),
+            HttpStatusCode.Conflict,
+            "",
+            "Já existe uma categoria chamada 'Supermarket' neste nível.");
+        await Refused(
+            TransactionsFixtures.Delete($"/api/categories/{parentId}"),
+            HttpStatusCode.Conflict,
+            "",
+            "'Groceries' ainda tem 1 subcategoria(s). Exclua-as antes.");
+        await Refused(
+            TransactionsFixtures.Delete($"/api/categories/{travelId}"),
+            HttpStatusCode.Conflict,
+            "",
+            "'Travel' ainda tem 1 lançamento(s). Recategorize-os ou exclua-os antes.");
     }
 
     /// <summary>

@@ -70,20 +70,16 @@ public static class CsvTemplateEndpoints
                 DateFormat = request.DateFormat.Trim(),
                 SignMode = request.SignMode,
                 DateColumn = request.DateColumn.Trim(),
-                AmountColumn = Optional(request.AmountColumn),
-                DebitColumn = Optional(request.DebitColumn),
-                CreditColumn = Optional(request.CreditColumn),
+                AmountColumn = RequestText.Optional(request.AmountColumn),
+                DebitColumn = RequestText.Optional(request.DebitColumn),
+                CreditColumn = RequestText.Optional(request.CreditColumn),
                 DescriptionColumns = request.DescriptionColumns.Trim(),
                 CreatedAt = DateTimeOffset.UtcNow,
             };
 
             database.CsvTemplates.Add(template);
 
-            try
-            {
-                await database.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException exception) when (exception.IsDuplicate())
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 return Problems.Conflict($"Já existe um modelo chamado '{template.Name}'.");
             }
@@ -127,7 +123,7 @@ public static class CsvTemplateEndpoints
             request.CreditColumn,
             request.DescriptionColumns);
 
-        var violations = new List<RuleViolation?>();
+        var violations = new List<RuleViolation>();
 
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > NameLength)
         {
@@ -139,12 +135,10 @@ public static class CsvTemplateEndpoints
             violations.Add(new RuleViolation("delimiter", "O delimitador é um único caractere."));
         }
 
-        violations.AddRange(mapping.Validate(table: null).Select(violation => (RuleViolation?)violation));
+        violations.AddRange(mapping.Validate(table: null));
 
-        return Problems.Validation([.. violations]);
+        return Problems.Validation(violations);
     }
-
-    private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static TemplateResponse Describe(CsvTemplate template) => new(
         template.Id,

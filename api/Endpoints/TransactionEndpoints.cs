@@ -1,4 +1,5 @@
 ﻿using Finance.Api.Application;
+using Finance.Api.Application.Transactions;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -14,14 +15,6 @@ public static class TransactionEndpoints
     private const int MaximumPageSize = 200;
 
     private const int DefaultPageSize = 50;
-
-    private sealed record TransactionRequest(
-        Guid AccountId,
-        Guid CategoryId,
-        decimal Amount,
-        string Currency,
-        DateOnly Date,
-        string Description);
 
     private sealed record TransactionResponse(
         Guid Id,
@@ -118,14 +111,15 @@ public static class TransactionEndpoints
         });
 
         transactions.MapPost("/", async (
-            TransactionRequest request,
+            TransactionInput request,
             AppDbContext database,
+            TransactionInputRules rules,
             ICurrentUser currentUser,
             CancellationToken cancellationToken) =>
         {
-            var resolved = await ResolveAsync(request, database, cancellationToken);
+            var resolved = await rules.ResolveAsync(request, cancellationToken);
 
-            if (resolved.Problem is { } invalid)
+            if (Problems.Validation(resolved.Violations) is { } invalid)
             {
                 return invalid;
             }
@@ -151,8 +145,9 @@ public static class TransactionEndpoints
 
         transactions.MapPut("/{id:guid}", async (
             Guid id,
-            TransactionRequest request,
+            TransactionInput request,
             AppDbContext database,
+            TransactionInputRules rules,
             CancellationToken cancellationToken) =>
         {
             // Before validating the body: somebody else's transaction is not there to
@@ -165,9 +160,9 @@ public static class TransactionEndpoints
                 return Results.NotFound();
             }
 
-            var resolved = await ResolveAsync(request, database, cancellationToken);
+            var resolved = await rules.ResolveAsync(request, cancellationToken);
 
-            if (resolved.Problem is { } invalid)
+            if (Problems.Validation(resolved.Violations) is { } invalid)
             {
                 return invalid;
             }
@@ -204,75 +199,6 @@ public static class TransactionEndpoints
         });
 
         return routes;
-    }
-
-    /// <summary>
-    /// Spec rules 1 to 5. The two ids are resolved first because the rules after them
-    /// are questions about the rows they name.
-    /// </summary>
-    /// <remarks>
-    /// Resolution goes through the query filter, so an id belonging to another user
-    /// comes back as null and is reported as a field that does not resolve. That is
-    /// spec rule 4, and it is why this is a 400 rather than a 403 — and why no write
-    /// can follow it.
-    /// </remarks>
-    private static async Task<(IResult? Problem, Account? Account, Category? Category)> ResolveAsync(
-        TransactionRequest request,
-        AppDbContext database,
-        CancellationToken cancellationToken)
-    {
-        var account = await database.Accounts
-            .SingleOrDefaultAsync(entity => entity.Id == request.AccountId, cancellationToken);
-
-        var category = await database.Categories
-            .SingleOrDefaultAsync(entity => entity.Id == request.CategoryId, cancellationToken);
-
-        if (Problems.Validation(
-                account is null ? new RuleViolation("accountId", "Conta não encontrada.") : null,
-                category is null ? new RuleViolation("categoryId", "Categoria não encontrada.") : null)
-            is { } unresolved)
-        {
-            return (unresolved, null, null);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Description))
-        {
-            return (Problems.Validation("description", "A descrição é obrigatória."), null, null);
-        }
-
-        // Checked before Money is constructed, so a bad code is a named field rather
-        // than the constructor's ArgumentException turning into a 500.
-        if (!Money.IsIsoCode(request.Currency))
-        {
-            return (
-                Problems.Validation(
-                    "currency",
-                    "A moeda deve ser um código ISO 4217 de três letras maiúsculas."),
-                null,
-                null);
-        }
-
-        if (request.Currency != account!.Currency)
-        {
-            return (
-                Problems.Validation(
-                    "currency",
-                    $"'{account.Name}' está em {account.Currency}, então o lançamento não pode "
-                    + $"estar em {request.Currency}."),
-                null,
-                null);
-        }
-
-        // Rounded first, so an amount of 0.001 is rejected as the zero it becomes
-        // rather than accepted as the non-zero it arrived as.
-        var amount = new Money(request.Amount, request.Currency).Amount;
-
-        var problem = Problems.Validation(
-            TransactionRules.ValidateAmount(amount),
-            TransactionRules.ValidateSign(amount, category!.Kind),
-            TransactionRules.ValidateDate(request.Date, DateOnly.FromDateTime(DateTime.UtcNow)));
-
-        return problem is null ? (null, account, category) : (problem, null, null);
     }
 
     private static TransactionResponse Describe(

@@ -268,11 +268,9 @@ public static class ImportEndpoints
 
         if (outcome.OpenBatchId is { } openBatchId)
         {
-            return Results.Problem(
-                title: "Conflito",
-                detail: "Já existe uma importação em andamento. Confirme ou descarte-a antes de enviar outro arquivo.",
-                statusCode: StatusCodes.Status409Conflict,
-                extensions: new Dictionary<string, object?> { ["openBatchId"] = openBatchId });
+            return Problems.Conflict(
+                "Já existe uma importação em andamento. Confirme ou descarte-a antes de enviar outro arquivo.",
+                new Dictionary<string, object?> { ["openBatchId"] = openBatchId });
         }
 
         var summary = outcome.Summary!;
@@ -331,9 +329,9 @@ public static class ImportEndpoints
                 form["dateFormat"].ToString(),
                 signMode,
                 form["dateColumn"].ToString(),
-                Optional(form["amountColumn"]),
-                Optional(form["debitColumn"]),
-                Optional(form["creditColumn"]),
+                RequestText.Optional(form["amountColumn"]),
+                RequestText.Optional(form["debitColumn"]),
+                RequestText.Optional(form["creditColumn"]),
                 form["descriptionColumns"].ToString());
         }
 
@@ -359,7 +357,7 @@ public static class ImportEndpoints
 
         if (violations.Count > 0)
         {
-            return (null, Problems.Validation([.. violations.Select(violation => (RuleViolation?)violation)]));
+            return (null, Problems.Validation(violations));
         }
 
         return (CsvRowInterpreter.Interpret(table, mapping), null);
@@ -528,8 +526,6 @@ public static class ImportEndpoints
             "tab" or "\\t" => '\t',
             _ => null,
         };
-
-    private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>
     /// The id filter is applied before the projection: EF cannot see through a

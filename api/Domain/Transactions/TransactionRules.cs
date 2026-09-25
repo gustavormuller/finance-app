@@ -13,7 +13,8 @@ public readonly record struct RuleViolation(string Field, string Message);
 /// <remarks>
 /// The rules that are not here — currency matching the account, ids resolving under
 /// the current user's filter, a child category being given children — all need a
-/// query to decide, and live in <c>Application/</c> next to the context that runs it.
+/// query to decide, and live in <c>Application/Transactions</c> and
+/// <c>Application/Categories</c>, next to the context that runs it.
 /// </remarks>
 public static class TransactionRules
 {

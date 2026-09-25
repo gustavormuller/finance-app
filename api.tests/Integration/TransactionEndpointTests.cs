@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -184,6 +185,55 @@ public sealed class TransactionEndpointTests(PostgresFixture postgres)
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("date", await TransactionsFixtures.ProblemFieldsAsync(response, cancellationToken));
+    }
+
+    /// <summary>
+    /// Rules 1 to 5 in the order they are decided, each refusal with its fields and exact
+    /// pt-BR words: the ids first (both at once), then the description, the currency, and
+    /// last the amount, sign and date together.
+    /// </summary>
+    [Fact]
+    public async Task Each_transaction_refusal_keeps_its_fields_and_its_words()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("transaction-words", cancellationToken);
+        var accountId = await user.CreateAccountAsync("Nubank", cancellationToken);
+        var categoryId = await user.CreateCategoryAsync("Groceries", cancellationToken);
+        var latest = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(1).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
+        async Task Refused(object body, Dictionary<string, string[]> expected)
+        {
+            using var response = await user.Client.SendAsync(TransactionsFixtures.Post("/api/transactions", body), cancellationToken);
+            using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal(
+                expected,
+                problem.RootElement.GetProperty("errors").EnumerateObject().ToDictionary(
+                    field => field.Name,
+                    field => field.Value.EnumerateArray().Select(message => message.GetString()!).ToArray()));
+        }
+
+        await Refused(
+            TransactionsFixtures.TransactionBody(Guid.NewGuid(), Guid.NewGuid(), description: " "),
+            new() { ["accountId"] = ["Conta não encontrada."], ["categoryId"] = ["Categoria não encontrada."] });
+        await Refused(
+            TransactionsFixtures.TransactionBody(accountId, categoryId, 0m, currency: "usd", description: " "),
+            new() { ["description"] = ["A descrição é obrigatória."] });
+        await Refused(
+            TransactionsFixtures.TransactionBody(accountId, categoryId, 0m, currency: "usd"),
+            new() { ["currency"] = ["A moeda deve ser um código ISO 4217 de três letras maiúsculas."] });
+        await Refused(
+            TransactionsFixtures.TransactionBody(accountId, categoryId, 0m, currency: "USD"),
+            new() { ["currency"] = ["'Nubank' está em BRL, então o lançamento não pode estar em USD."] });
+        await Refused(
+            TransactionsFixtures.TransactionBody(accountId, categoryId, 0.001m, date: "1899-12-31"),
+            new() { ["amount"] = ["O valor não pode ser zero."], ["date"] = [$"A data deve estar entre 01/01/1900 e {latest}."] });
+        await Refused(
+            TransactionsFixtures.TransactionBody(accountId, categoryId, 12m),
+            new() { ["amount"] = ["Uma categoria de despesa exige um valor negativo."] });
     }
 
     /// <summary>Spec integration test 12. Both ends of the range are inclusive.</summary>

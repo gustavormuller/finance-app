@@ -1,5 +1,6 @@
 ﻿using Finance.Api.Application.Ai;
 using Finance.Api.Domain.Transactions;
+using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -45,16 +46,22 @@ internal static class Problems
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);
     }
 
+    /// <inheritdoc cref="Validation(ReadOnlySpan{RuleViolation?})"/>
+    public static IResult? Validation(IEnumerable<RuleViolation> violations) =>
+        Validation([.. violations.Select(violation => (RuleViolation?)violation)]);
+
     /// <summary>
     /// A refusal the caller could resolve by doing something else first — deleting
     /// the children, moving the transactions, picking another name. The reason is in
     /// the body because the spec asks the UI to show it rather than fail silently.
     /// </summary>
-    public static IResult Conflict(string reason) =>
+    /// <param name="extensions">Members the UI needs to act on the refusal, such as the id of what is in the way.</param>
+    public static IResult Conflict(string reason, IDictionary<string, object?>? extensions = null) =>
         Results.Problem(
             title: "Conflito",
             detail: reason,
-            statusCode: StatusCodes.Status409Conflict);
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: extensions);
 
     /// <summary>
     /// A refusal that resolves itself with time. <c>Retry-After</c> says how long, in
@@ -108,4 +115,19 @@ internal static class Problems
     /// </summary>
     public static bool IsDuplicate(this DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: UniqueViolation };
+
+    /// <summary>Saves; false when a unique index refused the write (<see cref="IsDuplicate"/>).</summary>
+    public static async Task<bool> TrySaveAsync(this AppDbContext database, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+
+            return true;
+        }
+        catch (DbUpdateException exception) when (exception.IsDuplicate())
+        {
+            return false;
+        }
+    }
 }

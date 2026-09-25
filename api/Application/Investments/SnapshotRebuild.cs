@@ -1,4 +1,5 @@
-﻿using Finance.Api.Domain.Investments;
+﻿using Finance.Api.Application.MarketData;
+using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -30,9 +31,6 @@ namespace Finance.Api.Application.Investments;
 /// </remarks>
 public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
 {
-    /// <summary>The benchmark series that values a USD asset in BRL.</summary>
-    public const string UsdBrl = "USDBRL";
-
     public DateOnly Today => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
 
     /// <summary>
@@ -74,7 +72,7 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
         var prices = await ClosesAsync(asset.MarketAssetId, from, cancellationToken);
         var rates = asset.Currency == SnapshotBuilder.BaseCurrency || movements.Count == 0
             ? []
-            : await RatesAsync(movements.Min(movement => movement.Date), cancellationToken);
+            : await db.UsdBrlRatesAsync(movements.Min(movement => movement.Date), last: null, cancellationToken);
 
         await db.PortfolioDaily.Where(row => row.AssetId == assetId && row.Date >= from).ExecuteDeleteAsync(cancellationToken);
 
@@ -127,7 +125,7 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
             await db.Prices.Where(price => price.MarketAssetId == asset.MarketAssetId).MinAsync(price => (DateOnly?)price.Date, cancellationToken),
             asset.Currency == SnapshotBuilder.BaseCurrency
                 ? DateOnly.MinValue
-                : await db.Benchmarks.Where(rate => rate.Code == UsdBrl).MinAsync(rate => (DateOnly?)rate.Date, cancellationToken),
+                : await db.Benchmarks.Where(rate => rate.Code == Benchmark.UsdBrl).MinAsync(rate => (DateOnly?)rate.Date, cancellationToken),
         ];
 
         var from = lastRow is { } last && last < yesterday ? last.AddDays(1) : yesterday;
@@ -144,13 +142,6 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
         var closes = db.Prices.AsNoTracking().Where(price => price.MarketAssetId == marketAssetId);
         var anchor = await closes.Where(price => price.Date <= from).MaxAsync(price => (DateOnly?)price.Date, cancellationToken);
         return await closes.Where(price => price.Date >= (anchor ?? from)).ToListAsync(cancellationToken);
-    }
-
-    private async Task<List<Benchmark>> RatesAsync(DateOnly firstMovement, CancellationToken cancellationToken)
-    {
-        var rates = db.Benchmarks.AsNoTracking().Where(rate => rate.Code == UsdBrl);
-        var anchor = await rates.Where(rate => rate.Date <= firstMovement).MaxAsync(rate => (DateOnly?)rate.Date, cancellationToken);
-        return await (anchor is { } start ? rates.Where(rate => rate.Date >= start) : rates).ToListAsync(cancellationToken);
     }
 
     /// <summary>The asset's id folded to the <c>bigint</c> an advisory lock takes.</summary>

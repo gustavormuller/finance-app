@@ -341,7 +341,9 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         Assert.True((await include.Content.ReadFromJsonAsync<ImportFixtures.RowItem>(cancellationToken))!.Included);
 
         Assert.Equal(1, (await user.GetBatchAsync(again.BatchId, cancellationToken)).Counts.Included);
-        Assert.Equal((1, 1), ((await user.CommitAsync(again.BatchId, cancellationToken)).Committed, 1));
+
+        var committed = await user.CommitAsync(again.BatchId, cancellationToken);
+        Assert.Equal((1, 1), (committed.Committed, committed.Skipped));
 
         await using var context = TransactionsFixtures.ContextFor(postgres.ConnectionString, user.Id);
         var written = await context.Transactions.Where(transaction => transaction.ImportBatchId == again.BatchId).ToListAsync(cancellationToken);
@@ -377,7 +379,8 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         Assert.Equal([RowIssues.CurrencyMismatch("USD")], invalid.Issues);
         Assert.False(invalid.Included);
 
-        Assert.Equal((2, 1), ((await user.CommitAsync(staged.BatchId, cancellationToken)).Committed, 1));
+        var committed = await user.CommitAsync(staged.BatchId, cancellationToken);
+        Assert.Equal((2, 1), (committed.Committed, committed.Skipped));
         Assert.Equal(2, (await user.ListTransactionsAsync(cancellationToken)).Total);
     }
 
@@ -563,7 +566,8 @@ public sealed class ImportEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.BadRequest, include.StatusCode);
         Assert.Contains("include", await TransactionsFixtures.ProblemFieldsAsync(include, cancellationToken));
 
-        Assert.Equal((0, 1), ((await user.CommitAsync(staged.BatchId, cancellationToken)).Committed, 1));
+        var committed = await user.CommitAsync(staged.BatchId, cancellationToken);
+        Assert.Equal((0, 1), (committed.Committed, committed.Skipped));
     }
 
     [Fact]
