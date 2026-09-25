@@ -1,7 +1,5 @@
 ﻿using System.Net;
-using System.Net.Http.Json;
 using Finance.Api.Application.MarketData;
-using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Infrastructure.Jobs;
 using Microsoft.EntityFrameworkCore;

@@ -1,7 +1,6 @@
 ﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using Finance.Api.Application.Ai;
-using Finance.Api.Application.Dashboard;
 using Finance.Api.Application.Investments;
 using Finance.Api.Domain.Transactions;
 
