@@ -107,6 +107,82 @@ public sealed class InvestmentSummaryTests(PostgresFixture postgres)
         Assert.Equal(new SummaryItem(0m, 0m, 0m), summaryB);
     }
 
+    private sealed record FxItem(decimal Rate, DateOnly Date);
+
+    private sealed record AllocationItem(string Class, decimal ValueBrl, decimal Share);
+
+    /// <summary>016's summary: 007's totals, the allocation by class and the latest USDBRL.</summary>
+    private sealed record FullSummaryItem(
+        decimal TotalBrl, decimal TotalCostBrl, decimal UnrealisedBrl, List<AllocationItem> Allocation, FxItem? UsdBrl);
+
+    /// <summary>Spec 016 integration test 1.</summary>
+    [Fact]
+    public async Task The_summary_carries_the_latest_usdbrl_rate_as_stored_for_every_user()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var api = await StartAsync(postgres, ct);
+        var userA = await api.SignInAsync("holder", ct);
+        var userB = await api.SignInAsync("empty", ct);
+
+        var before = await userA.Client.GetFromJsonAsync<FullSummaryItem>("/api/investments/summary", ct);
+        Assert.Null(before!.UsdBrl);
+
+        await api.UsdBrlAsync(ct, (D, 5.1m), (D.AddDays(3), 5.3012m), (D.AddDays(1), 5.2m));
+        await api.HoldAsync(userA.Id, await api.CatalogueAsync("PETR4", ct, "BRL", (D, 10m)), ct, Buy(D, 1m, 10m));
+
+        var summaryA = await userA.Client.GetFromJsonAsync<FullSummaryItem>("/api/investments/summary", ct);
+        var summaryB = await userB.Client.GetFromJsonAsync<FullSummaryItem>("/api/investments/summary", ct);
+
+        Assert.Equal(new FxItem(5.3012m, D.AddDays(3)), summaryA!.UsdBrl);
+        Assert.Equal(new FxItem(5.3012m, D.AddDays(3)), summaryB!.UsdBrl);
+    }
+
+    /// <summary>Spec 016 integration test 2.</summary>
+    [Fact]
+    public async Task The_summary_allocates_the_latest_rows_by_class_with_shares_summing_to_one()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var api = await StartAsync(postgres, ct);
+        var userA = await api.SignInAsync("holder", ct);
+        var userB = await api.SignInAsync("empty", ct);
+        await api.UsdBrlAsync(ct, (D, 5m));
+        var hglg11 = await api.CatalogueAsync("HGLG11", ct, "BRL", (D, 100m));
+        await using (var catalogue = api.Context(null))
+        {
+            await catalogue.MarketAssets.Where(asset => asset.Id == hglg11.Id)
+                .ExecuteUpdateAsync(set => set.SetProperty(asset => asset.Class, Finance.Api.Domain.MarketData.MarketAssetClass.Fii), ct);
+        }
+
+        Asset[] held =
+        [
+            await api.HoldAsync(userA.Id, await api.CatalogueAsync("PETR4", ct, "BRL", (D, 10m), (D.AddDays(3), 11m)), ct, Buy(D, 100m, 10m, 5m)),
+            await api.HoldAsync(userA.Id, await api.CatalogueAsync("VALE3", ct, "BRL", (D, 60m)), ct, Buy(D.AddDays(1), 10m, 61m)),
+            await api.HoldAsync(userA.Id, await api.CatalogueAsync("AAPL", ct, "USD", (D, 100m)), ct, Buy(D, 2m, 100m)),
+            // Sold down to nothing: a class worth zero is not in the allocation.
+            await api.HoldAsync(userA.Id, hglg11, ct, Buy(D, 1m, 100m), Sell(D.AddDays(1), 1m, 100m)),
+        ];
+        await using (var context = api.Context(userA.Id))
+        {
+            var rebuild = new Finance.Api.Application.Investments.SnapshotRebuild(context, TimeProvider.System);
+            foreach (var asset in held)
+            {
+                await rebuild.RebuildAsync(asset.Id, D, ct);
+            }
+        }
+
+        var summaryA = await userA.Client.GetFromJsonAsync<FullSummaryItem>("/api/investments/summary", ct);
+        var summaryB = await userB.Client.GetFromJsonAsync<FullSummaryItem>("/api/investments/summary", ct);
+
+        // 1 100 + 600 in BR stocks, 2 x 100 x 5 in US ones: 1 700 and 1 000 of 2 700. Truncated,
+        // 0.6296 and 0.3703 leave a ten-thousandth, which goes to the larger remainder.
+        Assert.Equal(2700m, summaryA!.TotalBrl);
+        Assert.Equal(
+            [new AllocationItem("StockBr", 1700m, 0.6296m), new AllocationItem("StockUs", 1000m, 0.3704m)],
+            summaryA.Allocation);
+        Assert.Equal(1m, summaryA.Allocation.Sum(item => item.Share));
+        Assert.Empty(summaryB!.Allocation);
+    }
+
     /// <summary>The definition of done: truncate, POST /rebuild, identical rows; and only the caller's.</summary>
     [Fact]
     public async Task Rebuild_restores_the_callers_truncated_rows_exactly_and_no_one_elses()

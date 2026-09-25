@@ -105,6 +105,33 @@ test('a dividend raises Proventos and leaves the quantity alone', async ({ page 
 });
 
 /**
+ * Spec 016 E2E test 15. The fakes store USDBRL at 0,05 on every sync, so the latest rate is
+ * always 0,05 and R$ 1.000,00 is US$ 20.000,00. The choice is the browser's: a reload keeps it.
+ */
+test('US$ shows the position and the total at the latest dollar, and survives a reload', async ({ page }) => {
+  const assetId = await holdHundredPetr4(page, 'e2e-invest-dollar');
+  await page.getByRole('link', { name: '← Investimentos' }).click();
+  const row = page.getByTestId(`position-${assetId}`);
+  await expect(row).toContainText('R$ 1.000,00');
+
+  const currency = page.getByRole('group', { name: 'Moeda' });
+  await currency.getByRole('button', { name: 'US$' }).click();
+
+  await expect(row).toContainText('US$ 20.000,00');
+  await expect(page.getByTestId('positions-total')).toContainText('US$ 20.000,00');
+  await expect(page.getByTestId('holdings-total')).toHaveText('US$ 20.000,00');
+  await expect(page.getByTestId('currency-note')).toContainText('US$ 1 = R$ 0,05');
+
+  await page.reload();
+  await expect(currency.getByRole('button', { name: 'US$' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId(`position-${assetId}`)).toContainText('US$ 20.000,00');
+
+  await currency.getByRole('button', { name: 'R$' }).click();
+  await expect(page.getByTestId(`position-${assetId}`)).toContainText('R$ 1.000,00');
+  await expect(page.getByTestId('currency-note')).toHaveCount(0);
+});
+
+/**
  * Spec E2E test 33. A dividend is left behind on purpose: the buy alone is deleted, the
  * position drops to zero with income still on it, and the row is hidden, not removed.
  */

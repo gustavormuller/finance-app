@@ -50,7 +50,21 @@ export async function createAccount(page: Page, name: string, openingBalance?: s
   }
   await page.getByRole('button', { name: 'Criar conta' }).click();
 
-  await expect(page.getByRole('cell', { name })).toBeVisible();
+  // 015: a new account is selected, so its name becomes the detail's heading.
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+}
+
+/**
+ * An account's "Importar extrato" tab, reached the way a person reaches it (015): the
+ * accounts, the account's card, the tab. Waits for the wizard's first step.
+ */
+export async function openImportTab(page: Page, account: string) {
+  await page.goto('/accounts');
+  await page.getByRole('link', { name: account, exact: true }).click();
+  await expect(page.getByRole('heading', { name: account, exact: true })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Importar extrato' }).click();
+  await expect(page.getByRole('heading', { name: '1. Arquivo' })).toBeVisible();
 }
 
 /**

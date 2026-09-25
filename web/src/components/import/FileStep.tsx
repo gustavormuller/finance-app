@@ -1,97 +1,95 @@
+import { Upload } from 'lucide-react';
 import { useState } from 'react';
 
-import type { Account } from '@/api/finance';
 import Alert from '@/components/Alert';
-import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 /**
- * Step 1: pick an account, pick a file. The extension decides where the file goes
- * next — `.ofx` straight to the preview, `.csv`, `.xls` and `.xlsx` to the mapping
- * step — and that decision is the page's, so this component only hands the file over.
+ * Step 1: a file for the account the page is about (015), dropped on the zone or
+ * chosen with the button, and either starts at once. The extension decides where the
+ * file goes next — `.ofx` straight to the preview, `.csv`, `.xls` and `.xlsx` to the
+ * mapping step — and that decision is the caller's, so this component only hands the
+ * file over.
  */
 export default function FileStep({
-  accounts,
+  accountName,
   busy,
   error,
-  onSubmit,
+  onFile,
 }: {
-  accounts: Account[];
+  accountName: string;
   busy: boolean;
   error: React.ReactNode;
-  onSubmit: (accountId: string, file: File) => void;
+  onFile: (file: File) => void;
 }): React.JSX.Element {
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
-  const [file, setFile] = useState<File | null>(null);
-  const [touched, setTouched] = useState(false);
-
-  const missingAccount = touched && accountId === '';
-  const missingFile = touched && file === null;
+  const [dragging, setDragging] = useState(false);
 
   return (
-    <form
-      noValidate
-      className="grid max-w-xl gap-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setTouched(true);
+    <div className="grid gap-4">
+      <div
+        data-testid="drop-zone"
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          const file = event.dataTransfer.files[0];
 
-        if (accountId !== '' && file !== null) {
-          onSubmit(accountId, file);
-        }
-      }}
-    >
-      <div className="grid gap-2">
-        <Label htmlFor="import-account">Conta</Label>
-        <select
-          id="import-account"
-          className={selectClasses}
-          value={accountId}
-          onChange={(event) => setAccountId(event.target.value)}
-        >
-          <option value="">Escolha uma conta</option>
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name}
-            </option>
-          ))}
-        </select>
-        {missingAccount && (
-          <p role="alert" className="text-destructive text-sm">
-            Escolha a conta que recebe os lançamentos.
-          </p>
+          if (file && !busy) {
+            onFile(file);
+          }
+        }}
+        className={cn(
+          'border-primary/35 bg-primary/5 flex flex-col items-center gap-2.5 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-8',
+          dragging && 'border-primary bg-accent',
         )}
-      </div>
+      >
+        <span className="bg-accent text-primary flex size-13 items-center justify-center rounded-2xl">
+          <Upload className="size-6" aria-hidden="true" />
+        </span>
+        <p className="font-display text-xl font-semibold break-words">Arraste aqui o extrato da conta {accountName}</p>
+        <p className="text-muted-foreground max-w-md text-sm">
+          OFX, CSV ou planilha do Excel (.xls, .xlsx), até 2 MB e 5.000 lançamentos. Lançamentos repetidos ficam
+          de fora sozinhos.
+        </p>
 
-      <div className="grid gap-2">
-        <Label htmlFor="import-file">Arquivo</Label>
-        <Input
+        {/* The input is the control, visually replaced by its label; the peer ring shows
+            where keyboard focus is. Cleared after each pick, so the same file can be
+            chosen again after a refusal. */}
+        <input
           id="import-file"
           type="file"
           accept=".ofx,.csv,.txt,.xls,.xlsx"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          className="peer sr-only"
+          disabled={busy}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+
+            if (file) {
+              onFile(file);
+            }
+          }}
         />
-        <p className="text-muted-foreground text-sm">
-          OFX, CSV ou planilha do Excel (.xls, .xlsx) exportada do banco, até 2 MB e 5.000
-          lançamentos. Um OFX vai direto para a revisão; CSV e planilhas passam antes pelo
-          mapeamento das colunas.
+        <Button
+          asChild
+          className={cn(
+            'peer-focus-visible:ring-ring/50 mt-1.5 cursor-pointer peer-focus-visible:ring-[3px]',
+            busy && 'pointer-events-none opacity-50',
+          )}
+        >
+          <label htmlFor="import-file">{busy ? 'Enviando…' : 'Escolher arquivo'}</label>
+        </Button>
+        <p className="text-muted-foreground text-xs">
+          Um OFX vai direto para a revisão; CSV e planilhas passam antes pelo mapeamento das colunas.
         </p>
-        {missingFile && (
-          <p role="alert" className="text-destructive text-sm">
-            Escolha um arquivo.
-          </p>
-        )}
       </div>
 
       {error && <Alert>{error}</Alert>}
-
-      <div>
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Enviando…' : 'Enviar'}
-        </Button>
-      </div>
-    </form>
+    </div>
   );
 }

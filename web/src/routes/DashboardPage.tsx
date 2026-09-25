@@ -11,7 +11,7 @@ import MonthlyChart from '@/components/dashboard/MonthlyChart';
 import MonthTotals from '@/components/dashboard/MonthTotals';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import PageHeader from '@/components/PageHeader';
-import { useMonthly, useSummary } from '@/components/dashboard/queries';
+import { useMonthly, useNetWorth, useSummary } from '@/components/dashboard/queries';
 import { currentMonth } from '@/lib/months';
 
 /**
@@ -27,8 +27,9 @@ export default function DashboardPage() {
 
   const summary = useSummary(month);
   const monthly = useMonthly(today);
+  const netWorth = useNetWorth(today);
 
-  if (summary.isError || monthly.isError) {
+  if (summary.isError || monthly.isError || netWorth.isError) {
     return (
       <Page>
         <Alert>Não foi possível carregar o painel. Recarregue a página para tentar de novo.</Alert>
@@ -36,7 +37,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!summary.data || !monthly.data) {
+  if (!summary.data || !monthly.data || !netWorth.data) {
     return (
       <Page>
         <p className="text-muted-foreground text-sm">Carregando…</p>
@@ -44,12 +45,14 @@ export default function DashboardPage() {
     );
   }
 
-  // No accounts and a year of zeros: nothing has been recorded, so a page of zeros
-  // would only look broken. An account with no transactions is not this case — its
-  // opening balance is already something to show.
+  // No accounts, a year of zeros and no net worth: nothing has been recorded, so a page
+  // of zeros would only look broken. An account with no transactions is not this case —
+  // its opening balance is already something to show — and neither is a portfolio held
+  // with no account (014).
   const empty =
     summary.data.balances.length === 0 &&
-    monthly.data.every((entry) => entry.income === 0 && entry.expense === 0);
+    monthly.data.every((entry) => entry.income === 0 && entry.expense === 0) &&
+    netWorth.data.length === 0;
 
   if (empty) {
     return (
@@ -63,7 +66,7 @@ export default function DashboardPage() {
             <Link to="/transactions" className="text-primary font-semibold hover:underline">
               Registrar um lançamento
             </Link>
-            <Link to="/import" className="text-primary font-semibold hover:underline">
+            <Link to="/accounts" className="text-primary font-semibold hover:underline">
               Importar um extrato
             </Link>
           </p>
@@ -78,7 +81,7 @@ export default function DashboardPage() {
           chart beside the latest transactions. */}
       <div className="grid gap-6 lg:grid-cols-6 [&>*]:min-w-0">
         <div className="lg:col-span-6">
-          <Balances summary={summary.data} />
+          <Balances summary={summary.data} netWorth={netWorth.data} through={today} />
         </div>
         <div className="lg:col-span-2">
           <MonthTotals month={month} latest={today} totals={summary.data.month} onMonth={setMonth} />

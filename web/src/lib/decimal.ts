@@ -47,7 +47,7 @@ export function toApiNumber(typed: string): number {
 }
 
 /** Integer division rounding half to even. `divisor` is positive. */
-function divideToEven(value: bigint, divisor: bigint): bigint {
+export function divideToEven(value: bigint, divisor: bigint): bigint {
   const quotient = value / divisor;
   const remainder = value % divisor;
   const twice = (remainder < 0n ? -remainder : remainder) * 2n;

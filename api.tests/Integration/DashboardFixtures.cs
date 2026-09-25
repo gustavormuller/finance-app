@@ -31,6 +31,9 @@ internal static class DashboardFixtures
 
     public sealed record CategoryItem(Guid CategoryId, string Name, decimal Amount, decimal Share);
 
+    /// <summary>014: one month-end point of the net-worth series.</summary>
+    public sealed record NetWorthItem(string Month, decimal Accounts, decimal Investments, decimal Total);
+
     /// <summary>
     /// The first day of the current calendar month, by the same UTC clock the API
     /// defaults its <c>month</c> parameter with.

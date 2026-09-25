@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { api, type AssetReturns, type Position, type ReturnsQuery } from '@/api/finance';
 import SectionHeading from '@/components/dashboard/SectionHeading';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { returnsInUsd } from '@/lib/currency';
 import { NO_DATA, formatRate, perYear } from '@/lib/rates';
 
 import { RETURNS, retryUnlessRefused } from './queries';
@@ -12,9 +13,18 @@ import { RETURNS, retryUnlessRefused } from './queries';
  * Spec 008 "Per asset": each asset's TWR and XIRR for the selected period, and a USD
  * asset's split into the asset's own move and the exchange rate. There is no list route,
  * so it is one `/api/returns/assets/{id}` call per asset (DEFERRED, 008 · CP4 and CP5),
- * under the same keys the asset's own page uses.
+ * under the same keys the asset's own page uses. `inDollars` (016) derives each TWR from
+ * the asset's own dollar index; its XIRR stays in reais.
  */
-export default function AssetReturnsTable({ positions, query }: { positions: Position[]; query: ReturnsQuery }) {
+export default function AssetReturnsTable({
+  positions,
+  query,
+  inDollars = false,
+}: {
+  positions: Position[];
+  query: ReturnsQuery;
+  inDollars?: boolean;
+}) {
   const results = useQueries({
     queries: positions.map((position) => ({
       queryKey: [...RETURNS, 'asset', position.assetId, query],
@@ -36,7 +46,7 @@ export default function AssetReturnsTable({ positions, query }: { positions: Pos
           <TableRow>
             <TableHead>Ativo</TableHead>
             <TableHead className="text-right">TWR no período</TableHead>
-            <TableHead className="text-right">XIRR</TableHead>
+            <TableHead className="text-right">{inDollars ? 'XIRR (em reais)' : 'XIRR'}</TableHead>
             <TableHead className="text-right">Ativo na moeda</TableHead>
             <TableHead className="text-right">Câmbio</TableHead>
           </TableRow>
@@ -53,7 +63,7 @@ export default function AssetReturnsTable({ positions, query }: { positions: Pos
                   {position.ticker}
                 </Link>
               </TableCell>
-              <Figures position={position} result={results[i]?.data} failed={results[i]?.isError ?? false} />
+              <Figures position={position} result={results[i]?.data} failed={results[i]?.isError ?? false} inDollars={inDollars} />
             </TableRow>
           ))}
         </TableBody>
@@ -62,7 +72,17 @@ export default function AssetReturnsTable({ positions, query }: { positions: Pos
   );
 }
 
-function Figures({ position, result, failed }: { position: Position; result: AssetReturns | undefined; failed: boolean }) {
+function Figures({
+  position,
+  result,
+  failed,
+  inDollars,
+}: {
+  position: Position;
+  result: AssetReturns | undefined;
+  failed: boolean;
+  inDollars: boolean;
+}) {
   if (!result) {
     return (
       <TableCell colSpan={4} className="text-muted-foreground text-right text-sm">
@@ -76,7 +96,9 @@ function Figures({ position, result, failed }: { position: Position; result: Ass
 
   return (
     <>
-      <TableCell className="text-right tabular-nums">{formatRate(result.twr?.total)}</TableCell>
+      <TableCell className="text-right tabular-nums">
+        {formatRate(inDollars ? returnsInUsd(result)?.twr?.total : result.twr?.total)}
+      </TableCell>
       <TableCell className="text-right tabular-nums">{perYear(result.xirr)}</TableCell>
       {result.fx ? (
         <>

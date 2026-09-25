@@ -41,6 +41,10 @@ export interface Category {
  * here because the server is authoritative: every amount is rounded and stored as
  * `numeric(18,2)` there, and nothing client-side does arithmetic on money beyond
  * applying a sign. Any future totalling belongs on the API, not here.
+ *
+ * One exception, by design (016): a BRL figure shown in dollars is divided by the
+ * latest USDBRL at display time, the architecture's "convert on read". That division
+ * is exact, in `bigint`, and rounded once to the cent (`lib/currency.ts`).
  */
 export interface Transaction {
   id: string;
@@ -77,6 +81,13 @@ export interface AccountInput {
   currency: string;
   /** Omitted on create means 0; omitted on update keeps the stored value. */
   openingBalance?: number;
+}
+
+/** One category's use in a range (013): signed, as its transactions are. */
+export interface CategoryUsage {
+  categoryId: string;
+  count: number;
+  total: number;
 }
 
 export interface CategoryInput {
@@ -288,6 +299,19 @@ export interface CategoryTotal {
   share: number;
 }
 
+/**
+ * 014: what was owned at the end of a month — the summary's accounts as they stood that
+ * day, plus the portfolio's value. The current month is month-to-date.
+ */
+export interface NetWorthPoint {
+  /** `YYYY-MM`. */
+  month: string;
+  accounts: number;
+  investments: number;
+  /** `accounts + investments`. */
+  total: number;
+}
+
 /** The kinds the breakdown accepts; a Transfer is neither and the API refuses it. */
 export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
 
@@ -378,10 +402,27 @@ export interface Position {
   dividendsBrl: number | null;
 }
 
+/** One asset class's part of the total (016); `share` is a fraction, and the shares sum to 1. */
+export interface AllocationItem {
+  class: MarketAssetClass;
+  valueBrl: number;
+  share: number;
+}
+
+/** BRL per US dollar, the latest USDBRL the market data holds, and its day (016). */
+export interface UsdBrl {
+  rate: number;
+  date: string;
+}
+
 export interface PortfolioSummary {
   totalBrl: number;
   totalCostBrl: number;
   unrealisedBrl: number;
+  /** By value, highest first; a class worth zero is left out. */
+  allocation: AllocationItem[];
+  /** Null while no USDBRL has been synced: nothing can be shown in dollars. */
+  usdBrl: UsdBrl | null;
 }
 
 /** Either a catalogue entry already there, or 006's registration body. */
@@ -604,6 +645,9 @@ export const api = {
 
   deleteCategory: (id: string) => request<void>(`/api/categories/${id}`, { method: 'DELETE' }),
 
+  /** The 12 months ending today unless a range is given. */
+  categoryUsage: () => request<CategoryUsage[]>('/api/categories/usage'),
+
   listTransactions: (query: TransactionQuery) =>
     request<TransactionPage>(`/api/transactions?${searchParams(query)}`),
 
@@ -676,6 +720,9 @@ export const api = {
 
   dashboardMonthly: (months: number) =>
     request<MonthTotals[]>(`/api/dashboard/monthly?${searchParams({ months })}`),
+
+  dashboardNetWorth: (months: number) =>
+    request<NetWorthPoint[]>(`/api/dashboard/net-worth?${searchParams({ months })}`),
 
   dashboardByCategory: (month: string, kind: BreakdownKind) =>
     request<CategoryTotal[]>(`/api/dashboard/by-category?${searchParams({ month, kind })}`),

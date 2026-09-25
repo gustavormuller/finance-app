@@ -1,6 +1,8 @@
 import { createRootRoute, createRoute } from '@tanstack/react-router';
 
-import AccountsPage from './routes/AccountsPage';
+import { accountTabs, type AccountTab } from './lib/accounts';
+import AccountPage from './routes/AccountPage';
+import AccountsPage, { FirstAccount } from './routes/AccountsPage';
 import AssetPage from './routes/AssetPage';
 import AssetReturnsPage from './routes/AssetReturnsPage';
 import CategoriesPage from './routes/CategoriesPage';
@@ -59,9 +61,12 @@ const transactionsRoute = createRoute({
   path: '/transactions',
 
   // 004's done step links here with the batch it just wrote, so the list opens on
-  // exactly those rows. Anything else in the query string is dropped.
-  validateSearch: (search: Record<string, unknown>): { importBatchId?: string } =>
-    typeof search.importBatchId === 'string' ? { importBatchId: search.importBatchId } : {},
+  // exactly those rows; 015's account page with the account. Anything else in the
+  // query string is dropped.
+  validateSearch: (search: Record<string, unknown>): { importBatchId?: string; accountId?: string } => ({
+    ...(typeof search.importBatchId === 'string' ? { importBatchId: search.importBatchId } : {}),
+    ...(typeof search.accountId === 'string' ? { accountId: search.accountId } : {}),
+  }),
 
   component: TransactionsPage,
 });
@@ -72,10 +77,28 @@ const importRoute = createRoute({
   component: ImportPage,
 });
 
+// 015: the accounts beside the selected one, whose tab is a search parameter so a
+// reload or a link opens it. Declared here, it is inherited by both children.
 const accountsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/accounts',
+  validateSearch: (search: Record<string, unknown>): { tab?: AccountTab } =>
+    accountTabs.includes(search.tab as AccountTab) && search.tab !== 'transactions'
+      ? { tab: search.tab as AccountTab }
+      : {},
   component: AccountsPage,
+});
+
+const accountsIndexRoute = createRoute({
+  getParentRoute: () => accountsRoute,
+  path: '/',
+  component: FirstAccount,
+});
+
+const accountRoute = createRoute({
+  getParentRoute: () => accountsRoute,
+  path: '$accountId',
+  component: AccountPage,
 });
 
 const categoriesRoute = createRoute({
@@ -129,5 +152,5 @@ const settingsRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute, categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute, assetReturnsRoute, settingsRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute.addChildren([accountsIndexRoute, accountRoute]), categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute, assetReturnsRoute, settingsRoute]),
 ]);

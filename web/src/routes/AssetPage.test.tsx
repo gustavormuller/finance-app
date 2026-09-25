@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { DailyRow, Movement, Position } from '@/api/finance';
+import type { DailyRow, Movement, Position, UsdBrl } from '@/api/finance';
+import { chooseCurrency } from '@/lib/currency';
 import { routeTree } from '@/routeTree';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
@@ -55,7 +56,10 @@ const daily: DailyRow[] = [
 
 type Answer = { status?: number; body?: unknown } | undefined;
 
-function stubAsset(state: { movements: Movement[]; daily?: DailyRow[] }, write: (request: SeenRequest) => Answer = () => undefined) {
+function stubAsset(
+  state: { movements: Movement[]; daily?: DailyRow[]; usdBrl?: UsdBrl },
+  write: (request: SeenRequest) => Answer = () => undefined,
+) {
   return stubFetch((request) => {
     const url = new URL(request.url, 'http://localhost');
 
@@ -69,7 +73,15 @@ function stubAsset(state: { movements: Movement[]; daily?: DailyRow[] }, write: 
       case '/api/investments/assets':
         return { body: [petr4] };
       case '/api/investments/summary':
-        return { body: { totalBrl: 3510, totalCostBrl: 3212, unrealisedBrl: 298 } };
+        return {
+          body: {
+            totalBrl: 3510,
+            totalCostBrl: 3212,
+            unrealisedBrl: 298,
+            allocation: [{ class: 'StockBr', valueBrl: 3510, share: 1 }],
+            usdBrl: state.usdBrl ?? null,
+          },
+        };
       case '/api/market-data/assets':
         return { body: [] };
       case '/api/investments/assets/a-petr4/movements':
@@ -98,6 +110,26 @@ function renderAt(path: string) {
 describe('AssetPage', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    act(() => chooseCurrency('BRL'));
+    localStorage.clear();
+  });
+
+  /** Spec 016 web test 13. */
+  it('shows its money in dollars at the latest rate, its prices in its own currency, and its history in reais', async () => {
+    localStorage.setItem('currency', 'USD');
+    stubAsset({ movements: [buy, dividend], usdBrl: { rate: 5, date: '2026-09-23' } });
+    renderAt('/investments/a-petr4');
+
+    const summary = await screen.findByTestId('asset-summary');
+    await waitFor(() => expect(text(summary)).toContain('US$ 702,00'));
+    expect(text(summary)).toContain('+US$ 59,60 (+9,28%)');
+    expect(text(summary)).toContain('US$ 24,00');
+    expect(text(summary)).toContain('R$ 32,12');
+    expect(text(screen.getByTestId('currency-note'))).toBe('em dólar · US$ 1 = R$ 5,00 em 23/09');
+    expect(within(screen.getByRole('group', { name: 'Moeda' })).getByRole('button', { name: 'US$' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: 'Valor ao longo do tempo, em reais' })).toBeInTheDocument();
+    // A movement is what was paid, in the asset's currency, whatever the page shows.
+    expect(text(screen.getByTestId('movement-m-buy'))).toContain('R$ 32,12');
   });
 
   it('shows the position and its movements, each kind in Portuguese', async () => {

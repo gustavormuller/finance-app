@@ -36,6 +36,12 @@ public sealed record MonthTotals(string Month, decimal Income, decimal Expense);
 public sealed record CategoryTotal(Guid CategoryId, string Name, decimal Amount, decimal Share);
 
 /// <summary>
+/// 014: what was owned at the end of one calendar month, <c>Month</c> as <c>YYYY-MM</c>.
+/// <c>Total</c> is <c>Accounts + Investments</c>.
+/// </summary>
+public sealed record NetWorthPoint(string Month, decimal Accounts, decimal Investments, decimal Total);
+
+/// <summary>
 /// The dashboard's three aggregations (005), in SQL through Dapper on the context's
 /// own connection (ARCHITECTURE.md §6).
 /// </summary>
@@ -116,6 +122,75 @@ public sealed class DashboardQueries(AppDbContext database)
         ORDER BY abs(SUM(t."Amount")) DESC, root."Name"
         """;
 
+    /// <remarks>
+    /// 014. <c>included</c> is the set of accounts the summary's total adds up, so a
+    /// month's <c>Accounts</c> is that total as it stood on the month's last day.
+    /// <c>Investments</c> takes each asset's latest <c>PortfolioDaily</c> row on or
+    /// before that day, one backwards probe of the primary key per month and asset.
+    /// The series opens at the first month with a transaction or a portfolio row, or
+    /// at the last month when opening balances are all there is (they have no date),
+    /// and never before the window.
+    /// </remarks>
+    internal const string NetWorthSql = """
+        WITH included AS (
+            SELECT a."Id", a."OpeningBalance"
+            FROM "Accounts" a
+            WHERE a."UserId" = @userId AND a."Currency" = @currency
+        ),
+        flows AS (
+            SELECT date_trunc('month', t."Date"::timestamp)::date AS "Start", SUM(t."Amount") AS "Amount"
+            FROM "Transactions" t
+            JOIN included a ON a."Id" = t."AccountId"
+            WHERE t."UserId" = @userId
+            GROUP BY 1
+        ),
+        bounds AS (
+            SELECT LEAST(
+                       (SELECT min(f."Start") FROM flows f),
+                       (SELECT date_trunc('month', min(d."Date")::timestamp)::date
+                        FROM "PortfolioDaily" d
+                        WHERE d."UserId" = @userId),
+                       (SELECT make_date(@toYear, @toMonth, 1) WHERE EXISTS (SELECT 1 FROM included))
+                   ) AS "Start"
+        ),
+        months AS (
+            SELECT step::date AS "Start", (step + interval '1 month')::date AS "Next"
+            FROM bounds b,
+                 generate_series(
+                     GREATEST(b."Start", make_date(@fromYear, @fromMonth, 1))::timestamp,
+                     make_date(@toYear, @toMonth, 1)::timestamp,
+                     interval '1 month') AS step
+            WHERE b."Start" IS NOT NULL
+        ),
+        invested AS (
+            SELECT m."Start", SUM(latest."ValueBrl") AS "Value"
+            FROM months m
+            CROSS JOIN "Assets" s
+            CROSS JOIN LATERAL (
+                SELECT d."ValueBrl"
+                FROM "PortfolioDaily" d
+                WHERE d."UserId" = @userId AND d."AssetId" = s."Id" AND d."Date" < m."Next"
+                ORDER BY d."Date" DESC
+                LIMIT 1
+            ) latest
+            WHERE s."UserId" = @userId
+            GROUP BY m."Start"
+        ),
+        held AS (
+            SELECT m."Start",
+                   (SELECT COALESCE(SUM(a."OpeningBalance"), 0) FROM included a)
+                   + COALESCE((SELECT SUM(f."Amount") FROM flows f WHERE f."Start" <= m."Start"), 0) AS "Value"
+            FROM months m
+        )
+        SELECT to_char(h."Start", 'YYYY-MM') AS "Month",
+               h."Value" AS "Accounts",
+               COALESCE(i."Value", 0) AS "Investments",
+               h."Value" + COALESCE(i."Value", 0) AS "Total"
+        FROM held h
+        LEFT JOIN invested i ON i."Start" = h."Start"
+        ORDER BY h."Start"
+        """;
+
     private sealed record BalanceRow(Guid AccountId, string Name, AccountType Type, string Currency, decimal Balance);
 
     private sealed record CategoryRow(Guid CategoryId, string Name, decimal Amount);
@@ -162,6 +237,34 @@ public sealed class DashboardQueries(AppDbContext database)
                 fromMonth = first.Month,
                 count = months,
                 currency = Account.DefaultCurrency,
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// 014: the month-end net worth of at most <paramref name="months"/> months ending
+    /// with <paramref name="lastMonth"/>, oldest first, from the first month with data.
+    /// </summary>
+    public async Task<IReadOnlyList<NetWorthPoint>> NetWorthAsync(
+        Guid userId,
+        DateOnly lastMonth,
+        int months,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(months, 1);
+
+        var first = lastMonth.AddMonths(1 - months);
+
+        return await QueryAsync<NetWorthPoint>(
+            NetWorthSql,
+            new
+            {
+                userId,
+                currency = Account.DefaultCurrency,
+                fromYear = first.Year,
+                fromMonth = first.Month,
+                toYear = lastMonth.Year,
+                toMonth = lastMonth.Month,
             },
             cancellationToken);
     }
