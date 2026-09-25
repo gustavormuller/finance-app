@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * 012: the Obsidiana direction. `:root` is the light theme (Quartzo), `.dark` the dark
+ * The Obsidiana direction. `:root` is the light theme (Quartzo), `.dark` the dark
  * one (Obsidiana); `lib/theme.ts` and the script in index.html put `dark` on <html>.
  *
  * Every text pair here reaches 4.5:1 on both the ground and a card. Chart series differ

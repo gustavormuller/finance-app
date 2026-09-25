@@ -1,6 +1,6 @@
 import { ApiError, type ImportBatch } from '@/api/finance';
 
-/** The account page's tabs (015); `transactions` is the default and is left out of the URL. */
+/** The account page's tabs; `transactions` is the default and is left out of the URL. */
 export type AccountTab = 'transactions' | 'import' | 'details';
 
 export const accountTabs: AccountTab[] = ['transactions', 'import', 'details'];

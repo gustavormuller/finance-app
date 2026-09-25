@@ -1,5 +1,5 @@
 /**
- * What every Recharts chart shares (012): the tooltip drawn as a solid popover in the
+ * What every Recharts chart shares: the tooltip drawn as a solid popover in the
  * theme's colours, and money formatting for axes and tooltips. Colours are CSS
  * variables, so a chart follows the theme without re-rendering.
  */

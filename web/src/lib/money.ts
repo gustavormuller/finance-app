@@ -1,5 +1,5 @@
 /**
- * How 007's figures are written on screen: pt-BR, with the currency's own symbol.
+ * How figures are written on screen: pt-BR, with the currency's own symbol.
  *
  * Display only. Every value here arrives computed by the API; nothing is added up.
  */
@@ -29,7 +29,7 @@ export function formatSignedMoney(value: number, currency = 'BRL'): string {
 
 const compactFormats = new Map<string, Intl.NumberFormat>();
 
-/** A figure beside another, where the cents are noise: `R$ 39 mil`, `US$ 3,5 mil` (016). */
+/** A figure beside another, where the cents are noise: `R$ 39 mil`, `US$ 3,5 mil`. */
 export function formatCompactMoney(value: number, currency = 'BRL'): string {
   let format = compactFormats.get(currency);
   if (!format) {
@@ -88,7 +88,7 @@ export function businessDaysSince(priceDate: string, today: string): number {
   return count;
 }
 
-/** Spec 007: a price older than 3 business days is flagged — the sync may be broken. */
+/** A price older than 3 business days is flagged: the sync may be broken. */
 export const STALE_AFTER_BUSINESS_DAYS = 3;
 
 export function isStalePrice(priceDate: string, today: string): boolean {

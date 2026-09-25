@@ -5,7 +5,7 @@ import type { Returns, ReturnsPoint } from '@/api/finance';
 import { divideToEven } from './decimal';
 
 /**
- * Reais or dollars (016): which currency the investments area shows its money in.
+ * Reais or dollars: which currency the investments area shows its money in.
  *
  * A per-device convenience in `localStorage`, as `lib/theme.ts` keeps the theme, never a
  * server setting. Key `currency`, values `BRL` | `USD`. Storage that cannot be read is R$;
@@ -85,7 +85,7 @@ export function brlToUsd(brl: number, rate: number): number {
   return Number(divideToEven(units(brl, CENTS) * 10n ** BigInt(RATE_PLACES), rateUnits)) / 100;
 }
 
-/** The benchmark code whose index is the dollar, base 100 (008). */
+/** The benchmark code whose index is the dollar, base 100. */
 const DOLLAR = 'USDBRL';
 
 /**
@@ -98,7 +98,7 @@ function returnOver(index: number, dollar: number): number {
   return Number(ratio - 10n ** BigInt(RETURN_PLACES)) / 10 ** RETURN_PLACES;
 }
 
-/** `(1 + total)^(365 / days) - 1`, 008's annualisation; display only, so a float. */
+/** `(1 + total)^(365 / days) - 1`, the API's annualisation; display only, so a float. */
 function annualise(total: number, days: number): number | null {
   const rate = days > 0 ? Math.pow(1 + total, 365 / days) - 1 : NaN;
 
@@ -106,7 +106,7 @@ function annualise(total: number, days: number): number | null {
 }
 
 /**
- * 008's returns seen from a dollar (016, decision 13). The series carries the dollar as a
+ * The returns seen from a dollar (016, decision 13). The series carries the dollar as a
  * base-100 index, so a value in dollars is `index / dollar x 100` at every point, for the
  * portfolio and each benchmark alike, and a period's return is the last point over 100.
  *

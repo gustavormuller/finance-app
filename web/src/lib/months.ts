@@ -3,7 +3,7 @@
  *
  * The dashboard always sends the month it means, computed here from the local date:
  * the API's own default is the UTC month, which runs ahead of Brasília for three
- * hours at every month's turn (005 checkpoint 2).
+ * hours at every month's turn.
  */
 
 const MONTH_NAMES = [
