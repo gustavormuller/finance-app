@@ -10,8 +10,8 @@ namespace Finance.Api.Infrastructure;
 /// </summary>
 /// <remarks>
 /// The query filters are deliberately absent from this file. They are applied by that
-/// loop, to every entity implementing the interface, so a future entity cannot be
-/// isolated by accident of someone remembering to configure it here (ADR-007).
+/// loop, to every entity implementing the interface, so a future entity's isolation
+/// does not depend on someone remembering to configure it here (ADR-007).
 /// </remarks>
 internal static class TransactionsModel
 {
@@ -42,7 +42,7 @@ internal static class TransactionsModel
             // Scoped to the user, so it says nothing about anyone else's names.
             account.HasIndex(entity => new { entity.UserId, entity.Name }).IsUnique();
 
-            // 005: NOT NULL DEFAULT 0, so existing accounts start where they did —
+            // NOT NULL DEFAULT 0, so existing accounts start where they did —
             // their balance is the sum of their transactions.
             account.Property(entity => entity.OpeningBalance)
                 .HasColumnType("numeric(18,2)")
@@ -101,8 +101,8 @@ internal static class TransactionsModel
                 .OnDelete(DeleteBehavior.Cascade);
 
             // RESTRICT on both: an account or a category with history behind it is not
-            // something to delete by implication. The endpoints turn the resulting
-            // failure into a 409 that says which.
+            // something to delete by implication. The endpoints check first and answer
+            // with a 409 that says which.
             transaction.HasOne<Account>()
                 .WithMany()
                 .HasForeignKey(entity => entity.AccountId)

@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 namespace Finance.Api.Infrastructure;
 
 /// <summary>
-/// 010: in production only Caddy talks to the API, over plain HTTP on the Docker
-/// network, so the browser's scheme and address arrive as <c>X-Forwarded-Proto</c> and
+/// In production only Caddy talks to the API, over plain HTTP on the Docker network,
+/// so the browser's scheme and address arrive as <c>X-Forwarded-Proto</c> and
 /// <c>X-Forwarded-For</c>. Without the scheme the Google <c>redirect_uri</c> is built as
 /// <c>http://</c> and never matches the Cloud Console entry.
 /// </summary>

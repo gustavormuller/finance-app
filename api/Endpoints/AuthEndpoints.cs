@@ -49,7 +49,7 @@ public static class AuthEndpoints
             })
             .RequireAuthorization();
 
-        // 009: the user's own ai_enabled (ADR-010), the only way to turn AI on from the app.
+        // The user's own ai_enabled (ADR-010), the only way to turn AI on from the app.
         // Answers with the whole of GET /api/auth/me, aiEnabled included.
         routes.MapPatch("/api/auth/me", async (MePatch patch, ClaimsPrincipal principal, UserManager<AppUser> users) =>
             {

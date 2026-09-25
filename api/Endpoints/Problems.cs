@@ -6,8 +6,8 @@ using Npgsql;
 namespace Finance.Api.Endpoints;
 
 /// <summary>
-/// The two failure shapes 003's endpoints answer with, in one place so every route
-/// spells them the same way.
+/// The failure shapes the endpoints answer with, in one place so every route spells
+/// them the same way.
 /// </summary>
 /// <remarks>
 /// A rejected field is always a 400 naming the field, never a 403 — including when
@@ -76,8 +76,8 @@ internal static class Problems
         exception is AiDisabledException or AiBudgetExceededException or AiProviderException;
 
     /// <summary>
-    /// 009: an AI gate or provider failure as the pt-BR problem its status stands for: 403
-    /// AI off, 402 budget spent, 504 timed out, 502 any other provider failure. Never the
+    /// An AI gate or provider failure as the pt-BR problem its status stands for: 403 AI
+    /// off, 402 budget spent, 504 timed out, 502 any other provider failure. Never the
     /// exception's message, which is English and may name the model.
     /// </summary>
     public static IResult Ai(Exception exception) => exception switch
