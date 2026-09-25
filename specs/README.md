@@ -32,6 +32,8 @@ Each spec contains:
 | 010 | deploy | Oracle instance, Caddy, Tunnel, backups |
 | 011 | import-excel | `.xls`/`.xlsx` through the CSV mapping |
 | 012 | design-obsidiana | the Obsidiana look, dark and light themes |
+| 013 | categories-table | categories as a table with usage, edited in place |
+| 014 | net-worth | net worth over time, compact in the dashboard hero |
 | 015 | accounts-import | accounts as the home of import and its history |
 
 One number per session set. If a feature needs more than three sessions, it was scoped

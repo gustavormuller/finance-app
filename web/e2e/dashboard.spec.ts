@@ -21,6 +21,16 @@ function today() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+/** The 15th of the previous local month, `YYYY-MM-DD`: safely inside it on any day. */
+function lastMonth() {
+  const date = new Date();
+  date.setDate(15);
+  date.setMonth(date.getMonth() - 1);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+
+  return `${date.getFullYear()}-${month}-15`;
+}
+
 /** The balance row of the account called `name`; its test id carries the account id. */
 function accountBalance(page: Page, name: string) {
   return page.locator('[data-testid^="account-balance-"]').filter({ hasText: name }).getByTestId('amount');
@@ -134,4 +144,39 @@ test('a Transferência moves the balance and leaves the month totals alone', asy
   const rows = page.getByTestId('category-breakdown').getByTestId('category-row');
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText('Alimentação');
+});
+
+/**
+ * Spec 014 E2E test 14: last month ends at 900,00 and this month is at 857,10, with
+ * nothing invested, so net worth and Em contas agree and the month's change is the
+ * expense. Twelve months back there is no history, so that chip stays hidden.
+ */
+test('the hero shows net worth, its change over the month and the sparkline', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-net-worth'), 'Katherine Johnson');
+  await createAccount(page, 'Caixa', '1.000,00');
+
+  await createTransaction(page, {
+    account: 'Caixa',
+    category: 'Alimentação',
+    amount: '100.00',
+    date: lastMonth(),
+    description: 'Mercado do mês passado',
+  });
+  await createTransaction(page, {
+    account: 'Caixa',
+    category: 'Alimentação',
+    amount: '42.90',
+    date: today(),
+    description: 'Padaria',
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: 'Patrimônio · contas + investimentos' })).toBeVisible();
+  await expect(stat(page, 'net-worth-total')).toHaveText('+857,10');
+  await expect(stat(page, 'total-balance')).toHaveText('+857,10');
+  await expect(page.getByTestId('net-worth-change-month')).toHaveText('1 mês −42,90');
+  await expect(page.getByTestId('net-worth-change-twelve')).toBeHidden();
+  await expect(page.getByTestId('hero-invested')).toBeHidden();
+  await expect(page.getByTestId('net-worth-chart')).toBeVisible();
 });

@@ -7,7 +7,7 @@ using Finance.Api.Domain.Transactions;
 namespace Finance.Api.Endpoints;
 
 /// <summary>
-/// 005's three read-only dashboard routes. Parameters are bound as strings and
+/// 005's three read-only dashboard routes, and 014's net-worth series. Parameters are bound as strings and
 /// parsed here, so a malformed one is a 400 with a pt-BR message naming the field
 /// rather than the framework's English binding failure.
 /// </summary>
@@ -21,9 +21,19 @@ public static partial class DashboardEndpoints
 
     private const int DefaultMonths = 12;
 
+    /// <summary>
+    /// 014's window. Refused rather than clamped outside these bounds: the route is new,
+    /// so nothing relies on a lenient reading of it.
+    /// </summary>
+    private const int MaximumNetWorthMonths = 120;
+
+    private const int DefaultNetWorthMonths = 24;
+
     private const string MonthMessage = "O mês deve estar no formato AAAA-MM, por exemplo 2026-09.";
 
     private const string MonthsMessage = "O número de meses deve ser um número inteiro.";
+
+    private const string NetWorthMonthsMessage = "O número de meses deve ser um número inteiro entre 1 e 120.";
 
     private const string KindMessage = "O tipo deve ser receita (Income) ou despesa (Expense).";
 
@@ -67,6 +77,28 @@ public static partial class DashboardEndpoints
                 currentUser.Id!.Value,
                 CurrentMonth(),
                 Math.Clamp(count, 1, MaximumMonths),
+                cancellationToken));
+        });
+
+        dashboard.MapGet("/net-worth", async (
+            DashboardQueries queries,
+            ICurrentUser currentUser,
+            CancellationToken cancellationToken,
+            string? months = null) =>
+        {
+            var count = DefaultNetWorthMonths;
+
+            if (months is not null
+                && (!int.TryParse(months, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out count)
+                    || count is < 1 or > MaximumNetWorthMonths))
+            {
+                return Problems.Validation("months", NetWorthMonthsMessage);
+            }
+
+            return Results.Ok(await queries.NetWorthAsync(
+                currentUser.Id!.Value,
+                CurrentMonth(),
+                count,
                 cancellationToken));
         });
 
