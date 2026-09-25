@@ -132,7 +132,57 @@ public static class CategoryEndpoints
             return Results.NoContent();
         });
 
+        // 013: how much each category was used in a range, by default the 12 months
+        // ending today. Only categories with a transaction in the range appear; the
+        // screen rolls subcategories up into their main category itself.
+        categories.MapGet("/usage", async (
+            AppDbContext database,
+            CancellationToken cancellationToken,
+            string? from = null,
+            string? to = null) =>
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var (start, end, problem) = ParseRange(from, to, today);
+
+            if (problem is not null)
+            {
+                return problem;
+            }
+
+            return Results.Ok(await database.Transactions
+                .Where(transaction => transaction.Date >= start && transaction.Date <= end)
+                .GroupBy(transaction => transaction.CategoryId)
+                .Select(group => new UsageResponse(group.Key, group.Count(), group.Sum(transaction => transaction.Money.Amount)))
+                .ToListAsync(cancellationToken));
+        });
+
         return routes;
+    }
+
+    private sealed record UsageResponse(Guid CategoryId, int Count, decimal Total);
+
+    private static (DateOnly From, DateOnly To, IResult? Problem) ParseRange(string? from, string? to, DateOnly today)
+    {
+        static DateOnly? Parse(string? text) =>
+            DateOnly.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date)
+                ? date
+                : null;
+
+        var end = to is null ? today : Parse(to);
+        if (end is null)
+        {
+            return (default, default, Problems.Validation("to", "Data inválida."));
+        }
+
+        var start = from is null ? end.Value.AddMonths(-12).AddDays(1) : Parse(from);
+        if (start is null)
+        {
+            return (default, default, Problems.Validation("from", "Data inválida."));
+        }
+
+        return start > end
+            ? (default, default, Problems.Validation("from", "A data inicial deve ser anterior ou igual à data final."))
+            : (start.Value, end.Value, null);
     }
 
     /// <summary>

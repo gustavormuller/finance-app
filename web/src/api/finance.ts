@@ -79,6 +79,13 @@ export interface AccountInput {
   openingBalance?: number;
 }
 
+/** One category's use in a range (013): signed, as its transactions are. */
+export interface CategoryUsage {
+  categoryId: string;
+  count: number;
+  total: number;
+}
+
 export interface CategoryInput {
   name: string;
   kind: CategoryKind;
@@ -616,6 +623,9 @@ export const api = {
     request<Category>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
 
   deleteCategory: (id: string) => request<void>(`/api/categories/${id}`, { method: 'DELETE' }),
+
+  /** The 12 months ending today unless a range is given. */
+  categoryUsage: () => request<CategoryUsage[]>('/api/categories/usage'),
 
   listTransactions: (query: TransactionQuery) =>
     request<TransactionPage>(`/api/transactions?${searchParams(query)}`),
