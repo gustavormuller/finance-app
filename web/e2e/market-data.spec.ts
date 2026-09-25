@@ -82,7 +82,7 @@ test('a manual sync on the fake providers appears as Succeeded, by provider', as
   await expect(run).toContainText('Manual');
   await expect(run.getByTestId('provider-summary-Brapi')).toContainText('brapi');
   await expect(run.getByTestId('provider-summary-Brapi')).toContainText('itens sincronizados');
-  await expect(run.getByTestId('provider-summary-Binance')).toContainText('itens sincronizados');
+  await expect(run.getByTestId('provider-summary-Binance')).toContainText(/linhas? gravadas?/);
   await expect(run.getByTestId('provider-summary-Bcb')).toContainText('Banco Central (SGS)');
   await expect(run.getByText('com falha')).toHaveCount(0);
 
