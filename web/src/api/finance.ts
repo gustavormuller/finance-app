@@ -9,6 +9,7 @@
  */
 
 import type { AuthenticatedUser } from '@/auth/useMe';
+import { fileNameFrom } from '@/lib/download';
 
 export type AccountType = 'Checking' | 'Savings' | 'CreditCard' | 'Cash' | 'Investment';
 
@@ -96,14 +97,23 @@ export interface CategoryInput {
   parentId: string | null;
 }
 
-export interface TransactionQuery {
+/** Which transactions the list shows and its export (021) writes. */
+export interface TransactionFilter {
   from?: string;
   to?: string;
   accountId?: string;
   categoryId?: string;
   importBatchId?: string;
+}
+
+export interface TransactionQuery extends TransactionFilter {
   page?: number;
   pageSize?: number;
+}
+
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string;
 }
 
 // ---- 004: import ------------------------------------------------------------
@@ -579,11 +589,32 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
   }
 
+  throw await refusal(response);
+}
+
+/**
+ * A file the API sends (021): the whole body, and the name its `Content-Disposition`
+ * gives. A refusal is an `ApiError`, as for any other request.
+ */
+async function download(url: string, fallbackName: string): Promise<DownloadedFile> {
+  const response = await fetch(url, { credentials: 'same-origin' });
+
+  if (!response.ok) {
+    throw await refusal(response);
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: fileNameFrom(response.headers.get('Content-Disposition'), fallbackName),
+  };
+}
+
+async function refusal(response: Response): Promise<ApiError> {
   // The API answers every refusal as problem details. `errors` is present on a 400
   // naming fields; `detail` carries the readable sentence a 409 exists to give.
   const problem = await response.json().catch(() => ({}) as Record<string, unknown>);
 
-  throw new ApiError(
+  return new ApiError(
     response.status,
     (problem.detail as string) ?? (problem.title as string) ?? `Request failed (${response.status})`,
     (problem.errors as Record<string, string[]>) ?? {},
@@ -650,6 +681,10 @@ export const api = {
 
   listTransactions: (query: TransactionQuery) =>
     request<TransactionPage>(`/api/transactions?${searchParams(query)}`),
+
+  /** Every transaction `filter` selects, not one page, as the CSV the API writes (021). */
+  exportTransactions: (filter: TransactionFilter) =>
+    download(`/api/transactions/export?${searchParams(filter)}`, 'lancamentos.csv'),
 
   createTransaction: (input: TransactionInput) =>
     request<Transaction>('/api/transactions', { method: 'POST', body: JSON.stringify(input) }),
