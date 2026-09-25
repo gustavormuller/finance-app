@@ -10,12 +10,11 @@ namespace Finance.Api.Domain.Import;
 /// </summary>
 /// <remarks>
 /// A BOM wins. Otherwise strict UTF-8: it is the one encoding a file can be
-/// <em>proven</em> to be in, because random Latin-1 bytes almost never form valid
-/// UTF-8 sequences. Only when that proof fails is the file read as Latin-1, which
-/// covers every accented letter Portuguese has and differs from Windows-1252 only
-/// in the 0x80–0x9F block. Windows-1252 itself is not available under
-/// <c>InvariantGlobalization</c> without registering a code-page provider, and the
-/// difference is not worth the dependency.
+/// <em>proven</em> to be in, because random Windows-1252 bytes almost never form valid
+/// UTF-8 sequences. Only when that proof fails is the file read as Windows-1252. That
+/// also reads ISO-8859-1 correctly: the two agree on every letter Portuguese has and
+/// differ only in 0x80–0x9F, where Windows-1252 has punctuation (en dash, curly quotes,
+/// the euro sign) and ISO-8859-1 has control characters no statement contains.
 /// </remarks>
 public static class StatementText
 {
@@ -25,6 +24,16 @@ public static class StatementText
 
     private static readonly UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+    private static readonly Encoding Windows1252;
+
+    static StatementText()
+    {
+        // .NET knows Windows code pages only once the provider shipped in the shared
+        // framework is registered. Registering twice is harmless.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        Windows1252 = Encoding.GetEncoding(1252);
+    }
 
     public static string Decode(ReadOnlySpan<byte> bytes)
     {
@@ -50,7 +59,7 @@ public static class StatementText
         }
         catch (DecoderFallbackException)
         {
-            return Encoding.Latin1.GetString(bytes);
+            return Windows1252.GetString(bytes);
         }
     }
 }
