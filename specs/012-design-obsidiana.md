@@ -69,3 +69,34 @@ scrolling sideways; the dark theme loads without a white flash.
 - Both verify scripts green
 - Tests 1–7 exist and pass
 - Screenshots of the dashboard, transactions, import, investments and returns pages in both themes
+
+## Amendments
+
+1. **A border utility beside `glass` must win.** *(Added 2026-09-25, after 015 and 023.)*
+   `@utility glass` set `border: 1px solid var(--border)`. Tailwind v4 orders utilities by
+   the properties they set, and the `border` shorthand is not in its property list, so
+   `.glass` was sorted by `background-color` and landed after every `border-*` colour, width
+   and style utility. Next to it, `border-primary` lost to `var(--border)`. Two places pair
+   them: the selected account card (015), whose primary outline never showed, and the
+   danger zone card on `/settings` (023, still in review), which works around it with
+   `border-destructive/40!`.
+
+   **Rule: `glass` sets `border-width`, `border-style` and `border-color` as longhands.**
+   The values stay the same (1px, solid, `var(--border)`), so a panel with nothing next to it
+   looks as before. `border-width` puts `.glass` ahead of every border utility, so
+   `glass border-primary` shows the primary colour without `!`. Two options were turned down.
+   A `!` on each pairing works, but the next pairing that forgets it fails silently, as 015's
+   did. Leaving the colour to the base layer's `* { border-color: var(--border) }` would also
+   work, but then the panel's look would depend on a rule elsewhere in the file.
+
+   **Visible change:** the selected account card gets its primary outline. No other screen
+   changes. Once 023 lands, its `!` does no harm and can go in a later change **(review)**.
+
+   **Tests:**
+   8. Unit (`web/src/glass.node.test.ts`): compile `src/index.css` with Tailwind and build
+      `glass` beside `border-primary`, `border-destructive/40`, `border-2` and `border-dashed`.
+      Each border utility's rule comes after `.glass`, so it wins the cascade. Vitest empties
+      CSS imports, so the test reads the files from disk, and a `*.node.test.ts` file is
+      typechecked by `tsconfig.node.json` (Node types) instead of `tsconfig.app.json`.
+   9. E2E (`web/e2e/theme.spec.ts`): create an account, which selects it; its card's
+      `border-top-color` is the computed `--primary`.

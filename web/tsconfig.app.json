@@ -25,5 +25,7 @@
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Tests that read files from disk; tsconfig.node.json checks them with Node types.
+  "exclude": ["src/**/*.node.test.ts"]
 }
