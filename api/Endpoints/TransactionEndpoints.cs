@@ -48,46 +48,25 @@ public static class TransactionEndpoints
         transactions.MapGet("/", async (
             AppDbContext database,
             CancellationToken cancellationToken,
-            DateOnly? from = null,
-            DateOnly? to = null,
-            Guid? accountId = null,
-            Guid? categoryId = null,
-            Guid? importBatchId = null,
+            string? from = null,
+            string? to = null,
+            string? accountId = null,
+            string? categoryId = null,
+            string? importBatchId = null,
             int page = 1,
             int pageSize = DefaultPageSize) =>
         {
+            var (filter, problem) = TransactionFilter.Parse(from, to, accountId, categoryId, importBatchId);
+
+            if (filter is null)
+            {
+                return problem!;
+            }
+
             page = Math.Max(page, 1);
             pageSize = Math.Clamp(pageSize, 1, MaximumPageSize);
 
-            var query = database.Transactions.AsQueryable();
-
-            // Both ends inclusive, which is what a person means by "March 10th to
-            // March 20th" on a filter bar.
-            if (from is { } start)
-            {
-                query = query.Where(transaction => transaction.Date >= start);
-            }
-
-            if (to is { } end)
-            {
-                query = query.Where(transaction => transaction.Date <= end);
-            }
-
-            if (accountId is { } onlyAccount)
-            {
-                query = query.Where(transaction => transaction.AccountId == onlyAccount);
-            }
-
-            if (categoryId is { } onlyCategory)
-            {
-                query = query.Where(transaction => transaction.CategoryId == onlyCategory);
-            }
-
-            // 004: the "see what this import wrote" link from the done step.
-            if (importBatchId is { } onlyBatch)
-            {
-                query = query.Where(transaction => transaction.ImportBatchId == onlyBatch);
-            }
+            var query = filter.Apply(database.Transactions);
 
             var total = await query.CountAsync(cancellationToken);
 

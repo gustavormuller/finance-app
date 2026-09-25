@@ -131,6 +131,21 @@ internal static class TransactionsFixtures
             : [];
     }
 
+    /// <summary>The messages a problem-details response gave for one field; empty when it named no such field.</summary>
+    public static async Task<IReadOnlyList<string>> ProblemMessagesAsync(
+        HttpResponseMessage response,
+        string field,
+        CancellationToken cancellationToken)
+    {
+        using var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync(cancellationToken));
+
+        return document.RootElement.TryGetProperty("errors", out var errors)
+            && errors.TryGetProperty(field, out var messages)
+            ? [.. messages.EnumerateArray().Select(message => message.GetString()!)]
+            : [];
+    }
+
     /// <summary>
     /// The response shapes, declared by the tests rather than shared with the
     /// endpoints: a test that reuses the production DTO cannot notice the endpoint

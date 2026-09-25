@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -330,6 +330,55 @@ public sealed class TransactionEndpointTests(PostgresFixture postgres)
 
         Assert.Equal("nubank groceries", Assert.Single(byAccount!.Items).Description);
         Assert.Equal("inter travel", Assert.Single(byCategory!.Items).Description);
+    }
+
+    /// <summary>
+    /// Spec 021 integration test 13, the list's half: a malformed filter is refused in
+    /// pt-BR, naming the field, rather than with the framework's bare 400.
+    /// </summary>
+    [Theory]
+    [InlineData("from=2026-13-01", "from", "A data inicial deve estar no formato AAAA-MM-DD, por exemplo 2026-01-31.")]
+    [InlineData("to=31/12/2026", "to", "A data final deve estar no formato AAAA-MM-DD, por exemplo 2026-01-31.")]
+    [InlineData("accountId=nubank", "accountId", "A conta do filtro não é um identificador válido.")]
+    [InlineData("categoryId=42", "categoryId", "A categoria do filtro não é um identificador válido.")]
+    [InlineData("importBatchId=ontem", "importBatchId", "A importação do filtro não é um identificador válido.")]
+    public async Task A_malformed_filter_is_refused_naming_the_field(string query, string field, string message)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("bad-filter", cancellationToken);
+
+        using var response = await user.Client.GetAsync($"/api/transactions?{query}", cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal([message], await TransactionsFixtures.ProblemMessagesAsync(response, field, cancellationToken));
+    }
+
+    /// <summary>
+    /// Spec 021 decision 5: an empty filter value is no filter, and a range that ends
+    /// before it starts selects nothing rather than being refused.
+    /// </summary>
+    [Fact]
+    public async Task Empty_filters_are_ignored_and_a_reversed_range_is_empty()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("empty-filter", cancellationToken);
+        var accountId = await user.CreateAccountAsync("Nubank", cancellationToken);
+        var categoryId = await user.CreateCategoryAsync("Groceries", cancellationToken);
+
+        await user.CreateTransactionAsync(TransactionsFixtures.TransactionBody(accountId, categoryId), cancellationToken);
+
+        var unfiltered = await user.Client.GetFromJsonAsync<TransactionsFixtures.TransactionPage>(
+            "/api/transactions?from=&to=&accountId=&categoryId=&importBatchId=", cancellationToken);
+
+        var reversed = await user.Client.GetFromJsonAsync<TransactionsFixtures.TransactionPage>(
+            "/api/transactions?from=2026-09-30&to=2026-09-01", cancellationToken);
+
+        Assert.Equal(1, unfiltered!.Total);
+        Assert.Equal(0, reversed!.Total);
     }
 
     /// <summary>Editing and deleting one's own transaction, the ordinary path.</summary>
