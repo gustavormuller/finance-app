@@ -14,9 +14,9 @@ import ReturnsHero from '@/components/returns/ReturnsHero';
 import { buttonVariants } from '@/components/ui/button';
 
 /**
- * `/investments` (007, laid out by 016's design P1): how the portfolio is doing first,
- * then what is held. The returns lead; the positions table and "Adicionar ativo" follow
- * under "Posições", unchanged. With nothing held there are no returns to show.
+ * `/investments`, laid out by 016's design P1: how the portfolio is doing first, then
+ * what is held. The returns lead; the positions table and "Adicionar ativo" follow
+ * under "Posições". With nothing held there are no returns to show.
  */
 export default function InvestmentsPage() {
   const display = useDisplayCurrency();

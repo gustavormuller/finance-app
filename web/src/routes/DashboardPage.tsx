@@ -15,7 +15,7 @@ import { useMonthly, useNetWorth, useSummary } from '@/components/dashboard/quer
 import { currentMonth } from '@/lib/months';
 
 /**
- * `/` (005): where the money is, where it went this month, and how the last year
+ * `/`: where the money is, where it went this month, and how the last year
  * looks. Every number comes from the API already aggregated; the page only lays it
  * out.
  */
@@ -48,7 +48,7 @@ export default function DashboardPage() {
   // No accounts, a year of zeros and no net worth: nothing has been recorded, so a page
   // of zeros would only look broken. An account with no transactions is not this case —
   // its opening balance is already something to show — and neither is a portfolio held
-  // with no account (014).
+  // with no account.
   const empty =
     summary.data.balances.length === 0 &&
     monthly.data.every((entry) => entry.income === 0 && entry.expense === 0) &&
@@ -77,7 +77,7 @@ export default function DashboardPage() {
 
   return (
     <Page>
-      {/* 012: the Obsidiana grid — the hero across, three cards under it, then the
+      {/* The Obsidiana grid — the hero across, three cards under it, then the
           chart beside the latest transactions. */}
       <div className="grid gap-6 lg:grid-cols-6 [&>*]:min-w-0">
         <div className="lg:col-span-6">

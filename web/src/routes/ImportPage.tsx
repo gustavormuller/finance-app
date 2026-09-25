@@ -3,7 +3,7 @@ import { Navigate } from '@tanstack/react-router';
 import { useImports } from '@/components/accounts/queries';
 
 /**
- * `/import` (015): no longer a page — the import lives in each account — but links and
+ * `/import`: no longer a page — the import lives in each account — but links and
  * bookmarks to it keep working. With a statement in review, to that account's import
  * tab (the API keeps one per user); otherwise to the accounts.
  */

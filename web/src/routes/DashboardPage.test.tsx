@@ -192,7 +192,7 @@ describe('DashboardPage', () => {
 
     const empty = await screen.findByTestId('dashboard-empty');
     expect(within(empty).getByRole('link', { name: /lançamento/i })).toHaveAttribute('href', '/transactions');
-    // 015: an import starts from an account, and with none yet that is the first step.
+    // An import starts from an account, and with none yet that is the first step.
     expect(within(empty).getByRole('link', { name: /importar/i })).toHaveAttribute('href', '/accounts');
     expect(screen.queryByTestId('total-balance')).not.toBeInTheDocument();
   });
@@ -206,7 +206,6 @@ describe('DashboardPage', () => {
     expect(screen.queryByTestId('dashboard-empty')).not.toBeInTheDocument();
   });
 
-  /** 009: the "Análise do mês" card follows the month selector. */
   it('shows the analysis card for the selected month', async () => {
     const seen = stubApi();
     renderDashboard();

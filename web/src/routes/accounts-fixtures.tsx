@@ -8,7 +8,7 @@ import { stubFetch, type SeenRequest } from '@/test-utils';
 
 /**
  * What the accounts page reads, for the tests of `/accounts` and of the import inside
- * it (015). Not a test file: vitest only runs `*.test.tsx`.
+ * it. Not a test file: vitest only runs `*.test.tsx`.
  */
 
 export const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: true };
