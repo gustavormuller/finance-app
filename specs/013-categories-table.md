@@ -11,12 +11,12 @@ at the top of the page. This is variation C4 of the exploration.
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Layout | One table: Categoria (the tree), Tipo, Lançamentos 12m, Total 12m, Participação, actions. Main categories are rows; their subcategories are indented rows under them, collapsed by default and opened by clicking the main row. |
+| 1 | Layout | One table per kind (so no Tipo column): Categoria (the tree), Lançamentos 12m, Total 12m, Participação, actions. Main categories are rows; their subcategories are indented rows under them, collapsed by default and opened by clicking the main row. |
 | 2 | Filters | Kind: Todas (default, grouped under Receitas / Despesas / Transferências headings), Despesas, Receitas, Transferências. A search box that keeps a main category visible when one of its subcategories matches. A "Só as sem uso" switch that shows only categories with no transaction in the 12 months (with their main category as context). |
 | 3 | Usage | `GET /api/categories/usage` returns, per category, the number of transactions and their sum in a date range, default the 12 months ending today. A main category's row shows its own use plus its subcategories'. |
 | 4 | Participação | A category's share of its kind's total in the range: expenses of all expenses, income of all income. Transfers have none. A bar and the percentage. |
 | 5 | Editing | "Editar" opens a form in the row right under the category: Nome, Tipo, "Fica dentro de" (Nenhuma — é uma categoria principal, or a main category of the same kind). Salvar, Cancelar, Excluir. Only one form is open at a time. |
-| 6 | Creating | "Nova categoria" opens the same form as the first row of the table. "Nova subcategoria" on a main row opens it under that category's subcategories, with "Fica dentro de" already set. |
+| 6 | Creating | "Nova categoria" opens the same form above the tables (its kind is chosen in it). "Nova subcategoria" on a main row opens it under that category's subcategories, with "Fica dentro de" already set. |
 | 7 | Wording | "Categoria mãe" becomes "Fica dentro de"; "Nenhuma (nível principal)" becomes "Nenhuma — é uma categoria principal". |
 | 8 | What does not change | The two-level rule, the kind rules and every message the API already returns. |
 
