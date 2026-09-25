@@ -33,7 +33,10 @@ public sealed class MonthlyAnalysis(
     /// gateway saves its usage row on this context. The gateway checks <c>ai_enabled</c> and
     /// the budget again (step 3) and records the usage whatever happens (step 5).
     /// </summary>
-    /// <returns>False when the row is not this user's or no longer <c>Pending</c>, which runs nothing.</returns>
+    /// <returns>
+    /// False when the row is not this user's or no longer <c>Pending</c>, which runs nothing, or
+    /// when the user deleted their account while it ran (023), which leaves nothing to record.
+    /// </returns>
     public async Task<bool> RunAsync(Guid analysisId, CancellationToken ct)
     {
         var analysis = await db.AiAnalyses.SingleOrDefaultAsync(row => row.Id == analysisId, ct);
@@ -42,6 +45,23 @@ public sealed class MonthlyAnalysis(
             return false;
         }
 
+        try
+        {
+            return await RunPendingAsync(analysis, ct);
+        }
+        catch (DbUpdateException) when (!ct.IsCancellationRequested)
+        {
+            if (!await UserDeletedAsync(analysis))
+            {
+                throw;
+            }
+
+            return false;
+        }
+    }
+
+    private async Task<bool> RunPendingAsync(AiAnalysis analysis, CancellationToken ct)
+    {
         var prompt = MonthlyAnalysisPrompt.Current;
         (analysis.Status, analysis.StartedAt, analysis.PromptVersion) = (AiAnalysisStatus.Running, clock.GetUtcNow(), prompt.Version);
         (analysis.Content, analysis.Error, analysis.CompletedAt) = (null, null, null);
@@ -55,6 +75,11 @@ public sealed class MonthlyAnalysis(
         }
         catch (Exception failure) when (!ct.IsCancellationRequested)
         {
+            if (await UserDeletedAsync(analysis))
+            {
+                return false;
+            }
+
             // The reason stays in the log (keys redacted by the adapters); the row gets pt-BR copy.
             logger.LogWarning(failure, "AI analysis {AnalysisId} for {Month} failed", analysis.Id, analysis.Month);
             (analysis.Status, analysis.Error) = (AiAnalysisStatus.Failed, AiFailureText.For(failure));
@@ -63,6 +88,21 @@ public sealed class MonthlyAnalysis(
         // Not cancellable, like the usage row: the outcome was paid for.
         analysis.CompletedAt = clock.GetUtcNow();
         await db.SaveChangesAsync(CancellationToken.None);
+        return true;
+    }
+
+    /// <summary>
+    /// 023: an account deleted mid-run took this row with it, and the usage row cannot point at
+    /// a user who is gone, so a failed step is not the analysis failing. One quiet line instead.
+    /// </summary>
+    private async Task<bool> UserDeletedAsync(AiAnalysis analysis)
+    {
+        if (await db.Users.AnyAsync(user => user.Id == analysis.UserId, CancellationToken.None))
+        {
+            return false;
+        }
+
+        logger.LogInformation("AI analysis {AnalysisId} stopped: its user deleted their account.", analysis.Id);
         return true;
     }
 
