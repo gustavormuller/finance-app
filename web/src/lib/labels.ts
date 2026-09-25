@@ -175,6 +175,15 @@ export function benchmarkLabel(code: string): string {
   return benchmarkLabels[code] ?? code;
 }
 
+/** Where the full name does not fit, as in 016's comparison tiles. */
+const benchmarkShortLabels: Record<string, string> = {
+  IVVB11: 'S&P 500',
+};
+
+export function benchmarkShortLabel(code: string): string {
+  return benchmarkShortLabels[code] ?? benchmarkLabel(code);
+}
+
 export const returnsPeriodLabels: Record<ReturnsPeriodKind, string> = {
   inception: 'Desde o início',
   ytd: 'No ano',

@@ -19,16 +19,31 @@ const DASHES = ['6 3', '2 3', '10 4', '4 2 1 2', '1 3'];
  * the primary colour, each benchmark muted and toggleable. `codes` are the benchmarks
  * that could anchor; a null one has no key in `series`. Hovering lists every visible
  * series on that date; the hidden table gives the same at each month's last point.
+ * `bare` drops the panel, for a chart that sits inside another card (016's hero).
  */
-export default function ComparisonChart({ series, codes }: { series: ReturnsPoint[]; codes: string[] }) {
+export default function ComparisonChart({
+  series,
+  codes,
+  title = 'Carteira e referências, base 100',
+  bare = false,
+}: {
+  series: ReturnsPoint[];
+  codes: string[];
+  title?: string;
+  bare?: boolean;
+}) {
   const [hidden, setHidden] = useState<string[]>([]);
   const shown = codes.filter((code) => !hidden.includes(code));
   const toggle = (code: string) => setHidden((current) => (current.includes(code) ? current.filter((c) => c !== code) : [...current, code]));
   const monthEnds = series.filter((point, i) => series[i + 1]?.date.slice(0, 7) !== point.date.slice(0, 7));
 
   return (
-    <section aria-labelledby="comparison-heading" data-testid="comparison-chart" className="glass grid gap-3 rounded-2xl p-5 sm:p-6">
-      <SectionHeading id="comparison-heading">Carteira e referências, base 100</SectionHeading>
+    <section
+      aria-labelledby="comparison-heading"
+      data-testid="comparison-chart"
+      className={bare ? 'grid gap-3' : 'glass grid gap-3 rounded-2xl p-5 sm:p-6'}
+    >
+      <SectionHeading id="comparison-heading">{title}</SectionHeading>
 
       <div role="group" aria-label="Referências no gráfico" className="flex flex-wrap gap-1">
         {codes.map((code) => (
@@ -78,7 +93,7 @@ export default function ComparisonChart({ series, codes }: { series: ReturnsPoin
       {/* A table does not shrink to sr-only's 1px, so the wrapper carries it. */}
       <div className="sr-only">
         <table>
-          <caption>Carteira e referências no último ponto de cada mês, base 100</caption>
+          <caption>{title}, no último ponto de cada mês</caption>
           <thead>
             <tr>
               <th scope="col">Data</th>

@@ -4,7 +4,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { MarketAsset, PortfolioSummary, Position } from '@/api/finance';
+import type { MarketAsset, PortfolioSummary, Position, Returns } from '@/api/finance';
 import { chooseCurrency } from '@/lib/currency';
 import { routeTree } from '@/routeTree';
 import { stubFetch, type SeenRequest } from '@/test-utils';
@@ -79,6 +79,39 @@ const summary: PortfolioSummary = {
 
 const nothing: PortfolioSummary = { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0, allocation: [], usdBrl: null };
 
+/** Since inception, five years: P1's figures. The dollar ends 1% up on its base day. */
+const sinceInception: Returns = {
+  period: { from: '2021-10-04', to: '2026-09-23', days: 1816 },
+  twr: { total: 0.8423, annualised: 0.1309 },
+  xirr: 0.1414,
+  timingEffect: 0.0105,
+  benchmarks: {
+    CDI: { total: 0.8441, annualised: 0.1312 },
+    IPCA6: { total: 0.6689, annualised: 0.1084 },
+    IVVB11: { total: 0.4697, annualised: 0.0805 },
+    SELIC: { total: 0.8452, annualised: 0.1314 },
+    USDBRL: { total: 0.01, annualised: 0.002 },
+  },
+  series: [
+    { date: '2021-10-03', portfolio: 100, CDI: 100, IPCA6: 100, IVVB11: 100, SELIC: 100, USDBRL: 100 },
+    { date: '2024-01-01', portfolio: 150, CDI: 140, IPCA6: 130, IVVB11: 120, SELIC: 140, USDBRL: 90 },
+    { date: '2026-09-23', portfolio: 184.23, CDI: 184.41, IPCA6: 166.89, IVVB11: 146.97, SELIC: 184.52, USDBRL: 101 },
+  ],
+};
+
+/** Year to date: a loss, less than a year, and no dollar that could anchor. */
+const thisYear: Returns = {
+  period: { from: '2026-01-01', to: '2026-09-23', days: 266 },
+  twr: { total: -0.0363, annualised: -0.0493 },
+  xirr: -0.041,
+  timingEffect: 0.0083,
+  benchmarks: { CDI: { total: 0.1052, annualised: 0.1471 }, IPCA6: null, IVVB11: { total: 0.0719, annualised: 0.0999 }, SELIC: null, USDBRL: null },
+  series: [
+    { date: '2025-12-31', portfolio: 100, CDI: 100, IVVB11: 100 },
+    { date: '2026-09-23', portfolio: 96.37, CDI: 110.52, IVVB11: 107.19 },
+  ],
+};
+
 function stubInvestments(positions: () => Position[], extra: (request: SeenRequest, url: URL) => { status?: number; body?: unknown } | undefined = () => undefined) {
   return stubFetch((request) => {
     const url = new URL(request.url, 'http://localhost');
@@ -99,6 +132,8 @@ function stubInvestments(positions: () => Position[], extra: (request: SeenReque
         return { body: positions() };
       case 'GET /api/investments/summary':
         return { body: positions().length === 0 ? nothing : summary };
+      case 'GET /api/returns/portfolio':
+        return { body: url.searchParams.get('period') === 'ytd' ? thisYear : sinceInception };
       case 'GET /api/market-data/assets':
         return { body: [] };
       default:
@@ -339,6 +374,92 @@ describe('InvestmentsPage: adding an asset', () => {
   });
 });
 
+const returnsCalls = (seen: SeenRequest[]) =>
+  seen.filter((request) => request.url.startsWith('/api/returns/portfolio')).map((request) => request.url);
+
+describe('InvestmentsPage: returns first (016)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Spec 016 web test 7. */
+  it('leads with the return since inception, its annual rate and the XIRR, above the positions', async () => {
+    stubInvestments(() => [aapl, petr4]);
+    renderAt('/investments');
+
+    const hero = await screen.findByTestId('returns-hero');
+    expect(await within(hero).findByRole('heading', { name: 'Rentabilidade da carteira · desde 04/10/2021' })).toBeInTheDocument();
+    const twr = within(hero).getByTestId('hero-twr');
+    expect(plain(twr)).toBe('+84,23%');
+    expect(twr).toHaveClass('text-positive');
+    expect(plain(within(hero).getByTestId('hero-annualised'))).toBe('+13,09% a.a.');
+    expect(plain(within(hero).getByTestId('hero-xirr'))).toBe('Retorno do seu dinheiro (considerando quando você aportou): +14,14% a.a.');
+    expect(within(hero).getByTestId('comparison-chart')).toBeInTheDocument();
+
+    const positions = await screen.findByTestId('position-a-petr4');
+    expect(hero.compareDocumentPosition(positions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  /** Spec 016 web test 7, the tiles. */
+  it('compares with CDI, IPCA + 6% and the S&P 500, the difference in points in its tone', async () => {
+    stubInvestments(() => [petr4]);
+    renderAt('/investments');
+
+    const cdi = await screen.findByTestId('hero-benchmark-CDI');
+    expect(plain(cdi)).toContain('vs CDI +84,41%');
+    expect(within(cdi).getByText('-0,18 p.p.')).toHaveClass('text-negative');
+    const ipca = screen.getByTestId('hero-benchmark-IPCA6');
+    expect(plain(ipca)).toContain('vs IPCA + 6% +66,89%');
+    expect(within(ipca).getByText('+17,34 p.p.')).toHaveClass('text-positive');
+    const sp500 = screen.getByTestId('hero-benchmark-IVVB11');
+    expect(plain(sp500)).toContain('vs S&P 500 +46,97%');
+    expect(within(sp500).getByText('+37,26 p.p.')).toHaveClass('text-positive');
+    expect(screen.queryByTestId('hero-benchmark-SELIC')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('hero-benchmark-USDBRL')).not.toBeInTheDocument();
+  });
+
+  /** Spec 016 web test 7, the periods. */
+  it('starts at Desde o início, refetches for another period, and has no annual rate under a year', async () => {
+    const seen = stubInvestments(() => [petr4]);
+    renderAt('/investments');
+
+    const periods = await screen.findByRole('group', { name: 'Período' });
+    expect(within(periods).getAllByRole('button').map((button) => button.textContent)).toEqual(['No ano', '12 meses', 'Desde o início']);
+    expect(within(periods).getByRole('button', { name: 'Desde o início' })).toHaveAttribute('aria-pressed', 'true');
+    await screen.findByTestId('hero-twr');
+
+    await userEvent.click(within(periods).getByRole('button', { name: 'No ano' }));
+
+    await vi.waitFor(() => expect(plain(screen.getByTestId('hero-twr'))).toBe('-3,63%'));
+    expect(within(periods).getByRole('button', { name: 'No ano' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('hero-twr')).toHaveClass('text-negative');
+    expect(plain(screen.getByTestId('hero-annualised'))).toBe('em 266 dias');
+    expect(plain(screen.getByTestId('hero-benchmark-IPCA6'))).toContain('Sem dados');
+    expect(returnsCalls(seen)).toEqual(['/api/returns/portfolio?period=inception', '/api/returns/portfolio?period=ytd']);
+  });
+
+  it('says so when nothing was valued in the period', async () => {
+    stubInvestments(
+      () => [petr4],
+      (_request, url) =>
+        url.pathname === '/api/returns/portfolio' ? { body: { ...sinceInception, period: null, twr: null, xirr: null, timingEffect: null, series: [] } } : undefined,
+    );
+    renderAt('/investments');
+
+    expect(await screen.findByText('Nenhuma posição valorizada neste período.')).toBeInTheDocument();
+    expect(screen.queryByTestId('hero-twr')).not.toBeInTheDocument();
+  });
+
+  it('asks for no returns while nothing is held', async () => {
+    const seen = stubInvestments(() => []);
+    renderAt('/investments');
+
+    expect(await screen.findByText('Nenhum ativo na carteira ainda.')).toBeInTheDocument();
+    expect(screen.queryByTestId('returns-hero')).not.toBeInTheDocument();
+    expect(returnsCalls(seen)).toEqual([]);
+  });
+});
+
 describe('InvestmentsPage: in dollars (016)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -392,5 +513,37 @@ describe('InvestmentsPage: in dollars (016)', () => {
 
     expect(await screen.findByText('Sem cotação do dólar sincronizada; valores em reais.')).toBeInTheDocument();
     expect(plain(screen.getByTestId('position-a-petr4'))).toContain('R$ 3.510,00');
+  });
+
+  /** Spec 016 web test 11, the hero. */
+  it('shows the return in dollars, derived from the dollar\'s index, and the XIRR in reais', async () => {
+    localStorage.setItem('currency', 'USD');
+    stubInvestments(() => [petr4]);
+    renderAt('/investments');
+
+    const hero = await screen.findByTestId('returns-hero');
+    expect(await within(hero).findByRole('heading', { name: 'Rentabilidade da carteira em dólar · desde 04/10/2021' })).toBeInTheDocument();
+    // 184.23 / 101 - 1.
+    expect(plain(within(hero).getByTestId('hero-twr'))).toBe('+82,41%');
+    expect(plain(within(hero).getByTestId('hero-xirr'))).toBe(
+      'Retorno do seu dinheiro (considerando quando você aportou): +14,14% a.a. (em reais)',
+    );
+    // 184.41 / 101 - 1, and the difference from the dollar figures.
+    const cdi = within(hero).getByTestId('hero-benchmark-CDI');
+    expect(plain(cdi)).toContain('vs CDI +82,58%');
+    expect(cdi).toHaveTextContent('-0,18 p.p.');
+  });
+
+  it('keeps the hero in reais, and says why, when the dollar could not anchor the period', async () => {
+    localStorage.setItem('currency', 'USD');
+    stubInvestments(
+      () => [petr4],
+      (_request, url) => (url.pathname === '/api/returns/portfolio' ? { body: thisYear } : undefined),
+    );
+    renderAt('/investments');
+
+    expect(await screen.findByText('Rentabilidade em reais: sem cotação do dólar no início do período.')).toBeInTheDocument();
+    expect(plain(screen.getByTestId('hero-twr'))).toBe('-3,63%');
+    expect(screen.getByRole('heading', { name: 'Rentabilidade da carteira · desde 01/01/2026' })).toBeInTheDocument();
   });
 });
