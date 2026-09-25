@@ -74,9 +74,16 @@ public sealed class PositionQueries(AppDbContext db)
         var movements = (await db.Movements.AsNoTracking().Where(movement => ids.Contains(movement.AssetId))
                 .ToListAsync(cancellationToken))
             .ToLookup(movement => movement.AssetId);
-        var latest = await db.PortfolioDaily.AsNoTracking()
-            .Where(row => ids.Contains(row.AssetId)
-                && row.Date == db.PortfolioDaily.Where(other => other.AssetId == row.AssetId).Max(other => other.Date))
+        // The latest row per asset, read as SummaryAsync reads it.
+        var latest = await (
+                from held in db.Assets
+                where assetId == null || held.Id == assetId
+                from row in db.PortfolioDaily
+                    .Where(daily => daily.AssetId == held.Id)
+                    .OrderByDescending(daily => daily.Date)
+                    .Select(daily => new { AssetId = held.Id, daily.Price, daily.PriceDate, daily.ValueBrl, daily.CostBasisBrl })
+                    .Take(1)
+                select row)
             .ToDictionaryAsync(row => row.AssetId, cancellationToken);
         var rates = await RatesAsync(
             assets.Where(asset => asset.Currency != SnapshotBuilder.BaseCurrency).SelectMany(asset => movements[asset.Id]),
@@ -107,12 +114,18 @@ public sealed class PositionQueries(AppDbContext db)
     /// </summary>
     public async Task<PortfolioSummary> SummaryAsync(CancellationToken cancellationToken)
     {
+        // A LATERAL join: per asset, one backwards probe of the primary key (UserId, AssetId,
+        // Date). The outer column in the inner projection is what keeps EF Core from turning
+        // it into a ROW_NUMBER() over every daily row the user has, which is linear in history.
         var latest = await (
-                from row in db.PortfolioDaily.AsNoTracking()
-                where row.Date == db.PortfolioDaily.Where(other => other.AssetId == row.AssetId).Max(other => other.Date)
-                join held in db.Assets on row.AssetId equals held.Id
+                from held in db.Assets
                 join market in db.MarketAssets on held.MarketAssetId equals market.Id
-                select new { row.ValueBrl, row.CostBasisBrl, market.Class })
+                from row in db.PortfolioDaily
+                    .Where(daily => daily.AssetId == held.Id)
+                    .OrderByDescending(daily => daily.Date)
+                    .Select(daily => new { daily.ValueBrl, daily.CostBasisBrl, market.Class })
+                    .Take(1)
+                select row)
             .ToListAsync(cancellationToken);
         var total = latest.Sum(row => row.ValueBrl);
         var cost = latest.Sum(row => row.CostBasisBrl);

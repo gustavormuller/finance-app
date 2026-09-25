@@ -66,7 +66,27 @@ Web: one script of 1 050 kB (314 kB gzip) for every page, the sign-in page inclu
 
 ## Changes
 
-Filled in per checkpoint, each with its before and after taken back to back.
+Each before and after taken back to back on the scaled database, two rounds, median of 20
+(ms); response bodies compared with `diff` and identical.
+
+### 1. The latest daily row per asset (summary and positions)
+
+**Cause.** Both read "each asset's latest row" as `WHERE "Date" = (SELECT max("Date") … WHERE
+"AssetId" = p."AssetId")`. PostgreSQL ran it as a sequential scan of `PortfolioDaily` with the
+subquery once **per row**: 22 662 probes and 69 282 buffers to return 13 rows (64 ms in
+`EXPLAIN ANALYZE`). The obvious LINQ rewrite, `OrderByDescending(Date).Take(1)` per asset, is
+turned by EF Core into `ROW_NUMBER() OVER (PARTITION BY "AssetId" …)` over every row the user
+has: 22 ms, and still linear in history.
+
+**Change.** The per-asset `Take(1)` projects a column of the outer query, which makes EF Core
+emit `JOIN LATERAL (… ORDER BY "Date" DESC LIMIT 1)`: one backwards probe of the primary key
+`(UserId, AssetId, Date)` per asset, 52 buffers, 0.2 ms. Still LINQ, still under the query
+filter. Pinned first by `Each_asset_is_valued_at_its_own_latest_row_and_only_for_its_owner`.
+
+| Route | before | after |
+|---|---:|---:|
+| `GET /api/investments/summary` | 78.0 | **5.8** |
+| `GET /api/investments/assets` | 92.6 | **20.2** |
 
 ## Measured, not worth doing
 

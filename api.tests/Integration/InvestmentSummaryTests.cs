@@ -183,6 +183,62 @@ public sealed class InvestmentSummaryTests(PostgresFixture postgres)
         Assert.Empty(summaryB!.Allocation);
     }
 
+    /// <summary>
+    /// Spec 018 test 1: the summary and the positions read each asset's own latest row, per
+    /// user. The rows stop on different days, and another user's later row for the same
+    /// instrument counts for that user alone.
+    /// </summary>
+    [Fact]
+    public async Task Each_asset_is_valued_at_its_own_latest_row_and_only_for_its_owner()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var api = await StartAsync(postgres, ct);
+        var userA = await api.SignInAsync("holder", ct);
+        var userB = await api.SignInAsync("other", ct);
+        var petr4 = await api.CatalogueAsync("PETR4", ct);
+        var early = await api.HoldAsync(userA.Id, petr4, ct);
+        var late = await api.HoldAsync(userA.Id, await api.CatalogueAsync("VALE3", ct), ct);
+        var others = await api.HoldAsync(userB.Id, petr4, ct);
+        await WriteRowsAsync(api, early, (D, 10m, 100m, 90m), (D.AddDays(2), 12m, 120m, 90m));
+        await WriteRowsAsync(api, late, (D, 10m, 50m, 40m), (D.AddDays(5), 11m, 55m, 40m));
+        await WriteRowsAsync(api, others, (D.AddDays(9), 999m, 999m, 1m));
+
+        var summaryA = await userA.Client.GetFromJsonAsync<FullSummaryItem>("/api/investments/summary", ct);
+        var summaryB = await userB.Client.GetFromJsonAsync<SummaryItem>("/api/investments/summary", ct);
+        var positionsA = (await userA.Client.GetFromJsonAsync<List<PositionItem>>("/api/investments/assets", ct))!;
+        var positionsB = (await userB.Client.GetFromJsonAsync<List<PositionItem>>("/api/investments/assets", ct))!;
+
+        Assert.Equal((175m, 130m, 45m), (summaryA!.TotalBrl, summaryA.TotalCostBrl, summaryA.UnrealisedBrl));
+        Assert.Equal([new AllocationItem("StockBr", 175m, 1m)], summaryA.Allocation);
+        Assert.Equal(new SummaryItem(999m, 1m, 998m), summaryB);
+        Assert.Equal(
+            [("PETR4", 12m, D.AddDays(2), 120m, 90m, 30m, 0.3333m), ("VALE3", 11m, D.AddDays(5), 55m, 40m, 15m, 0.375m)],
+            positionsA.Select(p => (p.Ticker, p.Price, p.PriceDate, p.ValueBrl, p.CostBasisBrl, p.UnrealisedBrl, p.UnrealisedPct)));
+        Assert.Equal(
+            [("PETR4", 999m, D.AddDays(9), 999m)],
+            positionsB.Select(p => (p.Ticker, p.Price, p.PriceDate, p.ValueBrl)));
+    }
+
+    /// <summary>Daily rows as given: date, price, value and cost basis, all in BRL.</summary>
+    private static async Task WriteRowsAsync(
+        InvestmentsApi api, Asset asset, params (DateOnly Date, decimal Price, decimal ValueBrl, decimal CostBasisBrl)[] rows)
+    {
+        await using var context = api.Context(asset.UserId);
+        context.AddRange(rows.Select(row => new PortfolioDaily
+        {
+            UserId = asset.UserId,
+            AssetId = asset.Id,
+            Date = row.Date,
+            Quantity = row.ValueBrl / row.Price,
+            Price = row.Price,
+            PriceDate = row.Date,
+            FxRate = 1m,
+            ValueBrl = row.ValueBrl,
+            CostBasisBrl = row.CostBasisBrl,
+        }));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
     /// <summary>The definition of done: truncate, POST /rebuild, identical rows; and only the caller's.</summary>
     [Fact]
     public async Task Rebuild_restores_the_callers_truncated_rows_exactly_and_no_one_elses()
