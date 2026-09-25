@@ -365,3 +365,7 @@ bash scripts/verify.sh
 
 E2E on :5093/:5193 against `financas_e2e_perf` (never `scripts/verify-e2e.sh`, which stops
 the shared PostgreSQL). The before/after tables above were taken with the scripts in "Method".
+
+Result on this branch: `verify.sh` green, .NET 1 010 of 1 010 and web 248 of 248 (34 files);
+E2E 30 of 30. With the mutation-wide invalidation taken out, the new E2E test fails, the
+dashboard still reading `+1.000,00`, as it should.
