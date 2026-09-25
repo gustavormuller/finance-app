@@ -205,6 +205,66 @@ public sealed class TransactionExportTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>
+    /// Spec 021 integration test 15: an export imports back through 004's CSV path with
+    /// decision 14's mapping, and every date, amount and description survives it except
+    /// the one guarded against formulas, which keeps its apostrophe.
+    /// </summary>
+    [Fact]
+    public async Task An_export_imports_back_through_the_csv_mapping()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("export-round-trip", cancellationToken);
+        var source = await user.CreateAccountAsync("Nubank", cancellationToken);
+        var target = await user.CreateAccountAsync("Cópia", cancellationToken);
+        var seeded = await user.CategoriesAsync(cancellationToken);
+        var food = seeded["Alimentação"].Id;
+
+        (decimal Amount, string Date, string Description, Guid Category)[] originals =
+        [
+            (-1234.56m, "2026-09-03", "Mercado; \"Pão de Açúcar\"", food),
+            (1234567890.12m, "2026-09-05", "Salário de setembro", seeded["Salário"].Id),
+            (-0.01m, "2026-09-01", "Linha 1\nLinha 2", food),
+            (-12.50m, "2026-09-04", "Café, pão e leite", food),
+            (-42.90m, "2026-09-02", "=1+1", food),
+        ];
+
+        foreach (var (amount, date, description, category) in originals)
+        {
+            await user.CreateTransactionAsync(
+                TransactionsFixtures.TransactionBody(source, category, amount, date: date, description: description),
+                cancellationToken);
+        }
+
+        using var export = await user.Client.GetAsync($"/api/transactions/export?accountId={source}", cancellationToken);
+        var file = await export.Content.ReadAsByteArrayAsync(cancellationToken);
+
+        using var upload = await user.Client.SendAsync(
+            ImportFixtures.Upload(
+                "/api/imports",
+                file,
+                export.Content.Headers.ContentDisposition!.FileName!,
+                ImportFixtures.CsvFields(target, "pt-BR", "dd/MM/yyyy", "Signed", "Data", "Valor", "Descrição", delimiter: ";")),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+        var staged = (await upload.Content.ReadFromJsonAsync<ImportFixtures.UploadResult>(cancellationToken))!;
+        Assert.Equal((5, 5, 0), (staged.RowCount, staged.Ready, staged.Invalid));
+        Assert.Equal(5, (await user.CommitAsync(staged.BatchId, cancellationToken)).Committed);
+
+        var imported = (await user.ListTransactionsAsync(cancellationToken, $"accountId={target}&pageSize=200")).Items
+            .Select(item => (item.Amount, item.Date.ToString("yyyy-MM-dd"), item.Description))
+            .OrderBy(item => item.Item2);
+
+        var expected = originals
+            .Select(original => (original.Amount, original.Date, original.Description == "=1+1" ? "'=1+1" : original.Description))
+            .OrderBy(item => item.Date);
+
+        Assert.Equal(expected, imported);
+    }
+
     /// <summary>The body after the BOM, which every export starts with.</summary>
     private static async Task<string> ExportTextAsync(SignedInUser user, string query, CancellationToken cancellationToken)
     {
