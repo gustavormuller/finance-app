@@ -66,7 +66,7 @@ public static class AccountEndpoints
 
             database.Accounts.Add(account);
 
-            if (!await TrySaveAsync(database, cancellationToken))
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 return Problems.Conflict($"Já existe uma conta chamada '{account.Name}'.");
             }
@@ -101,7 +101,7 @@ public static class AccountEndpoints
                 ? Round(opening)
                 : account.OpeningBalance;
 
-            if (!await TrySaveAsync(database, cancellationToken))
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 return Problems.Conflict($"Já existe uma conta chamada '{account.Name}'.");
             }
@@ -152,20 +152,6 @@ public static class AccountEndpoints
             request.Currency is not null && !Money.IsIsoCode(request.Currency)
                 ? new RuleViolation("currency", "A moeda deve ser um código ISO 4217 de três letras maiúsculas.")
                 : null);
-
-    private static async Task<bool> TrySaveAsync(AppDbContext database, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await database.SaveChangesAsync(cancellationToken);
-
-            return true;
-        }
-        catch (DbUpdateException exception) when (exception.IsDuplicate())
-        {
-            return false;
-        }
-    }
 
     private static AccountResponse Describe(Account account) =>
         new(account.Id, account.Name, account.Type, account.Currency, account.CreatedAt, account.OpeningBalance);

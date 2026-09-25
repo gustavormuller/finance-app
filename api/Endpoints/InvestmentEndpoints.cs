@@ -73,7 +73,7 @@ public static class InvestmentEndpoints
             TimeProvider clock,
             CancellationToken cancellationToken) =>
         {
-            var nickname = string.IsNullOrWhiteSpace(request.Nickname) ? null : request.Nickname.Trim();
+            var nickname = RequestText.Optional(request.Nickname);
             if (nickname is { Length: > NicknameLength })
             {
                 return Problems.Validation("nickname", $"O apelido deve ter até {NicknameLength} caracteres.");
@@ -122,11 +122,7 @@ public static class InvestmentEndpoints
             };
             database.Add(held);
 
-            try
-            {
-                await database.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException exception) when (exception.IsDuplicate())
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 // A new catalogue row cannot already be held, so its duplicate is the
                 // catalogue's: another request registered the same symbol first.

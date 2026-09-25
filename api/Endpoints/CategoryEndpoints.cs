@@ -55,7 +55,7 @@ public static class CategoryEndpoints
 
             database.Categories.Add(category);
 
-            if (!await TrySaveAsync(database, cancellationToken))
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 return Problems.Conflict($"Já existe uma categoria chamada '{category.Name}' neste nível.");
             }
@@ -86,7 +86,7 @@ public static class CategoryEndpoints
             category.Kind = request.Kind;
             category.ParentId = request.ParentId;
 
-            if (!await TrySaveAsync(database, cancellationToken))
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 return Problems.Conflict($"Já existe uma categoria chamada '{category.Name}' neste nível.");
             }
@@ -248,20 +248,6 @@ public static class CategoryEndpoints
         }
 
         return null;
-    }
-
-    private static async Task<bool> TrySaveAsync(AppDbContext database, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await database.SaveChangesAsync(cancellationToken);
-
-            return true;
-        }
-        catch (DbUpdateException exception) when (exception.IsDuplicate())
-        {
-            return false;
-        }
     }
 
     private static CategoryResponse Describe(Category category) =>

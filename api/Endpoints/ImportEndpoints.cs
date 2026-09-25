@@ -331,9 +331,9 @@ public static class ImportEndpoints
                 form["dateFormat"].ToString(),
                 signMode,
                 form["dateColumn"].ToString(),
-                Optional(form["amountColumn"]),
-                Optional(form["debitColumn"]),
-                Optional(form["creditColumn"]),
+                RequestText.Optional(form["amountColumn"]),
+                RequestText.Optional(form["debitColumn"]),
+                RequestText.Optional(form["creditColumn"]),
                 form["descriptionColumns"].ToString());
         }
 
@@ -528,8 +528,6 @@ public static class ImportEndpoints
             "tab" or "\\t" => '\t',
             _ => null,
         };
-
-    private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>
     /// The id filter is applied before the projection: EF cannot see through a

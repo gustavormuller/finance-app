@@ -1,5 +1,6 @@
 ﻿using Finance.Api.Application.Ai;
 using Finance.Api.Domain.Transactions;
+using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -108,4 +109,19 @@ internal static class Problems
     /// </summary>
     public static bool IsDuplicate(this DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: UniqueViolation };
+
+    /// <summary>Saves; false when a unique index refused the write (<see cref="IsDuplicate"/>).</summary>
+    public static async Task<bool> TrySaveAsync(this AppDbContext database, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+
+            return true;
+        }
+        catch (DbUpdateException exception) when (exception.IsDuplicate())
+        {
+            return false;
+        }
+    }
 }

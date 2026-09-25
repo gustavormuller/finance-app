@@ -70,20 +70,16 @@ public static class CsvTemplateEndpoints
                 DateFormat = request.DateFormat.Trim(),
                 SignMode = request.SignMode,
                 DateColumn = request.DateColumn.Trim(),
-                AmountColumn = Optional(request.AmountColumn),
-                DebitColumn = Optional(request.DebitColumn),
-                CreditColumn = Optional(request.CreditColumn),
+                AmountColumn = RequestText.Optional(request.AmountColumn),
+                DebitColumn = RequestText.Optional(request.DebitColumn),
+                CreditColumn = RequestText.Optional(request.CreditColumn),
                 DescriptionColumns = request.DescriptionColumns.Trim(),
                 CreatedAt = DateTimeOffset.UtcNow,
             };
 
             database.CsvTemplates.Add(template);
 
-            try
-            {
-                await database.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException exception) when (exception.IsDuplicate())
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 return Problems.Conflict($"Já existe um modelo chamado '{template.Name}'.");
             }
@@ -143,8 +139,6 @@ public static class CsvTemplateEndpoints
 
         return Problems.Validation([.. violations]);
     }
-
-    private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static TemplateResponse Describe(CsvTemplate template) => new(
         template.Id,
