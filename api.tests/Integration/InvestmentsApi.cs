@@ -119,5 +119,9 @@ internal sealed class InvestmentsApi : IAsyncDisposable
     public static Movement Dividend(DateOnly date, decimal amount) =>
         new() { Date = date, Kind = MovementKind.Dividend, Amount = amount };
 
-    public ValueTask DisposeAsync() => Factory.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await Factory.DisposeAsync();
+        PostgresFixture.ReleaseConnections(ConnectionString);
+    }
 }

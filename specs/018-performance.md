@@ -13,7 +13,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | # | Question | Decision |
 |---|---|---|
 | 1 | What is measured on | `financas_perf`, a `pg_dump` copy of `financas` (the owner: 1 419 transactions over 21 months, 13 assets, 550 movements, 22 662 daily rows over 5 years). Then the same database with synthetic volume, **"scaled"**: the owner's transactions copied five times further back (8 514 rows, 10 years) and 20 more users, each a copy of the owner (179 k transactions and 476 k daily rows in all). `financas` is only ever read, by `pg_dump`. |
-| 2 | How it is timed | The API from a scratch build, `Development`, SQL logging off, on :5093. A Node script signs in with `dev-login` and times each route 20 times after 3 warm-ups, each on a fresh connection, and reports the median. The machine is shared with other work, so a before and its after are always taken back to back, never across hours. |
+| 2 | How it is timed | The API from a scratch build, `Development`, SQL logging off, on :5093. A Node script signs in with `dev-login` and times each route on a fresh connection, reporting the median. The machine is shared with other agents, so builds are timed **interleaved** (base, after, base, after…) over several rounds, and each route gets **40 warm-up calls** first: with 3, the returns maths still ran unoptimised tier-0 JIT code for most of the measured calls, and when the tiered compiler caught up depended on the machine's load more than on the build (see change 2). Production is one long-lived process, so steady state is what counts. |
 | 3 | What counts as slow | A route whose median is well above the ~5 ms a plain filtered read costs here, and a cause `EXPLAIN (ANALYZE, BUFFERS)` or a timer can name. Anything at that floor is left alone. |
 | 4 | Rewriting a query | Only behind a test that pins its result first, and in the same layer and tool it was in: EF LINQ stays LINQ (the query filters keep applying), Dapper SQL stays SQL naming `"UserId"` in every statement. |
 | 5 | Indexes | Only where a plan shows the index used and the time gone. No index is added "in case". |
@@ -42,8 +42,9 @@ Marked **(review)** where the spec picked a default a person should confirm.
 
 ## Baseline
 
-Median of 20, milliseconds, one run each; "real" is the copy of `financas`, "scaled" adds the
-synthetic volume (decision 1).
+The first look, used to choose what to examine: median of 20 after 3 warm-ups, milliseconds,
+one run each; "real" is the copy of `financas`, "scaled" adds the synthetic volume (decision 1).
+The before/after figures below are the steady-state ones of decision 2.
 
 | Route | real | scaled |
 |---|---:|---:|
@@ -64,10 +65,31 @@ synthetic volume (decision 1).
 
 Web: one script of 1 050 kB (314 kB gzip) for every page, the sign-in page included.
 
-## Changes
+## Summary
 
-Each before and after taken back to back on the scaled database, two rounds, median of 20
-(ms); response bodies compared with `diff` and identical.
+Steady state on the scaled database: 40 warm-up calls, then the median of 15, per round; three
+interleaved rounds, median of the rounds (the rounds' minimum was within 2 ms of it for every
+read route). Response bodies of all 35 routes saved by both builds are identical.
+
+| Route | before (ms) | after (ms) |
+|---|---:|---:|
+| `GET /api/investments/summary` | 62.3 | **4.0** |
+| `GET /api/investments/assets` (positions) | 69.1 | **11.6** |
+| `GET /api/returns/portfolio?period=inception` | 79.8 | **64.9** |
+| `GET /api/returns/portfolio?period=12m` / `ytd` | 32.1 / 29.0 | **26.1 / 23.8** |
+| `GET /api/returns/assets/{id}` (13 assets) | 20.7–30.9 | 19.4–28.9 |
+| `GET /api/dashboard/net-worth` (24) / `?months=120` | 16.9 / 21.5 | **13.2 / 17.8** |
+| `POST …/movements` dated at the first buy (rebuilds ~1 800 rows) | 338 | **126** |
+| `DELETE /api/investments/movements/{id}`, same | 326 | **119** |
+| `POST /api/investments/rebuild` (13 assets, 22 662 rows) | 2 432 | **1 518** |
+| every other route (dashboard summary, monthly, by-category, transactions, categories, accounts, daily, movements) | 2.6–12.5 | unchanged |
+
+The three write rows: three interleaved rounds after a `VACUUM ANALYZE`, median.
+
+Web: the signed-out `/login` loads 404 kB of JavaScript instead of 1 026 kB (131 kB gzip instead
+of 303); coming back to a page within 30 s makes no request instead of 6–8.
+
+## Changes
 
 ### 1. The latest daily row per asset (summary and positions)
 
@@ -85,8 +107,8 @@ filter. Pinned first by `Each_asset_is_valued_at_its_own_latest_row_and_only_for
 
 | Route | before | after |
 |---|---:|---:|
-| `GET /api/investments/summary` | 78.0 | **5.8** |
-| `GET /api/investments/assets` | 92.6 | **20.2** |
+| `GET /api/investments/summary` | 62.3 | **4.0** |
+| `GET /api/investments/assets` | 69.1 | **11.6** |
 
 ### 2. The portfolio's returns: the last day and the daily rows
 
@@ -105,14 +127,20 @@ row. Two of those are the query, not the maths:
 The maths itself (TWR, XIRR, benchmark indices) is the returns module's and is not touched
 (ADR-017). Pinned first by `The_period_ends_on_the_callers_latest_row_across_assets`.
 
-The machine was busier during this pair (another agent's build), so both columns are slower
-than the baseline table; the median of four interleaved rounds:
+Each step on its own, three builds interleaved over four rounds, 40 warm-up calls (median of
+the rounds):
 
 | Route | before | last row | + projection |
 |---|---:|---:|---:|
-| `GET /api/returns/portfolio?period=inception` | 260 | 187 | **157** |
-| `GET /api/returns/portfolio?period=12m` | 104 | 59 | **62** |
-| `GET /api/returns/assets/{id}` | 37–54 | 35–51 | 43–63 (noise) |
+| `GET /api/returns/portfolio?period=inception` | 91.7 | 87.5 | **78.6** |
+| `GET /api/returns/portfolio?period=12m` | 33.6 | 31.3 | **28.3** |
+| `GET /api/returns/assets/{id}` (BTC, PETR4) | 29.6, 22.7 | 29.7, 21.5 | 29.2, 21.0 |
+
+A smaller gain than the phase timer suggested, because at steady state the rows cost less than
+in the profiled build. A first pair of runs, with 3 warm-ups on a loaded machine, had shown
+260 → 157 ms; repeated, the same build ranged from 106 to 385 ms between rounds, which is what
+decision 2 now guards against. The per-asset returns do not move: one asset is about 1 800 rows
+and one probe either way.
 
 ### 3. The snapshot rebuild's insert
 
@@ -129,11 +157,13 @@ its rollback assertion and now names the exception it gets (`PostgresException`,
 
 | Operation | before | after |
 |---|---:|---:|
-| `POST /api/investments/rebuild` (13 assets, 22 662 rows) | 2 524 / 2 767 | **1 408 / 1 963** |
-| `POST …/movements`, dated at the first buy (rebuilds ~1 800 rows) | 467 / 313 | **129 / 274** |
-| `DELETE /api/investments/movements/{id}`, same | 472 / 332 | **133 / 257** |
+| `POST /api/investments/rebuild` (13 assets, 22 662 rows) | 2 432 | **1 518** |
+| `POST …/movements`, dated at the first buy (rebuilds ~1 800 rows) | 338 | **126** |
+| `DELETE /api/investments/movements/{id}`, same | 326 | **119** |
 
-(Two rounds, busy machine.)
+What remains of the full rebuild is per asset: loading its closes and rates, and the insert's
+foreign-key checks. The nightly rebuild after the sync starts at yesterday, one or two rows per
+asset, and was never slow.
 
 ### 4. Where the net-worth series opens
 
@@ -149,8 +179,8 @@ Still Dapper, still `"UserId" = @userId` in each part. Pinned first by
 
 | Route | before | after |
 |---|---:|---:|
-| `GET /api/dashboard/net-worth` (24) | 17.9 | **14.2** |
-| `GET /api/dashboard/net-worth?months=120` | 23.6 | **19.5** |
+| `GET /api/dashboard/net-worth` (24) | 16.9 | **13.2** |
+| `GET /api/dashboard/net-worth?months=120` | 21.5 | **17.8** |
 
 What is left is the all-time sum of the user's transactions per month (8 514 rows at ten years),
 which the balances need too; see "Measured, not worth doing".
@@ -234,15 +264,51 @@ and did not fail again.
 
 ## Measured, not worth doing
 
-Filled in as measured.
+- **An index for the transactions list**, `(UserId, Date DESC, CreatedAt DESC)`. Tried in a
+  rolled-back transaction on the scaled data: the planner kept its bitmap AND of
+  `IX_Transactions_AccountId` and `IX_Transactions_UserId_Date` and a top-N sort of the user's
+  8 514 rows (8 ms); only the date-range filter used the new index, and that query was already
+  under 1 ms. No migration.
+- **The balances** (`/api/dashboard/summary`, 9.7 ms): an all-time sum per account over the
+  user's transactions, 4.7 ms in the database at ten years. A covering index would save a few
+  milliseconds for a migration; not now (see "Proposals").
+- **Tracking queries.** Every read route projects or uses `AsNoTracking`; the tracked queries
+  left are single-row lookups on write paths, which need tracking.
+- **The per-asset returns** (19–29 ms): about ten round trips each, at 1.5–2 ms per round trip
+  on this Windows and Docker set-up (far less on the Linux host), and the benchmark series built
+  again per call (about 10 ms). The fix is structural (see "Proposals").
+- **The returns maths** (TWR, XIRR, benchmark indices: about a third of the inception route).
+  The returns module is where the modelling rigour lives (ADR-017); nothing here justifies
+  touching it.
+- **Binary `COPY` for the rebuild's insert** instead of `unnest`: the database side is the
+  foreign-key triggers either way (23 of 33 ms for 1 814 rows).
+- **zstd in Caddy.** `encode gzip` is already on, for the static files and the proxied `/api`
+  JSON. The browser talks to Cloudflare, which picks the encoding it serves; zstd between Caddy
+  and the tunnel would change nothing a person waits for.
+- **An explicit `charts` chunk** and **`isolate: false`** in Vitest: changes 5 and 7.
 
 ## Proposals
 
-Filled in as measured.
+Not done, each for the reason given.
+
+1. **One route for every asset's returns**, e.g. `GET /api/returns/assets?period=…`. The returns
+   report makes 1 + 13 calls (17 requests on a cold `/investments/returns`), and each reloads the
+   movements, the USDBRL series and the benchmarks. One pass would read them once. It is a new
+   API shape, which this spec rules out; it needs its own spec.
+2. **`Cache-Control: public, max-age=31536000, immutable` on `/assets/*` in Caddy.** The chunk
+   names carry a content hash, so they never need revalidating; today each page load
+   revalidates its 10–20 chunks. Not measured here: it needs the production stack behind
+   Cloudflare, and it is a deploy change for the owner to take.
+3. **Benchmark indices cached in-process**, per code, base day and end, dropped after each sync.
+   It would take the ~10 ms off each per-asset call. It trades freshness rules for speed, so it
+   is a decision for a person, not a measurement.
+4. **A covering index for the all-time balances**, `(UserId, AccountId) INCLUDE ("Amount")`, if
+   the transaction count grows well past ten years of the owner's volume.
 
 ## Data model changes
 
-None planned; an index lands here only under decision 5.
+None. No migration: the only index candidate did not change the plan (decision 5, and
+"Measured, not worth doing"). `docs/migrations/` is unchanged.
 
 ## API surface
 
@@ -251,27 +317,45 @@ every body, and a before and an after are compared with `diff`.
 
 ## Test plan
 
+Each test that pins a query was written first and passed against the query it pins, before the
+query was rewritten.
+
+Found while verifying: the integration suite's PostgreSQL container ran out of connections.
+Every test that makes a database of its own (`InvestmentsApi`, `MarketDataApi`) left its Npgsql
+pool open, and Npgsql keeps idle connections for five minutes, longer than the suite runs. A poll
+of `pg_stat_activity` during the run peaked at exactly 100, the container's limit, and
+`TransactionPersistenceTests.Date_round_trips_as_the_same_calendar_day_under_any_server_timezone`,
+which opens two new connection strings, failed on `53300 too many clients` three runs out of
+three; this spec's four new per-database tests were enough to tip it. Both hosts now clear their
+database's pool when disposed (`PostgresFixture.ReleaseConnections`): peak 30, all green.
+
 ### Integration — `api.tests`
 
-1. The summary and the positions take each asset's latest daily row **per user**: two assets
-   whose rows end on different days, and another user's later rows for the same instrument,
-   which count for nobody but that user (pins the query before it is rewritten)
-2. The net-worth series opens at the first daily row when it predates every transaction
-   (014's tests 3 and 5 already pin it; kept green)
-3. The snapshot rebuild writes exactly the rows `SnapshotBuilder` builds, in the caller's
-   transaction, and a failure rolls back the delete with it (007's rebuild tests kept green,
-   plus one for the rollback)
-4. 008's returns tests kept green unchanged
+1. `InvestmentSummaryTests.Each_asset_is_valued_at_its_own_latest_row_and_only_for_its_owner`:
+   the summary and the positions take each asset's own latest row, the rows ending on different
+   days, and another user's later row for the same instrument counts for that user only
+2. `DashboardNetWorthTests.The_series_opens_at_the_callers_earliest_daily_row_across_assets`:
+   with no transactions, the series opens at the caller's earliest row, whichever asset has it,
+   and not at another user's earlier one
+3. `SnapshotRebuildTests.The_stored_rows_are_exactly_the_builders_in_every_column`, a USD asset;
+   007's `A_failing_insert_leaves_the_previous_rows_intact` keeps its rollback assertion and
+   expects the `PostgresException` (22003) the insert now throws
+4. `ReturnsEndpointTests.The_period_ends_on_the_callers_latest_row_across_assets`; 008's returns
+   tests unchanged and green
 
 ### Unit — `web`
 
-5. A mutation, when it settles, marks every cached query stale, and the queries on screen still
-   refetch through their explicit invalidations
-6. Every existing page test passes with the pages loaded lazily
+5. `src/lib/queryClient.test.ts`: a read within 30 s is not fetched again; a mutation that
+   succeeds or fails marks every cached query stale without fetching; the next read fetches;
+   a query on screen that the mutation invalidates itself is refetched
+6. Every existing page test passes with the pages lazy; the tests that render the route tree
+   import `src/test-routes.ts` first
 
 ### E2E
 
-7. Every existing test passes, on an isolated database (`financas_e2e_perf`)
+7. `dashboard.spec.ts`: an expense added after the dashboard was read shows on it after a
+   client-side navigation (it would fail with the 30 s `staleTime` alone)
+8. Every existing test passes, on an isolated database (`financas_e2e_perf`)
 
 ## Verification
 

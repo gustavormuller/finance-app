@@ -40,6 +40,18 @@ public sealed class PostgresFixture : IAsyncLifetime
         return new NpgsqlConnectionStringBuilder(ConnectionString) { Database = name }.ConnectionString;
     }
 
+    /// <summary>
+    /// Closes the idle connections of a database from <see cref="CreateEmptyDatabaseAsync"/>
+    /// once its test is done. Each such database is a pool of its own, and Npgsql keeps idle
+    /// connections for five minutes, longer than the suite runs: left open, they reached the
+    /// container's 100 connections and refused the next test's.
+    /// </summary>
+    public static void ReleaseConnections(string connectionString)
+    {
+        using var connection = new NpgsqlConnection(connectionString);
+        NpgsqlConnection.ClearPool(connection);
+    }
+
     public ValueTask DisposeAsync() => _container.DisposeAsync();
 }
 
