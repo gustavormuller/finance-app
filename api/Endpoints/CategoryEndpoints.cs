@@ -1,4 +1,5 @@
 ﻿using Finance.Api.Application;
+using Finance.Api.Application.Categories;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -36,10 +37,11 @@ public static class CategoryEndpoints
         categories.MapPost("/", async (
             CategoryRequest request,
             AppDbContext database,
+            CategoryRules rules,
             ICurrentUser currentUser,
             CancellationToken cancellationToken) =>
         {
-            if (await ValidateAsync(request, editing: null, database, cancellationToken) is { } invalid)
+            if (await ValidateAsync(request, editing: null, rules, cancellationToken) is { } invalid)
             {
                 return invalid;
             }
@@ -67,6 +69,7 @@ public static class CategoryEndpoints
             Guid id,
             CategoryRequest request,
             AppDbContext database,
+            CategoryRules rules,
             CancellationToken cancellationToken) =>
         {
             var category = await database.Categories
@@ -77,7 +80,7 @@ public static class CategoryEndpoints
                 return Results.NotFound();
             }
 
-            if (await ValidateAsync(request, id, database, cancellationToken) is { } invalid)
+            if (await ValidateAsync(request, id, rules, cancellationToken) is { } invalid)
             {
                 return invalid;
             }
@@ -97,6 +100,7 @@ public static class CategoryEndpoints
         categories.MapDelete("/{id:guid}", async (
             Guid id,
             AppDbContext database,
+            CategoryRules rules,
             CancellationToken cancellationToken) =>
         {
             var category = await database.Categories
@@ -107,23 +111,9 @@ public static class CategoryEndpoints
                 return Results.NotFound();
             }
 
-            var children = await database.Categories
-                .CountAsync(entity => entity.ParentId == id, cancellationToken);
-
-            if (children > 0)
+            if (await rules.DeleteRefusalAsync(category, cancellationToken) is { } refusal)
             {
-                return Problems.Conflict(
-                    $"'{category.Name}' ainda tem {children} subcategoria(s). Exclua-as antes.");
-            }
-
-            var referencing = await database.Transactions
-                .CountAsync(transaction => transaction.CategoryId == id, cancellationToken);
-
-            if (referencing > 0)
-            {
-                return Problems.Conflict(
-                    $"'{category.Name}' ainda tem {referencing} lançamento(s). "
-                    + "Recategorize-os ou exclua-os antes.");
+                return Problems.Conflict(refusal);
             }
 
             database.Categories.Remove(category);
@@ -185,19 +175,12 @@ public static class CategoryEndpoints
             : (start.Value, end.Value, null);
     }
 
-    /// <summary>
-    /// The whole of spec rule 6 and integration tests 10 and 11: exactly two levels,
-    /// and a child agreeing with its parent about what kind of money it is.
-    /// </summary>
-    /// <param name="editing">
-    /// The category being edited, or null when creating. An edit has two extra ways to
-    /// break the tree that a create does not: adopting itself, and acquiring a parent
-    /// while already having children.
-    /// </param>
+    /// <summary>The name first, then the tree rules <see cref="CategoryRules"/> owns.</summary>
+    /// <param name="editing">The category being edited, or null when creating.</param>
     private static async Task<IResult?> ValidateAsync(
         CategoryRequest request,
         Guid? editing,
-        AppDbContext database,
+        CategoryRules rules,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -205,49 +188,8 @@ public static class CategoryEndpoints
             return Problems.Validation("name", "O nome é obrigatório.");
         }
 
-        if (request.ParentId is not { } parentId)
-        {
-            return null;
-        }
-
-        if (parentId == editing)
-        {
-            return Problems.Validation("parentId", "Uma categoria não pode ser mãe de si mesma.");
-        }
-
-        // Through the query filter: another user's category is not a parent, it is a
-        // field that does not resolve.
-        var parent = await database.Categories
-            .SingleOrDefaultAsync(entity => entity.Id == parentId, cancellationToken);
-
-        if (parent is null)
-        {
-            return Problems.Validation("parentId", "Categoria não encontrada.");
-        }
-
-        if (parent.ParentId is not null)
-        {
-            return Problems.Validation(
-                "parentId",
-                "As categorias têm no máximo dois níveis, e essa já é uma subcategoria.");
-        }
-
-        if (parent.Kind != request.Kind)
-        {
-            return Problems.Validation(
-                "kind",
-                $"Uma subcategoria de '{parent.Name}' precisa ser do mesmo tipo que ela.");
-        }
-
-        if (editing is { } id
-            && await database.Categories.AnyAsync(entity => entity.ParentId == id, cancellationToken))
-        {
-            return Problems.Validation(
-                "parentId",
-                "Essa categoria tem subcategorias, então não pode virar subcategoria.");
-        }
-
-        return null;
+        return Problems.Validation(
+            await rules.ValidatePlacementAsync(request.Kind, request.ParentId, editing, cancellationToken));
     }
 
     private static CategoryResponse Describe(Category category) =>
