@@ -29,7 +29,7 @@ export default function ComparisonChart({
 }: {
   series: ReturnsPoint[];
   codes: string[];
-  title?: string;
+  title?: string | undefined;
   bare?: boolean;
 }) {
   const [hidden, setHidden] = useState<string[]>([]);
