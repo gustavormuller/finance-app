@@ -14,7 +14,7 @@ namespace Finance.Api.Domain.Returns;
 /// The NPV is evaluated scaled by a positive factor, so that no discount factor exceeds 1.
 /// Unscaled, <c>(1 + r)^(-t/365)</c> at <c>r = -0.99</c> passes the <c>decimal</c> range
 /// after about 14 years, and at <c>r = 10</c> the mirror image does after about 28 if the
-/// flows are discounted to the last date instead (DEFERRED, 008 CP1). Scaling leaves the
+/// flows are discounted to the last date instead. Scaling leaves the
 /// NPV's sign, which is all bisection reads, and the ratio NPV / NPV', which is Newton's
 /// step, unchanged.
 /// </para>
@@ -51,7 +51,7 @@ public static class MoneyWeightedReturn
     /// </summary>
     /// <remarks>
     /// Each movement keeps its real date. TWR moves a buy made before the first close onto
-    /// that close, to match the value; XIRR has no daily value to match (DEFERRED, 008 CP2).
+    /// that close, to match the value; XIRR has no daily value to match.
     /// A movement on or before the base day is in the opening value already. A zero opening
     /// value (inception) or closing value adds no flow. A portfolio's flows are its assets'
     /// flows put together; they need not be summed by day.

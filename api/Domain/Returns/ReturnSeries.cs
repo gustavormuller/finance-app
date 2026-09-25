@@ -5,7 +5,7 @@ namespace Finance.Api.Domain.Returns;
 
 /// <summary>
 /// One asset's <see cref="ReturnDay"/>s from its <see cref="PortfolioDaily"/> rows and its
-/// movements, in BRL or in the asset's own currency (008, decision 3; DEFERRED, 008 CP1).
+/// movements, in BRL or in the asset's own currency (008, decision 3).
 /// </summary>
 /// <remarks>
 /// <para>

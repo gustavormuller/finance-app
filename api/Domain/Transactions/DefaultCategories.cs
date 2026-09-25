@@ -15,14 +15,14 @@
 /// </remarks>
 public static class DefaultCategories
 {
-    /// <summary>Where an imported expense lands when nothing in history says otherwise (004).</summary>
+    /// <summary>Where an imported expense lands when nothing in history says otherwise.</summary>
     public const string OtherExpenseName = "Outros";
 
-    /// <summary>Where an imported income lands when nothing in history says otherwise (004).</summary>
+    /// <summary>Where an imported income lands when nothing in history says otherwise.</summary>
     public const string OtherIncomeName = "Outras receitas";
 
     /// <summary>
-    /// Money moving between the user's own accounts (005): counted in balances, never
+    /// Money moving between the user's own accounts: counted in balances, never
     /// as income or expense.
     /// </summary>
     public const string TransferName = "Transferência";

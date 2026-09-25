@@ -23,7 +23,6 @@ public static class TransactionRules
     /// </summary>
     public const string AmountField = "amount";
 
-    /// <summary>The field name the API reports for a date rejection.</summary>
     public const string DateField = "date";
 
     /// <summary>
@@ -52,7 +51,7 @@ public static class TransactionRules
             new RuleViolation(AmountField, "Uma categoria de receita exige um valor positivo."),
         CategoryKind.Expense when amount > 0m =>
             new RuleViolation(AmountField, "Uma categoria de despesa exige um valor negativo."),
-        // 005: a transfer leaves one account and arrives in another, so either sign
+        // A transfer leaves one account and arrives in another, so either sign
         // is legitimate. Zero is still rule 1's to refuse.
         CategoryKind.Transfer => null,
         _ => null,

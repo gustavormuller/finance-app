@@ -6,7 +6,7 @@ namespace Finance.Api.Domain.Returns;
 /// <summary>
 /// The cash a movement moves, and its conversion to BRL: the one set of rules that both
 /// TWR (<see cref="ReturnSeries"/>) and XIRR (<see cref="MoneyWeightedReturn.FlowsInBrl"/>) read
-/// (008, decisions 3 and 4; DEFERRED, 008 CP1 and CP2).
+/// (008, decisions 3 and 4).
 /// </summary>
 internal static class MovementCash
 {

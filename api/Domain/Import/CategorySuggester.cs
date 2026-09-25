@@ -22,7 +22,7 @@ public static class CategorySuggester
     /// "Categoria não encontrada" rather than filed somewhere at random. Every
     /// candidate is held to 003's rule 3: its kind has to agree with the sign, or the
     /// commit would be refused anyway. The sign default is only ever Expense or
-    /// Income, never a Transfer (005).
+    /// Income, never a Transfer.
     /// </summary>
     public static Guid? Suggest(
         decimal amount,
