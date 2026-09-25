@@ -1,4 +1,5 @@
-﻿using Finance.Api.Application;
+﻿using System.Text;
+using Finance.Api.Application;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -94,6 +95,60 @@ public static class TransactionEndpoints
                 .ToListAsync(cancellationToken);
 
             return Results.Ok(new TransactionPage(items, page, pageSize, total));
+        });
+
+        // 021: every row the list's filters select, as a CSV for Excel pt-BR. Written as
+        // the rows arrive, so a large export is never held in memory.
+        transactions.MapGet("/export", (
+            AppDbContext database,
+            CancellationToken cancellationToken,
+            string? from = null,
+            string? to = null,
+            string? accountId = null,
+            string? categoryId = null,
+            string? importBatchId = null) =>
+        {
+            var (filter, problem) = TransactionFilter.Parse(from, to, accountId, categoryId, importBatchId);
+
+            if (filter is null)
+            {
+                return problem!;
+            }
+
+            // The parent is a second pass over Categories, so its query filter joins in
+            // too; a transaction on a main category has none.
+            var rows =
+                from transaction in filter.Apply(database.Transactions)
+                join account in database.Accounts on transaction.AccountId equals account.Id
+                join category in database.Categories on transaction.CategoryId equals category.Id
+                join parent in database.Categories on category.ParentId equals (Guid?)parent.Id into parents
+                from parent in parents.DefaultIfEmpty()
+                orderby transaction.Date descending, transaction.CreatedAt descending
+                select new ExportedTransaction(
+                    transaction.Date,
+                    transaction.Description,
+                    transaction.Money.Amount,
+                    transaction.Money.Currency,
+                    account.Name,
+                    parent == null ? category.Name : parent.Name,
+                    parent == null ? null : category.Name);
+
+            return Results.Stream(
+                async body =>
+                {
+                    await using var writer = new StreamWriter(body, new UTF8Encoding(false), leaveOpen: true);
+
+                    // The BOM, without which Excel reads UTF-8 as the system code page.
+                    await writer.WriteAsync('﻿');
+                    await writer.WriteAsync(TransactionCsv.Header + TransactionCsv.LineBreak);
+
+                    await foreach (var row in rows.AsAsyncEnumerable().WithCancellation(cancellationToken))
+                    {
+                        await writer.WriteAsync(TransactionCsv.Record(row) + TransactionCsv.LineBreak);
+                    }
+                },
+                contentType: "text/csv; charset=utf-8",
+                fileDownloadName: TransactionCsv.FileName(filter.From, filter.To));
         });
 
         transactions.MapPost("/", async (
