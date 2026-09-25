@@ -76,6 +76,33 @@ public sealed class ReturnsEndpointTests(PostgresFixture postgres)
         Assert.Equal((Bought, 100m), (body.Series[0]["date"].GetDateOnly(), body.Series[0]["portfolio"].GetDecimal()));
     }
 
+    /// <summary>
+    /// Spec 018 test 4: the period ends on the latest row of any of the caller's assets, not
+    /// on another user's later row for the same instrument, and an asset's own period on its own.
+    /// </summary>
+    [Fact]
+    public async Task The_period_ends_on_the_callers_latest_row_across_assets()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var api = await StartAsync(postgres, ct, ReturnsFixtures.ClockOn(MidYear));
+        var a = await api.SignInAsync("holder", ct);
+        var b = await api.SignInAsync("other", ct);
+        var start = MidYear.AddDays(-30);
+        var petr4 = await api.CatalogueAsync("PETR4", ct);
+        var longer = await api.HoldAsync(a.Id, petr4, ct, Buy(start, 10m, 10m));
+        var shorter = await api.HoldAsync(a.Id, await api.CatalogueAsync("VALE3", ct), ct, Buy(start, 1m, 50m));
+        var theirs = await api.HoldAsync(b.Id, petr4, ct, Buy(start, 1m, 10m));
+        await api.DailyAsync(longer, start, MidYear.AddDays(-10), 10m, 11m, ct);
+        await api.DailyAsync(shorter, start, MidYear.AddDays(-20), 1m, 50m, ct);
+        await api.DailyAsync(theirs, start, MidYear, 1m, 10m, ct);
+
+        var portfolio = await a.Client.GetFromJsonAsync<ReturnsBody>("/api/returns/portfolio", ct);
+        var own = await a.Client.GetFromJsonAsync<ReturnsBody>($"/api/returns/assets/{shorter.Id}", ct);
+
+        Assert.Equal(new PeriodBody(start, MidYear.AddDays(-10), 20), portfolio!.Period);
+        Assert.Equal(new PeriodBody(start, MidYear.AddDays(-20), 10), own!.Period);
+    }
+
     /// <summary>Spec integration test 30.</summary>
     [Fact]
     public async Task A_five_year_series_is_sampled_to_at_most_260_points()

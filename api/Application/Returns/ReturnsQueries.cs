@@ -136,8 +136,16 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
         var movements = (await db.Movements.AsNoTracking().Where(movement => ids.Contains(movement.AssetId))
                 .ToListAsync(cancellationToken))
             .ToLookup(movement => movement.AssetId);
-        var lastRow = await db.PortfolioDaily.Where(row => ids.Contains(row.AssetId))
-            .MaxAsync(row => (DateOnly?)row.Date, cancellationToken);
+        // Each asset's latest day is one backwards probe of the primary key; MAX over
+        // "AssetId" = ANY(ids) read every index entry of every asset instead.
+        var lastRow = await db.Assets
+            .Where(held => ids.Contains(held.Id))
+            .Select(held => db.PortfolioDaily
+                .Where(row => row.AssetId == held.Id)
+                .OrderByDescending(row => row.Date)
+                .Select(row => (DateOnly?)row.Date)
+                .FirstOrDefault())
+            .MaxAsync(cancellationToken);
         if (movements.Count == 0 || lastRow is null)
         {
             return null;
@@ -150,8 +158,19 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
         }
 
         var opening = range.From.AddDays(-1);
-        var rows = (await db.PortfolioDaily.AsNoTracking()
+        // Only the columns the returns read: the date and value for TWR and XIRR, quantity and
+        // price for the FX split. The rest stay at their defaults; at inception this is every
+        // row the user has, and decoding the other numeric columns was most of the request.
+        var rows = (await db.PortfolioDaily
                 .Where(row => ids.Contains(row.AssetId) && row.Date >= opening && row.Date <= range.To)
+                .Select(row => new PortfolioDaily
+                {
+                    AssetId = row.AssetId,
+                    Date = row.Date,
+                    Quantity = row.Quantity,
+                    Price = row.Price,
+                    ValueBrl = row.ValueBrl,
+                })
                 .ToListAsync(cancellationToken))
             .ToLookup(row => row.AssetId);
 

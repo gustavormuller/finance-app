@@ -88,6 +88,32 @@ filter. Pinned first by `Each_asset_is_valued_at_its_own_latest_row_and_only_for
 | `GET /api/investments/summary` | 78.0 | **5.8** |
 | `GET /api/investments/assets` | 92.6 | **20.2** |
 
+### 2. The portfolio's returns: the last day and the daily rows
+
+**Cause.** A timer per phase of `MeasureAsync` (inception, scaled data) put 58% of the request
+in loading the daily rows, 12% in the TWR, 10% in the benchmarks and 6% in finding the last
+row. Two of those are the query, not the maths:
+
+- The last row was `max("Date")` over `"AssetId" = ANY(ids)`: an index-only scan of every entry
+  of every asset, 29 278 buffers, 35 ms in `EXPLAIN ANALYZE`. Per asset, a backwards probe of
+  the primary key and the largest of those: 64 buffers, 0.25 ms.
+- The rows were loaded as whole entities, ten columns of which six are `numeric`. The database
+  side is 17 ms for 22 662 rows; the rest was moving and decoding columns nobody reads. The
+  returns read the date and value (TWR, XIRR) and quantity and price (the FX split); the query
+  now projects those five.
+
+The maths itself (TWR, XIRR, benchmark indices) is the returns module's and is not touched
+(ADR-017). Pinned first by `The_period_ends_on_the_callers_latest_row_across_assets`.
+
+The machine was busier during this pair (another agent's build), so both columns are slower
+than the baseline table; the median of four interleaved rounds:
+
+| Route | before | last row | + projection |
+|---|---:|---:|---:|
+| `GET /api/returns/portfolio?period=inception` | 260 | 187 | **157** |
+| `GET /api/returns/portfolio?period=12m` | 104 | 59 | **62** |
+| `GET /api/returns/assets/{id}` | 37–54 | 35–51 | 43–63 (noise) |
+
 ## Measured, not worth doing
 
 Filled in as measured.
