@@ -30,7 +30,7 @@ export default function AssetPage() {
   });
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div>
         <Link to="/investments" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
           ← Investimentos

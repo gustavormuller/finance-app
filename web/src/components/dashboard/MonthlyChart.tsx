@@ -71,25 +71,28 @@ export default function MonthlyChart({ series }: { series: MonthTotals[] }) {
         </ResponsiveContainer>
       </div>
 
-      <table className="sr-only">
-        <caption>Receitas e despesas por mês</caption>
-        <thead>
-          <tr>
-            <th scope="col">Mês</th>
-            <th scope="col">Receitas</th>
-            <th scope="col">Despesas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((entry) => (
-            <tr key={entry.month}>
-              <th scope="row">{formatMonth(entry.month)}</th>
-              <td>{money(entry.income)}</td>
-              <td>{money(entry.expense)}</td>
+      {/* A table does not shrink to sr-only's 1px, so the wrapper carries it. */}
+      <div className="sr-only">
+        <table>
+          <caption>Receitas e despesas por mês</caption>
+          <thead>
+            <tr>
+              <th scope="col">Mês</th>
+              <th scope="col">Receitas</th>
+              <th scope="col">Despesas</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((entry) => (
+              <tr key={entry.month}>
+                <th scope="row">{formatMonth(entry.month)}</th>
+                <td>{money(entry.income)}</td>
+                <td>{money(entry.expense)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }

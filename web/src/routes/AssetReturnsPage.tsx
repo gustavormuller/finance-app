@@ -16,7 +16,7 @@ export default function AssetReturnsPage() {
   const ticker = position?.ticker ?? 'Ativo';
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div>
         <Link to="/investments/$assetId" params={{ assetId }} className="text-muted-foreground text-sm underline-offset-4 hover:underline">
           ← {ticker}

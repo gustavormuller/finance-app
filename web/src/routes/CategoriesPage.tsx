@@ -60,7 +60,7 @@ export default function CategoriesPage() {
   const possibleParents = (categories.data ?? []).filter((category) => category.parentId === null);
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-3xl font-semibold tracking-tight">Categorias</h2>
 

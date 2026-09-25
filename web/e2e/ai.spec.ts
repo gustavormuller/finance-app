@@ -26,6 +26,10 @@ async function enableAi(page: Page) {
   await expect(page.getByTestId('ai-state')).toHaveText('Desligada');
   await page.getByRole('switch', { name: 'Usar IA nesta conta' }).check();
   await expect(page.getByTestId('ai-state')).toHaveText('Ligada');
+  // "Ligada" shows while the change is still being saved, and the switch is disabled
+  // until it is. Leaving the page before that cancels the request (a 499), and the
+  // account stays without AI.
+  await expect(page.getByRole('switch', { name: 'Usar IA nesta conta' })).toBeEnabled();
 }
 
 /** Step 1 through to the review, for `extrato.ofx`. */

@@ -29,7 +29,7 @@ export default function ProtectedLayout() {
       <div className="px-4 sm:px-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-8">
         <nav
           aria-label="Principal"
-          className="glass mb-6 flex items-center gap-1 overflow-x-auto rounded-2xl p-2 lg:sticky lg:top-6 lg:mb-0 lg:flex-col lg:items-stretch lg:overflow-visible lg:p-3"
+          className="glass mb-6 flex items-center gap-1 overflow-x-auto rounded-2xl p-2 [scrollbar-width:none] lg:sticky lg:top-6 lg:mb-0 lg:flex-col lg:items-stretch lg:overflow-visible lg:p-3"
         >
           {LINKS.map(([to, label, Icon]) => (
             <Link

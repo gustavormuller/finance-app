@@ -7,7 +7,7 @@ import SyncRuns from '@/components/market-data/SyncRuns';
  */
 export default function MarketDataPage() {
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div>
         <h2 className="text-3xl font-semibold tracking-tight">Dados de mercado</h2>
         <p className="text-muted-foreground mt-1 text-sm">

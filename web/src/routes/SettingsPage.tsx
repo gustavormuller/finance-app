@@ -38,7 +38,7 @@ export default function SettingsPage() {
   const aiEnabled = saving ?? me.data?.aiEnabled ?? false;
 
   return (
-    <section className="grid max-w-3xl gap-6">
+    <section className="grid max-w-3xl gap-6 [&>*]:min-w-0">
       <h2 className="text-3xl font-semibold tracking-tight">Configurações</h2>
 
       <div className="grid gap-6">

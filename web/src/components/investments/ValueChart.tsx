@@ -59,23 +59,26 @@ export default function ValueChart({ rows }: { rows: DailyRow[] }) {
             </ResponsiveContainer>
           </div>
 
-          <table className="sr-only">
-            <caption>Valor no último dia de cada mês</caption>
-            <thead>
-              <tr>
-                <th scope="col">Data</th>
-                <th scope="col">Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthEnds.map((row) => (
-                <tr key={row.date}>
-                  <th scope="row">{formatDate(row.date)}</th>
-                  <td>{formatMoney(row.valueBrl)}</td>
+          {/* A table does not shrink to sr-only's 1px, so the wrapper carries it. */}
+          <div className="sr-only">
+            <table>
+              <caption>Valor no último dia de cada mês</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Data</th>
+                  <th scope="col">Valor</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {monthEnds.map((row) => (
+                  <tr key={row.date}>
+                    <th scope="row">{formatDate(row.date)}</th>
+                    <td>{formatMoney(row.valueBrl)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>

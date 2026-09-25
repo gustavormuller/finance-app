@@ -73,16 +73,20 @@ export default function Balances({ summary }: { summary: DashboardSummary }) {
 const format = (value: number) =>
   Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** "R$" and the cents quieter than the reais, the way the eye reads a balance. */
+/**
+ * "R$" and the cents quieter than the reais, the way the eye reads a balance. The sign
+ * is printed as `Amount` prints it, and the figure carries `Amount`'s test id, so the
+ * total reads the same to the tests as every other amount.
+ */
 function Hero({ value }: { value: number }) {
   const [reais, cents] = format(value).split(',');
 
   return (
     <>
       <span className="text-muted-foreground text-2xl">R$</span>
-      <span className="flex items-baseline">
+      <span data-testid="amount" className="flex items-baseline">
         <span className={cn('text-5xl leading-none font-semibold sm:text-6xl', value < 0 && 'text-negative')}>
-          {value < 0 && '−'}
+          {value < 0 ? '−' : '+'}
           {reais}
         </span>
         <span className="text-muted-foreground text-3xl font-semibold">,{cents}</span>

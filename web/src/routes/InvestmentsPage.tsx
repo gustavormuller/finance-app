@@ -8,7 +8,7 @@ import { buttonVariants } from '@/components/ui/button';
 /** `/investments` (007): what the user holds, valued by the latest daily row. */
 export default function InvestmentsPage() {
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <PageHeader
         title="Investimentos"
         actions={

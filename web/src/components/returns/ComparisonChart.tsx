@@ -75,29 +75,32 @@ export default function ComparisonChart({ series, codes }: { series: ReturnsPoin
         </ResponsiveContainer>
       </div>
 
-      <table className="sr-only">
-        <caption>Carteira e referências no último ponto de cada mês, base 100</caption>
-        <thead>
-          <tr>
-            <th scope="col">Data</th>
-            <th scope="col">Carteira</th>
-            {shown.map((code) => (
-              <th key={code} scope="col">{benchmarkLabel(code)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {monthEnds.map((point) => (
-            <tr key={point.date}>
-              <th scope="row">{formatDate(point.date)}</th>
-              <td>{index(point.portfolio)}</td>
+      {/* A table does not shrink to sr-only's 1px, so the wrapper carries it. */}
+      <div className="sr-only">
+        <table>
+          <caption>Carteira e referências no último ponto de cada mês, base 100</caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Carteira</th>
               {shown.map((code) => (
-                <td key={code}>{typeof point[code] === 'number' ? index(point[code]) : ''}</td>
+                <th key={code} scope="col">{benchmarkLabel(code)}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {monthEnds.map((point) => (
+              <tr key={point.date}>
+                <th scope="row">{formatDate(point.date)}</th>
+                <td>{index(point.portfolio)}</td>
+                {shown.map((code) => (
+                  <td key={code}>{typeof point[code] === 'number' ? index(point[code]) : ''}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

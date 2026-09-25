@@ -76,7 +76,7 @@ export default function DashboardPage() {
     <Page>
       {/* 012: the Obsidiana grid — the hero across, three cards under it, then the
           chart beside the latest transactions. */}
-      <div className="grid gap-6 lg:grid-cols-6">
+      <div className="grid gap-6 lg:grid-cols-6 [&>*]:min-w-0">
         <div className="lg:col-span-6">
           <Balances summary={summary.data} />
         </div>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
 
 function Page({ children }: { children: React.ReactNode }) {
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <PageHeader title="Início" />
       {children}
     </section>
