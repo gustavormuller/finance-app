@@ -30,9 +30,10 @@ export default function DeleteAccount({ email }: { email: string }) {
   const confirmed = email !== '' && typed.trim() === email;
 
   return (
+    // Important, because `glass` sets its own border colour and is sorted after the colour utility.
     <section
       aria-labelledby="delete-account-heading"
-      className="glass border-destructive/40 grid gap-4 rounded-2xl p-5 sm:p-6"
+      className="glass border-destructive/40! grid gap-4 rounded-2xl p-5 sm:p-6"
     >
       <h3 id="delete-account-heading" className="text-destructive font-sans text-sm font-semibold">
         Excluir minha conta
