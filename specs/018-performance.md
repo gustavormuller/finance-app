@@ -187,6 +187,35 @@ Scripts per cold page load (headless Chromium, HTTP cache off, sizes from the bu
 A client-side navigation to a page not yet visited fetches its chunk: 123 kB for the
 transactions page, 14–39 kB for the others; Recharts is fetched once.
 
+### 6. React Query: 30 seconds of freshness, and every write ends it
+
+**Cause.** With the library's default `staleTime` of 0, a query is refetched by every observer
+that mounts after the first: on a cold load of the dashboard `/api/auth/me` went out three times
+(the guard, the layout, the AI card), `/api/accounts` twice on `/accounts`; every return to a
+page refetched all of it, and so did every focus of the tab.
+
+**Change.** Decision 8, in `src/lib/queryClient.ts`, used by `App.tsx`. The reason a longer
+`staleTime` is safe is the other half: the transaction form, for one, invalidates only
+`transactions`, and until now the dashboard's balances were fresh again only because every
+mount refetched. A `MutationCache` `onSettled` now marks every cached query stale (without
+fetching), so what is read next is fetched; each mutation's own invalidations still refetch
+what is on screen. Unit tests in `queryClient.test.ts`; a new E2E test adds an expense after
+the dashboard was read and comes back through the sidebar, cache intact, to the new balance.
+
+API requests per page, headless Chromium, the owner's data:
+
+| Load | before | after |
+|---|---:|---:|
+| cold `/` | 10 (`me` ×3) | **8** |
+| cold `/accounts` | 8 (`me` ×2, `accounts` ×2) | **6** |
+| cold `/transactions`, `/categories`, `/investments`, `/settings` | 6, 5, 6, 4 | **5, 4, 5, 3** |
+| cold `/investments/returns` | 18 | **17** |
+| back to `/` through the sidebar, within 30 s | 6–7 | **0** |
+| the tab focused again, within 30 s | 8 | **0** |
+
+`refetchOnWindowFocus` stays on: past 30 s, coming back to the tab still picks up what another
+tab or the nightly sync changed.
+
 ## Measured, not worth doing
 
 Filled in as measured.
