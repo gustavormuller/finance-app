@@ -75,6 +75,21 @@ public static class AuthEndpoints
             })
             .RequireAuthorization();
 
+        // 023: the account and everything in it (ADR-013). A cookie whose user is already
+        // gone is not a session, as in GET.
+        routes.MapDelete("/api/auth/me", async (UserDeletion deletion, SignInManager<AppUser> signInManager, CancellationToken ct) =>
+            {
+                if (!await deletion.DeleteAsync(ct))
+                {
+                    return Results.Unauthorized();
+                }
+
+                await signInManager.SignOutAsync();
+
+                return Results.NoContent();
+            })
+            .RequireAuthorization();
+
         routes.MapPost("/api/auth/logout", async (SignInManager<AppUser> signInManager) =>
             {
                 await signInManager.SignOutAsync();
