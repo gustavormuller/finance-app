@@ -56,9 +56,14 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-/** Any of the worker's caches will do: the names are content-hashed. Nothing is stored. */
+/**
+ * Any of the worker's caches will do, and any `Vary` is moot: a content-hashed name has one
+ * content. Without ignoreVary, a `Vary: Origin` (vite preview sends one) misses the module
+ * script and the stylesheet, CORS requests carrying an Origin the precache did not.
+ * Nothing is stored.
+ */
 async function cacheFirst(request: Request): Promise<Response> {
-  return (await caches.match(request)) ?? fetch(request);
+  return (await caches.match(request, { ignoreVary: true })) ?? fetch(request);
 }
 
 async function networkFirstShell(request: Request): Promise<Response> {
@@ -75,7 +80,7 @@ async function networkFirstShell(request: Request): Promise<Response> {
 
   // This build's own shell, not whichever cache happens to hold an index.html: it names
   // exactly the files precached beside it.
-  const shell = await (await caches.open(CACHE)).match(SHELL);
+  const shell = await (await caches.open(CACHE)).match(SHELL, { ignoreVary: true });
 
   return shell ?? answer ?? network;
 }
