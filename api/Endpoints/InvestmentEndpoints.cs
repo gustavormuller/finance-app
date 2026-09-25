@@ -3,7 +3,6 @@ using Finance.Api.Application.Investments;
 using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
-using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

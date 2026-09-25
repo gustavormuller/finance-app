@@ -55,11 +55,13 @@ internal static class Problems
     /// the children, moving the transactions, picking another name. The reason is in
     /// the body because the spec asks the UI to show it rather than fail silently.
     /// </summary>
-    public static IResult Conflict(string reason) =>
+    /// <param name="extensions">Members the UI needs to act on the refusal, such as the id of what is in the way.</param>
+    public static IResult Conflict(string reason, IDictionary<string, object?>? extensions = null) =>
         Results.Problem(
             title: "Conflito",
             detail: reason,
-            statusCode: StatusCodes.Status409Conflict);
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: extensions);
 
     /// <summary>
     /// A refusal that resolves itself with time. <c>Retry-After</c> says how long, in

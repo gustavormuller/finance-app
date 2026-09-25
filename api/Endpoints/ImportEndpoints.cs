@@ -268,11 +268,9 @@ public static class ImportEndpoints
 
         if (outcome.OpenBatchId is { } openBatchId)
         {
-            return Results.Problem(
-                title: "Conflito",
-                detail: "Já existe uma importação em andamento. Confirme ou descarte-a antes de enviar outro arquivo.",
-                statusCode: StatusCodes.Status409Conflict,
-                extensions: new Dictionary<string, object?> { ["openBatchId"] = openBatchId });
+            return Problems.Conflict(
+                "Já existe uma importação em andamento. Confirme ou descarte-a antes de enviar outro arquivo.",
+                new Dictionary<string, object?> { ["openBatchId"] = openBatchId });
         }
 
         var summary = outcome.Summary!;
