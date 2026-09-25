@@ -135,6 +135,26 @@ its rollback assertion and now names the exception it gets (`PostgresException`,
 
 (Two rounds, busy machine.)
 
+### 4. Where the net-worth series opens
+
+**Cause.** 014's `bounds` takes the month of the user's first `PortfolioDaily` row with
+`min("Date")`, which the primary key `(UserId, AssetId, Date)` cannot answer without reading all
+of the user's rows, and PostgreSQL evaluates `bounds` twice (it is inlined in two places): two
+bitmap scans of 22 662 rows, 6–10 ms each, on every dashboard load whatever the window.
+
+**Change.** The first row per asset is one forward probe (the same `LATERAL` shape the series
+already uses for each month's last row), and the earliest of those: `EXPLAIN ANALYZE` 25 → 17 ms.
+Still Dapper, still `"UserId" = @userId` in each part. Pinned first by
+`The_series_opens_at_the_callers_earliest_daily_row_across_assets`.
+
+| Route | before | after |
+|---|---:|---:|
+| `GET /api/dashboard/net-worth` (24) | 17.9 | **14.2** |
+| `GET /api/dashboard/net-worth?months=120` | 23.6 | **19.5** |
+
+What is left is the all-time sum of the user's transactions per month (8 514 rows at ten years),
+which the balances need too; see "Measured, not worth doing".
+
 ## Measured, not worth doing
 
 Filled in as measured.
