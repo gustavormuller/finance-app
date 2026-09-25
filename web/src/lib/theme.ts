@@ -4,11 +4,15 @@
  * or written — a private window, blocked site data — behaves as `system`.
  *
  * `index.html` applies the same rule before the first paint, so keep the two in step:
- * key `theme`, values `light` | `dark` | `system`, class `dark` on `<html>`.
+ * key `theme`, values `light` | `dark` | `system`, class `dark` on `<html>`, and the
+ * `theme-color` metas set to `THEME_COLOR`.
  */
 export type ThemeChoice = 'light' | 'dark' | 'system';
 
 const KEY = 'theme';
+
+/** Each theme's `--background` in index.css, as the browser's toolbar colour (022). */
+export const THEME_COLOR = { light: '#f1f2f7', dark: '#0b0c12' } as const;
 
 export function readThemeChoice(): ThemeChoice {
   try {
@@ -39,4 +43,10 @@ export function applyTheme(choice: ThemeChoice): void {
   root.classList.toggle('dark', dark);
   // Native controls — scrollbars, date pickers, the select popup — follow this.
   root.style.colorScheme = dark ? 'dark' : 'light';
+
+  // Both metas get the applied theme's colour: their media queries describe the system,
+  // which Claro and Escuro overrule.
+  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    meta.content = dark ? THEME_COLOR.dark : THEME_COLOR.light;
+  }
 }

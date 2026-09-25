@@ -89,6 +89,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
+    // Tests see every stylesheet as empty, except this one read as text: pwa.test.ts
+    // checks the colours in the manifest and index.html against the theme's tokens.
+    css: { include: [/\/src\/index\.css\?raw$/] },
     // Vitest owns src/. Playwright owns e2e/. Without this split, `vitest run`
     // picks up the Playwright specs and fails on a missing test runner.
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
