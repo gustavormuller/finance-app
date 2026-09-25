@@ -139,7 +139,7 @@ public static class TransactionEndpoints
                     await using var writer = new StreamWriter(body, new UTF8Encoding(false), leaveOpen: true);
 
                     // The BOM, without which Excel reads UTF-8 as the system code page.
-                    await writer.WriteAsync('﻿');
+                    await writer.WriteAsync('\uFEFF');
                     await writer.WriteAsync(TransactionCsv.Header + TransactionCsv.LineBreak);
 
                     await foreach (var row in rows.AsAsyncEnumerable().WithCancellation(cancellationToken))
