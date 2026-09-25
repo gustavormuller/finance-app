@@ -11,8 +11,8 @@ namespace Finance.Api.Tests.Integration;
 /// <summary>
 /// 009 spec integration tests 15-20 for <c>POST /api/imports/{id}/suggest</c>: the gates on
 /// a scripted provider, the categorisation on <see cref="FakeAiProvider"/>. Every refusal is
-/// a pt-BR problem detail that never echoes the exception's message. Test 15's analysis half
-/// is CP5's.
+/// a pt-BR problem detail that never echoes the exception's message. The analysis endpoint
+/// tests cover test 15's analysis half.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class AiSuggestEndpointTests(PostgresFixture postgres)

@@ -31,7 +31,7 @@ internal static class DashboardFixtures
 
     public sealed record CategoryItem(Guid CategoryId, string Name, decimal Amount, decimal Share);
 
-    /// <summary>014: one month-end point of the net-worth series.</summary>
+    /// <summary>One month-end point of the net-worth series.</summary>
     public sealed record NetWorthItem(string Month, decimal Accounts, decimal Investments, decimal Total);
 
     /// <summary>

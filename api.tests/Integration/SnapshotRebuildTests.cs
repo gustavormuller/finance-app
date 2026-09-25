@@ -6,9 +6,9 @@ using static Finance.Api.Tests.Integration.InvestmentsApi;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 007 checkpoint 3: <see cref="SnapshotRebuild"/>, the spec's <c>RebuildSnapshots</c>,
-/// against PostgreSQL. Spec integration test 22, and tests 19 and 20 at the service; their
-/// HTTP halves are in <c>InvestmentMovementEndpointTests</c>.
+/// <see cref="SnapshotRebuild"/>, the spec's <c>RebuildSnapshots</c>, against PostgreSQL.
+/// Spec 007 integration test 22, and tests 19 and 20 at the service; their HTTP halves are
+/// in <c>InvestmentMovementEndpointTests</c>.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class SnapshotRebuildTests(PostgresFixture postgres)

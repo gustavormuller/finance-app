@@ -8,8 +8,8 @@ using Npgsql;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 007 checkpoint 1: the storage layer of investments. The context half of spec
-/// integration tests 16, 23 and 24; their HTTP halves arrive with the endpoints.
+/// The storage layer of investments: the context half of spec 007 integration tests 16,
+/// 23 and 24.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class InvestmentsPersistenceTests(PostgresFixture postgres)

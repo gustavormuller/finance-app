@@ -8,8 +8,8 @@ using Npgsql;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 009 checkpoint 1: the storage layer of the AI module. The context halves of spec
-/// integration tests 13, 14 and 23; their HTTP halves arrive with the endpoints.
+/// The storage layer of the AI module. The context halves of spec 009 integration tests 13,
+/// 14 and 23; the endpoint tests cover their HTTP halves.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class AiPersistenceTests(PostgresFixture postgres)
