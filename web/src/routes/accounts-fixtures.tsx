@@ -4,6 +4,7 @@ import { render } from '@testing-library/react';
 
 import type { Account, AccountBalance, Category, ImportBatch, Transaction } from '@/api/finance';
 import { routeTree } from '@/routeTree';
+import '@/test-routes';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
 /**

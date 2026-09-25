@@ -1,6 +1,7 @@
 using Finance.Api.Application.Investments;
 using Finance.Api.Domain.Investments;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using static Finance.Api.Tests.Integration.InvestmentsApi;
 
 namespace Finance.Api.Tests.Integration;
@@ -34,6 +35,37 @@ public sealed class SnapshotRebuildTests(PostgresFixture postgres)
         Assert.Equal(10, rows.Count);
         Assert.Equal((10m, Start), (rows[0].Price, rows[0].PriceDate));
         Assert.Equal((12m, Start.AddDays(3), 1200m, 1005m), (rows[^1].Price, rows[^1].PriceDate, rows[^1].ValueBrl, rows[^1].CostBasisBrl));
+    }
+
+    /// <summary>
+    /// Spec 018 test 3: what is stored is exactly what <see cref="SnapshotBuilder"/> builds, every
+    /// column, for a USD asset whose average cost and BRL values need rounding.
+    /// </summary>
+    [Fact]
+    public async Task The_stored_rows_are_exactly_the_builders_in_every_column()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var api = await StartAsync(postgres, ct);
+        var user = await api.SignInAsync("rebuild", ct);
+        var aapl = await api.CatalogueAsync("AAPL", ct, "USD", (Start, 100.12345678m), (Start.AddDays(4), 101.5m));
+        await api.UsdBrlAsync(ct, (Start.AddDays(-3), 5.1234m), (Start.AddDays(2), 5.4321m));
+        var asset = await api.HoldAsync(
+            user.Id, aapl, ct, Buy(Start, 3.33333333m, 100.12345678m, 1.99m), Buy(Start.AddDays(3), 1.5m, 99.87654321m, 0.5m));
+
+        await using var context = api.Context(user.Id);
+        var written = await Rebuild(context).RebuildAsync(asset.Id, Start, ct);
+
+        var expected = SnapshotBuilder.Build(
+            user.Id, asset.Id, "USD",
+            await context.Movements.AsNoTracking().ToListAsync(ct),
+            await context.Prices.AsNoTracking().Where(price => price.MarketAssetId == aapl.Id).ToListAsync(ct),
+            await context.Benchmarks.AsNoTracking().Where(rate => rate.Code == "USDBRL").ToListAsync(ct),
+            Start, Today);
+        var stored = await context.PortfolioDaily.AsNoTracking().OrderBy(row => row.Date).ToListAsync(ct);
+        Assert.Equal(expected.Count, written);
+        Assert.Equal(
+            expected.Select(row => (row.UserId, row.AssetId, row.Date, row.Quantity, row.AverageCost, row.Price, row.PriceDate, row.FxRate, row.ValueBrl, row.CostBasisBrl)),
+            stored.Select(row => (row.UserId, row.AssetId, row.Date, row.Quantity, row.AverageCost, row.Price, row.PriceDate, row.FxRate, row.ValueBrl, row.CostBasisBrl)));
     }
 
     [Fact]
@@ -80,7 +112,8 @@ public sealed class SnapshotRebuildTests(PostgresFixture postgres)
 
             // Now worth about 1e20 BRL from day 5, past numeric(18,2): that day's insert fails.
             await context.Movements.ExecuteUpdateAsync(set => set.SetProperty(movement => movement.Quantity, 9_999_999_999m), ct);
-            await Assert.ThrowsAsync<DbUpdateException>(() => Rebuild(context).RebuildAsync(asset.Id, Start, ct));
+            var overflow = await Assert.ThrowsAsync<PostgresException>(() => Rebuild(context).RebuildAsync(asset.Id, Start, ct));
+            Assert.Equal(PostgresErrorCodes.NumericValueOutOfRange, overflow.SqlState);
         }
 
         await using (var context = api.Context(user.Id))

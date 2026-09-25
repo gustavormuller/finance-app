@@ -1,13 +1,14 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 
 import ThemeToggle from './components/ThemeToggle';
+import { createQueryClient } from './lib/queryClient';
 import { router } from './router';
 import HealthRoute from './routes/HealthRoute';
 
 // The client lives here rather than in main.tsx so <App /> stays renderable on its
 // own, which is what keeps App.test.tsx working without a wrapper.
-const queryClient = new QueryClient();
+const queryClient = createQueryClient();
 
 /*
  * The application shell: a top bar that does not change per route, the router's

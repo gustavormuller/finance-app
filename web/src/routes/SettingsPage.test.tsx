@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AiUsage } from '@/api/finance';
 import { routeTree } from '@/routeTree';
+import '@/test-routes';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
 const usage: AiUsage = { month: '2026-09', spentBrl: 0.1234, budgetBrl: 15, calls: 3 };

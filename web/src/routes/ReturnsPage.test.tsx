@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Position, Returns } from '@/api/finance';
 import { chooseCurrency } from '@/lib/currency';
 import { routeTree } from '@/routeTree';
+import '@/test-routes';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
 const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: false };

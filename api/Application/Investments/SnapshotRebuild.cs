@@ -79,20 +79,7 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
         await db.PortfolioDaily.Where(row => row.AssetId == assetId && row.Date >= from).ExecuteDeleteAsync(cancellationToken);
 
         var rows = SnapshotBuilder.Build(asset.UserId, assetId, asset.Currency, movements, prices, rates, from, Today);
-        db.PortfolioDaily.AddRange(rows);
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        finally
-        {
-            // Written or refused, the rows must not stay tracked for the next save in
-            // this context: the nightly run rebuilds many assets in one scope.
-            foreach (var row in rows)
-            {
-                db.Entry(row).State = EntityState.Detached;
-            }
-        }
+        await InsertAsync(asset.UserId, assetId, rows, cancellationToken);
 
         if (owned is not null)
         {
@@ -137,6 +124,34 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
         }
 
         return from;
+    }
+
+    /// <summary>
+    /// One statement for all of an asset's rows, in the transaction the rebuild runs in.
+    /// Through <c>SaveChanges</c>, five years of one asset (about 1 800 rows) were 1 800
+    /// tracked entities and 18 000 parameters, and nine tenths of the rebuild's time. The
+    /// values are the builder's, already rounded; the columns' scales are the same either way.
+    /// </summary>
+    private async Task InsertAsync(Guid userId, Guid assetId, IReadOnlyList<PortfolioDaily> rows, CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        DateOnly[] dates = [.. rows.Select(row => row.Date)], priceDates = [.. rows.Select(row => row.PriceDate)];
+        decimal[] quantities = [.. rows.Select(row => row.Quantity)], averageCosts = [.. rows.Select(row => row.AverageCost)],
+            prices = [.. rows.Select(row => row.Price)], fxRates = [.. rows.Select(row => row.FxRate)],
+            values = [.. rows.Select(row => row.ValueBrl)], costs = [.. rows.Select(row => row.CostBasisBrl)];
+
+        await db.Database.ExecuteSqlAsync(
+            $"""
+            INSERT INTO "PortfolioDaily"
+                ("UserId", "AssetId", "Date", "Quantity", "AverageCost", "Price", "PriceDate", "FxRate", "ValueBrl", "CostBasisBrl")
+            SELECT {userId}, {assetId}, day.*
+            FROM unnest({dates}, {quantities}, {averageCosts}, {prices}, {priceDates}, {fxRates}, {values}, {costs}) AS day
+            """,
+            cancellationToken);
     }
 
     private async Task<List<Price>> ClosesAsync(Guid marketAssetId, DateOnly from, CancellationToken cancellationToken)
