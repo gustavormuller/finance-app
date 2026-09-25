@@ -5,6 +5,7 @@ import { api } from '@/api/finance';
 import { useMe } from '@/auth/useMe';
 import Alert from '@/components/Alert';
 import SectionHeading from '@/components/dashboard/SectionHeading';
+import DeleteAccount from '@/components/settings/DeleteAccount';
 import { formatMoney } from '@/lib/money';
 import { formatMonth } from '@/lib/months';
 
@@ -98,6 +99,8 @@ export default function SettingsPage() {
             </>
           )}
         </section>
+
+        <DeleteAccount email={me.data?.email ?? ''} />
       </div>
     </section>
   );
