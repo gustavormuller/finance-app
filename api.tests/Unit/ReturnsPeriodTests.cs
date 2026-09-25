@@ -3,8 +3,8 @@
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 008 checkpoint 4: the period a return is measured over (decision 9) and the chart's
-/// sampling (at most 260 points). The integration halves are spec tests 28–30.
+/// The period a return is measured over (008, decision 9) and the chart's sampling (at most
+/// 260 points). The integration halves are spec tests 28–30.
 /// </summary>
 public sealed class ReturnsPeriodTests
 {

@@ -78,7 +78,7 @@ public sealed class TransactionRulesTests
 
     /// <summary>
     /// 005 spec unit test 3. Zero is refused once, by rule 1, and rule 3 stays silent
-    /// so the same field is not reported twice (see DEFERRED.md, 005 checkpoint 1).
+    /// so the same field is not reported twice.
     /// </summary>
     [Fact]
     public void Transfer_rejects_zero()

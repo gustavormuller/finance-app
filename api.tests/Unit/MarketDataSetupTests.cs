@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Finance.Api.Tests.Unit;
 
-/// <summary>006: the container hands out one typed-client adapter per port and kind.</summary>
+/// <summary>The container hands out one typed-client adapter per port and kind.</summary>
 public sealed class MarketDataSetupTests
 {
     [Fact]

@@ -6,8 +6,8 @@ using Polly.Timeout;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 006: what the /market-data screen reads about a failure is pt-BR, chosen by the
-/// exception's type. The English message is for the log and never shown.
+/// What the /market-data screen reads about a failure is pt-BR, chosen by the exception's
+/// type. The English message is for the log and never shown.
 /// </summary>
 public sealed class SyncErrorTextTests
 {

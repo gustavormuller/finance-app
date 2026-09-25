@@ -5,8 +5,8 @@ using Finance.Api.Infrastructure.MarketData;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 008 checkpoint 6: the E2E fakes' closes have a shape, so a return can be non-zero (spec
-/// 008 E2E test 36), while the latest close stays 10, which 007's E2E reads as the value.
+/// The E2E fakes' closes have a shape, so a return can be non-zero (spec 008 E2E test 36),
+/// while the latest close stays 10, which 007's E2E reads as the value.
 /// </summary>
 public sealed class FakeMarketDataProvidersTests
 {

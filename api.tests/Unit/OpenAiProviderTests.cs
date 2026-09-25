@@ -6,7 +6,7 @@ using static Finance.Api.Tests.Unit.AiProviderHarness;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 009 checkpoint 3: the OpenAI Chat Completions adapter against hand-written fixtures
+/// The OpenAI Chat Completions adapter against hand-written fixtures
 /// (<c>Fixtures/Ai/README.md</c>). The network is never hit; the key goes in a header only.
 /// </summary>
 public sealed class OpenAiProviderTests
