@@ -225,6 +225,9 @@ Every entry: spec · checkpoint · what · why deferred · what was done instead
   `{ "Code": 12, "Unit": "PercentPerDay" }`. That gives 008 a typed value, and a typo
   fails binding. `Level` covers index points, exchange rates and prices; for these the
   return is a ratio.
+  **Verified live on 2026-09-25 (019):** all four codes answer, with values in the expected
+  units: CDI and SELIC 0.050788 (% a day), IPCA −0.32 (% a month, 2026-08), USDBRL 5.1795.
+  No change to `appsettings.json` was needed.
 - **006 · CP2 · provider behaviour from documentation, not observation.** Each of these is
   unverified against the live API:
   - BCB: a `404` is read as "no values in the range", for example a weekend or a month IPCA
@@ -3350,3 +3353,23 @@ covered); nothing has been deployed.** These need a human:
 - **ARCHITECTURE.md's deploy text** needs updating once it has shipped (a DoD item; flagged,
   not edited).
 - **The whole run 005–010:** see the handoff's last section.
+
+## 019 · market data without the owner's keys
+
+- **019 · live checks, 2026-09-25.** Binance klines work with no key (`BTCBRL` from
+  2020-10-13). brapi without a token serves PETR4, VALE3, MGLU3 and ITUB4 only; every
+  other ticker, IVVB11 and unknown ones included, is HTTP 401 `MISSING_TOKEN`, so 006's
+  "unknown ticker is a 404" only holds with a token. Twelve Data is HTTP 401 without a
+  key. CoinGecko works keyless up to 365 days. Four responses are now real captures in
+  `api.tests/Fixtures/MarketData/`; the 006 files are still hand-written.
+- **019 · no migration.** `ProviderKind.Binance = 3` is stored in the existing `int`
+  column, which has no check constraint; `dotnet ef migrations has-pending-model-changes`
+  reports no changes.
+- **019 · pending human (spec 019, out of scope):** brapi's free token serves 3 months of
+  history, and its docs say a request beyond the plan is HTTP 403. A new asset's first
+  sync asks for 5 years, so with a free token it would fail as "O provedor recusou a chave
+  de acesso." every night. Not observable without a token. Decide between a paid plan and
+  a configurable maximum range for the brapi adapter.
+- **019 · pending human:** the Binance registration rule (BRL only, symbol ending in BRL)
+  and the provider descriptions in the registration select are spec decisions 6 and 12,
+  marked (review).
