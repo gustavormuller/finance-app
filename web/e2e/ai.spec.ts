@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { createAccount, devLogin, uniqueEmail } from './support';
+import { createAccount, devLogin, openImportTab, uniqueEmail } from './support';
 
 /**
  * Spec 009 E2E tests 28 and 29, against the real API and a real PostgreSQL, with the API on
@@ -34,10 +34,9 @@ async function enableAi(page: Page) {
 
 /** Step 1 through to the review, for `extrato.ofx`. */
 async function uploadOfx(page: Page, account: string) {
-  await page.goto('/import');
-  await page.getByLabel('Conta').selectOption({ label: account });
-  await page.getByLabel('Arquivo').setInputFiles(OFX);
-  await page.getByRole('button', { name: 'Enviar' }).click();
+  // 015: from the account's own tab, where choosing the file starts the upload.
+  await openImportTab(page, account);
+  await page.getByLabel('Escolher arquivo').setInputFiles(OFX);
 
   await expect(page.getByRole('heading', { name: '3. Revisão' })).toBeVisible();
 }
