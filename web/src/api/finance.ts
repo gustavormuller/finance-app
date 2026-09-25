@@ -41,6 +41,10 @@ export interface Category {
  * here because the server is authoritative: every amount is rounded and stored as
  * `numeric(18,2)` there, and nothing client-side does arithmetic on money beyond
  * applying a sign. Any future totalling belongs on the API, not here.
+ *
+ * One exception, by design (016): a BRL figure shown in dollars is divided by the
+ * latest USDBRL at display time, the architecture's "convert on read". That division
+ * is exact, in `bigint`, and rounded once to the cent (`lib/currency.ts`).
  */
 export interface Transaction {
   id: string;
@@ -378,10 +382,27 @@ export interface Position {
   dividendsBrl: number | null;
 }
 
+/** One asset class's part of the total (016); `share` is a fraction, and the shares sum to 1. */
+export interface AllocationItem {
+  class: MarketAssetClass;
+  valueBrl: number;
+  share: number;
+}
+
+/** BRL per US dollar, the latest USDBRL the market data holds, and its day (016). */
+export interface UsdBrl {
+  rate: number;
+  date: string;
+}
+
 export interface PortfolioSummary {
   totalBrl: number;
   totalCostBrl: number;
   unrealisedBrl: number;
+  /** By value, highest first; a class worth zero is left out. */
+  allocation: AllocationItem[];
+  /** Null while no USDBRL has been synced: nothing can be shown in dollars. */
+  usdBrl: UsdBrl | null;
 }
 
 /** Either a catalogue entry already there, or 006's registration body. */

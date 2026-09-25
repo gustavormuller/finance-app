@@ -50,7 +50,7 @@ const expenses: CategoryTotal[] = [
 
 const incomes: CategoryTotal[] = [{ categoryId: 'c-salary', name: 'Salário', amount: 5000, share: 1 }];
 
-const noPortfolio: PortfolioSummary = { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0 };
+const noPortfolio: PortfolioSummary = { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0, allocation: [], usdBrl: null };
 
 function stubApi(
   overrides: { summary?: DashboardSummary; monthly?: MonthTotals[]; portfolio?: PortfolioSummary } = {},
@@ -201,7 +201,7 @@ describe('DashboardPage', () => {
 
   /** Spec 012 web unit test 6: the hero adds what is invested, only when something is. */
   it('shows the invested total in the hero when there are positions, and not otherwise', async () => {
-    stubApi({ portfolio: { totalBrl: 25300, totalCostBrl: 19014.1, unrealisedBrl: 6285.9 } });
+    stubApi({ portfolio: { totalBrl: 25300, totalCostBrl: 19014.1, unrealisedBrl: 6285.9, allocation: [], usdBrl: null } });
     renderDashboard();
 
     const invested = await screen.findByTestId('hero-invested');

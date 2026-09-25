@@ -70,7 +70,7 @@ function stubReturns(
       case 'GET /api/investments/assets':
         return { body: positions };
       case 'GET /api/investments/summary':
-        return { body: { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0 } };
+        return { body: { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0, allocation: [], usdBrl: null } };
       case 'GET /api/market-data/assets':
         return { body: [] };
       default:

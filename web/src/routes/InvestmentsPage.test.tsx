@@ -65,7 +65,18 @@ const soldOut: Position = { ...petr4, assetId: 'a-vale3', ticker: 'VALE3', name:
 
 const justAdded: Position = { ...petr4, ...empty, assetId: 'a-itub4', ticker: 'ITUB4', name: 'Itaú PN', quantity: 0, averageCost: 0 };
 
-const summary: PortfolioSummary = { totalBrl: 14510, totalCostBrl: 11212.34, unrealisedBrl: 3297.66 };
+const summary: PortfolioSummary = {
+  totalBrl: 14510,
+  totalCostBrl: 11212.34,
+  unrealisedBrl: 3297.66,
+  allocation: [
+    { class: 'StockUs', valueBrl: 11000, share: 0.7581 },
+    { class: 'StockBr', valueBrl: 3510, share: 0.2419 },
+  ],
+  usdBrl: { rate: 5.5, date: '2026-09-23' },
+};
+
+const nothing: PortfolioSummary = { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0, allocation: [], usdBrl: null };
 
 function stubInvestments(positions: () => Position[], extra: (request: SeenRequest, url: URL) => { status?: number; body?: unknown } | undefined = () => undefined) {
   return stubFetch((request) => {
@@ -86,7 +97,7 @@ function stubInvestments(positions: () => Position[], extra: (request: SeenReque
       case 'GET /api/investments/assets':
         return { body: positions() };
       case 'GET /api/investments/summary':
-        return { body: positions().length === 0 ? { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0 } : summary };
+        return { body: positions().length === 0 ? nothing : summary };
       case 'GET /api/market-data/assets':
         return { body: [] };
       default:

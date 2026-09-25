@@ -69,7 +69,7 @@ function stubAsset(state: { movements: Movement[]; daily?: DailyRow[] }, write: 
       case '/api/investments/assets':
         return { body: [petr4] };
       case '/api/investments/summary':
-        return { body: { totalBrl: 3510, totalCostBrl: 3212, unrealisedBrl: 298 } };
+        return { body: { totalBrl: 3510, totalCostBrl: 3212, unrealisedBrl: 298, allocation: [{ class: 'StockBr', valueBrl: 3510, share: 1 }], usdBrl: null } };
       case '/api/market-data/assets':
         return { body: [] };
       case '/api/investments/assets/a-petr4/movements':
