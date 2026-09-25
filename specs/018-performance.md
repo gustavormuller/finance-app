@@ -17,7 +17,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 3 | What counts as slow | A route whose median is well above the ~5 ms a plain filtered read costs here, and a cause `EXPLAIN (ANALYZE, BUFFERS)` or a timer can name. Anything at that floor is left alone. |
 | 4 | Rewriting a query | Only behind a test that pins its result first, and in the same layer and tool it was in: EF LINQ stays LINQ (the query filters keep applying), Dapper SQL stays SQL naming `"UserId"` in every statement. |
 | 5 | Indexes | Only where a plan shows the index used and the time gone. No index is added "in case". |
-| 6 | The snapshot rebuild's insert | Written with PostgreSQL's binary `COPY` on the context's own connection and transaction, instead of `SaveChanges` over thousands of tracked rows. Same rows, same transaction, same advisory lock. **(review)** |
+| 6 | The snapshot rebuild's insert | One `INSERT … SELECT FROM unnest(arrays)` through `Database.ExecuteSqlAsync`, instead of `SaveChanges` over thousands of tracked rows. Same rows, same transaction (EF enlists raw SQL in it), same advisory lock. A failed insert now surfaces as the `PostgresException` itself rather than wrapped in a `DbUpdateException`; nothing catches either on these paths. Binary `COPY` was the alternative; the database side is dominated by the foreign-key triggers either way. **(review)** |
 | 7 | Web bundle | Each page is its own chunk, loaded on navigation (TanStack Router's `lazyRouteComponent`), and Recharts with its dependencies is a separate `charts` chunk. |
 | 8 | React Query defaults | `staleTime` of 30 s, so a page mounted again within 30 s, or a tab focused again, does not refetch what it just read. Correctness after a write is kept by construction: **every** mutation, when it settles, marks every query stale (without refetching). The explicit invalidations stay and still refetch what the page shows. **(review)** |
 | 9 | Response compression | Caddy already has `encode gzip`. See "Measured, not worth doing". |
@@ -113,6 +113,27 @@ than the baseline table; the median of four interleaved rounds:
 | `GET /api/returns/portfolio?period=inception` | 260 | 187 | **157** |
 | `GET /api/returns/portfolio?period=12m` | 104 | 59 | **62** |
 | `GET /api/returns/assets/{id}` | 37–54 | 35–51 | 43–63 (noise) |
+
+### 3. The snapshot rebuild's insert
+
+**Cause.** A throwaway timer around the rebuild of each asset (about 1 800 rows for five years):
+building the rows 1–6 ms, `AddRange` 20–55 ms, `SaveChanges` 240–400 ms. The rebuild runs on
+every movement write, from the movement's date, so a movement dated years back paid it too.
+
+**Change.** Decision 6: one statement with the rows as arrays. On the database side the insert
+of 1 814 rows is 33 ms, of which 23 ms are the two foreign-key triggers (`UserId`, `AssetId`),
+and the delete before it 1.2 ms. Pinned first by
+`The_stored_rows_are_exactly_the_builders_in_every_column` (a USD asset: all ten columns equal
+to `SnapshotBuilder.Build`'s). 007's `A_failing_insert_leaves_the_previous_rows_intact` keeps
+its rollback assertion and now names the exception it gets (`PostgresException`, 22003).
+
+| Operation | before | after |
+|---|---:|---:|
+| `POST /api/investments/rebuild` (13 assets, 22 662 rows) | 2 524 / 2 767 | **1 408 / 1 963** |
+| `POST …/movements`, dated at the first buy (rebuilds ~1 800 rows) | 467 / 313 | **129 / 274** |
+| `DELETE /api/investments/movements/{id}`, same | 472 / 332 | **133 / 257** |
+
+(Two rounds, busy machine.)
 
 ## Measured, not worth doing
 
