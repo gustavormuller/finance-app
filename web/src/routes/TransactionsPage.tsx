@@ -44,12 +44,13 @@ function isoDay(date: Date) {
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  // Arriving from an import's done step: show that batch, whatever its dates, rather
-  // than the current month with most of it filtered out.
-  const { importBatchId } = useSearch({ strict: false }) as { importBatchId?: string };
+  // Arriving from an import's done step, or from an account (015): show that batch or
+  // that account, whatever the dates, rather than the current month with most of it
+  // filtered out.
+  const { importBatchId, accountId } = useSearch({ strict: false }) as { importBatchId?: string; accountId?: string };
   const [filter, setFilter] = useState(
-    importBatchId
-      ? { from: '', to: '', accountId: '', categoryId: '', importBatchId }
+    importBatchId || accountId
+      ? { from: '', to: '', accountId: accountId ?? '', categoryId: '', importBatchId: importBatchId ?? '' }
       : { ...currentMonth(), accountId: '', categoryId: '', importBatchId: '' },
   );
   const [page, setPage] = useState(1);

@@ -2,11 +2,12 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { createAccount, devLogin, uniqueEmail } from './support';
+import { createAccount, devLogin, openImportTab, uniqueEmail } from './support';
 
 /**
  * Spec E2E tests 63 to 66, against the real API and a real PostgreSQL, with the
- * fixture files in ./fixtures.
+ * fixture files in ./fixtures. Since 015 every import starts from the account's own
+ * tab, where choosing a file starts it.
  */
 
 const OFX = fileURLToPath(new URL('./fixtures/extrato.ofx', import.meta.url));
@@ -15,10 +16,8 @@ const XLSX = fileURLToPath(new URL('./fixtures/bb-extrato.xlsx', import.meta.url
 
 /** Step 1 through to the review, for an OFX. */
 async function uploadOfx(page: Page, account: string) {
-  await page.goto('/import');
-  await page.getByLabel('Conta').selectOption({ label: account });
-  await page.getByLabel('Arquivo').setInputFiles(OFX);
-  await page.getByRole('button', { name: 'Enviar' }).click();
+  await openImportTab(page, account);
+  await page.getByLabel('Escolher arquivo').setInputFiles(OFX);
 
   await expect(page.getByRole('heading', { name: '3. Revisão' })).toBeVisible();
 }
@@ -80,10 +79,8 @@ test('a CSV is mapped with a live preview, reviewed and committed', async ({ pag
   await devLogin(page, uniqueEmail('e2e-import-csv'), 'Alan Turing');
   await createAccount(page, 'Nubank');
 
-  await page.goto('/import');
-  await page.getByLabel('Conta').selectOption({ label: 'Nubank' });
-  await page.getByLabel('Arquivo').setInputFiles(CSV);
-  await page.getByRole('button', { name: 'Enviar' }).click();
+  await openImportTab(page, 'Nubank');
+  await page.getByLabel('Escolher arquivo').setInputFiles(CSV);
 
   await expect(page.getByRole('heading', { name: '2. Mapeamento' })).toBeVisible();
   await expect(page.getByLabel('Delimitador')).toHaveValue(',');
@@ -123,7 +120,7 @@ test('undoing a committed batch removes its rows from the list', async ({ page }
   await step(page).getByRole('button', { name: 'Confirmar' }).click();
 
   await expect(page.getByRole('heading', { name: '1. Arquivo' })).toBeVisible();
-  await expect(page.getByText('Nenhuma importação ainda.')).toBeVisible();
+  await expect(page.getByText('Nenhuma importação nesta conta ainda.')).toBeVisible();
 
   await page.goto('/transactions');
   await expect(page.getByText(/nenhum lançamento/i)).toBeVisible();
@@ -138,10 +135,8 @@ test('an .xlsx is mapped, reviewed and committed', async ({ page }) => {
   await devLogin(page, uniqueEmail('e2e-import-xlsx'), 'Grace Hopper');
   await createAccount(page, 'Banco do Brasil');
 
-  await page.goto('/import');
-  await page.getByLabel('Conta').selectOption({ label: 'Banco do Brasil' });
-  await page.getByLabel('Arquivo').setInputFiles(XLSX);
-  await page.getByRole('button', { name: 'Enviar' }).click();
+  await openImportTab(page, 'Banco do Brasil');
+  await page.getByLabel('Escolher arquivo').setInputFiles(XLSX);
 
   await expect(page.getByRole('heading', { name: '2. Mapeamento' })).toBeVisible();
   await expect(page.getByLabel('Delimitador')).toHaveCount(0);
@@ -166,4 +161,39 @@ test('an .xlsx is mapped, reviewed and committed', async ({ page }) => {
   await page.getByRole('link', { name: 'Ver lançamentos' }).click();
   await expect(page.getByRole('row', { name: /SUPERMERCADO ZONA SUL/ }).getByTestId('amount')).toHaveText('−187,43');
   await expect(page.getByRole('row', { name: /Rende Fácil/ }).getByTestId('amount')).toHaveText('+0,30');
+});
+
+/**
+ * Spec 015 E2E test 20: the account's card reflects the import, and a statement in
+ * review is found from another account's tab and from the old /import address.
+ */
+test('the account shows the import in its card, and a review in progress is found from anywhere', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-import-account'), 'Ada Lovelace');
+  await createAccount(page, 'Nubank', '1.000,00');
+  await createAccount(page, 'Inter');
+
+  await uploadOfx(page, 'Nubank');
+
+  // Another account's tab says where the review is, instead of offering a drop zone.
+  await openImportTab(page, 'Inter');
+  await expect(page.getByText(/Há um extrato em revisão na conta Nubank\./)).toBeVisible();
+  await expect(page.getByTestId('drop-zone')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Abrir a importação da conta Nubank' }).click();
+  await expect(page.getByRole('heading', { name: 'Nubank', exact: true })).toBeVisible();
+  await expect(page.getByText('O extrato extrato.ofx ainda está em revisão.')).toBeVisible();
+
+  // So does the address the import used to have.
+  await page.goto('/import');
+  await expect(page).toHaveURL(/\/accounts\/[^/?]+\?tab=import$/);
+  await expect(page.getByRole('heading', { name: 'Nubank', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar a revisão' }).click();
+  await expect(page.getByTestId('preview-counts')).toHaveText(/3 prontas/);
+
+  await commit(page);
+
+  // 1.000,00 opening, then +3.000,00 −1.234,56 −55,90.
+  const card = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: 'Nubank', exact: true }) });
+  await expect(card.getByTestId('amount')).toHaveText('+2.709,54');
+  await expect(card).toContainText(/Último extrato em \d{2}\/\d{2}/);
+  await expect(page.getByTestId('import-history-row')).toHaveCount(1);
 });

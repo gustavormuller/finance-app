@@ -17,8 +17,8 @@ function formatInstant(iso: string): string {
 }
 
 /**
- * Past batches, newest first. A staged one can be resumed or discarded; a
- * committed one can be undone.
+ * One account's past batches (015), newest first. A staged one can be resumed or
+ * discarded; a committed one can be undone.
  */
 export default function ImportHistory({
   batches,
@@ -34,41 +34,46 @@ export default function ImportHistory({
   onUndo: (batch: ImportBatch) => unknown;
 }): React.JSX.Element {
   if (batches.length === 0) {
-    return (
-      <p className="text-muted-foreground glass rounded-2xl py-8 text-center text-sm">Nenhuma importação ainda.</p>
-    );
+    return <p className="text-muted-foreground py-4 text-sm">Nenhuma importação nesta conta ainda.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
-      <Table>
+      <Table bare>
         <TableHeader>
           <TableRow>
-            <TableHead>Quando</TableHead>
             <TableHead>Arquivo</TableHead>
-            <TableHead className="hidden md:table-cell">Conta</TableHead>
-            <TableHead className="hidden md:table-cell">Situação</TableHead>
-            <TableHead className="text-right">Linhas</TableHead>
-            <TableHead className="text-right">Importadas</TableHead>
+            <TableHead className="hidden sm:table-cell">Quando</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Linhas</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Importadas</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {batches.map((batch) => (
             <TableRow key={batch.id} data-testid="import-history-row">
-              <TableCell className="whitespace-nowrap tabular-nums">{formatInstant(batch.createdAt)}</TableCell>
-              <TableCell>
+              {/* The file name wraps, and the status rides under it: the history sits
+                  beside the account list, in half a page. On a phone the other columns
+                  join that line, so the actions keep their room. */}
+              <TableCell className="font-medium break-words whitespace-normal">
                 {batch.fileName}
-                <span className="text-muted-foreground block text-xs md:hidden">
-                  {batch.accountName} · {importBatchStatusLabels[batch.status]}
+                <span className="text-muted-foreground block text-xs font-normal">
+                  <span className="sm:hidden">{formatInstant(batch.createdAt)} · </span>
+                  {importBatchStatusLabels[batch.status]} · {importSourceLabels[batch.source]}
+                  <span className="sm:hidden">
+                    {' '}
+                    · {batch.rowCount} {batch.rowCount === 1 ? 'linha' : 'linhas'}
+                    {batch.committedCount !== null && `, ${batch.committedCount} importadas`}
+                  </span>
                 </span>
               </TableCell>
-              <TableCell className="hidden md:table-cell">{batch.accountName}</TableCell>
-              <TableCell className="hidden md:table-cell">
-                {importBatchStatusLabels[batch.status]} · {importSourceLabels[batch.source]}
+              <TableCell className="text-muted-foreground hidden tabular-nums sm:table-cell">
+                {formatInstant(batch.createdAt)}
               </TableCell>
-              <TableCell className="text-right tabular-nums">{batch.rowCount}</TableCell>
-              <TableCell className="text-right tabular-nums">{batch.committedCount ?? '—'}</TableCell>
+              <TableCell className="hidden text-right tabular-nums sm:table-cell">{batch.rowCount}</TableCell>
+              <TableCell className="hidden text-right tabular-nums sm:table-cell">
+                {batch.committedCount ?? '—'}
+              </TableCell>
               <TableCell>
                 <div className="flex justify-end gap-1">
                   {batch.status === 'Staged' ? (
