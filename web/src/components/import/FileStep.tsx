@@ -51,7 +51,7 @@ export default function FileStep({
         <span className="bg-accent text-primary flex size-13 items-center justify-center rounded-2xl">
           <Upload className="size-6" aria-hidden="true" />
         </span>
-        <p className="font-display text-xl font-semibold break-words">Arraste o extrato do {accountName} aqui</p>
+        <p className="font-display text-xl font-semibold break-words">Arraste aqui o extrato da conta {accountName}</p>
         <p className="text-muted-foreground max-w-md text-sm">
           OFX, CSV ou planilha do Excel (.xls, .xlsx), até 2 MB e 5.000 lançamentos. Lançamentos repetidos ficam
           de fora sozinhos.

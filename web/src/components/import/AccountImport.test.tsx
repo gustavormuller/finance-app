@@ -83,7 +83,7 @@ describe('AccountImport, the file step', () => {
     const seen = stubUpload();
     renderAt('/accounts/acc-1?tab=import');
 
-    expect(await screen.findByText('Arraste o extrato do Nubank aqui')).toBeInTheDocument();
+    expect(await screen.findByText('Arraste aqui o extrato da conta Nubank')).toBeInTheDocument();
     expect(screen.getByText(/OFX, CSV ou planilha do Excel/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Conta')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enviar' })).not.toBeInTheDocument();
