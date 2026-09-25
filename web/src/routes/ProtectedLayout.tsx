@@ -1,17 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useNavigate } from '@tanstack/react-router';
-import { House, Landmark, ListOrdered, Settings, Tags, TrendingUp, Upload, type LucideIcon } from 'lucide-react';
+import { House, Landmark, ListOrdered, Settings, Tags, TrendingUp, type LucideIcon } from 'lucide-react';
 
 import { useMe } from '../auth/useMe';
 import { Button } from '@/components/ui/button';
 import RequireAuth from './RequireAuth';
 
+// 015: no "Importar" — a statement is imported from its account, so Contas takes the
+// place the import had.
 const LINKS: [string, string, LucideIcon][] = [
   ['/', 'Início', House],
   ['/transactions', 'Lançamentos', ListOrdered],
-  ['/import', 'Importar', Upload],
-  ['/investments', 'Investimentos', TrendingUp],
   ['/accounts', 'Contas', Landmark],
+  ['/investments', 'Investimentos', TrendingUp],
   ['/categories', 'Categorias', Tags],
   ['/settings', 'Configurações', Settings],
 ];
