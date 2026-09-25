@@ -22,7 +22,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 7 | Where the query lives | A fourth Dapper statement in `Application/Dashboard/DashboardQueries.cs`, with `"UserId" = @userId` on every table it reads, so 005's grep test (integration test 6) covers it. The per-asset lookup walks `PortfolioDaily`'s primary key `(UserId, AssetId, Date)` backwards, one probe per month and asset. **No migration.** |
 | 8 | The hero's figures | Today's, and each one the same number another screen shows: **Em contas** is the summary's `total` (the account list below adds up to it), **investido** is the series' last `investments` (equal to `GET /api/investments/summary`), and the large figure is their sum. Each chip is that figure minus the total at a reference month's end. The sparkline's last point differs from the large figure only in decision 3's case, a transaction dated after this month. **(review)** |
 | 9 | Chips | **1 mês**: against the end of the previous month. **No ano**: against the end of last December. **12 meses**: against the end of the same month a year ago. Signed as `Amount` signs (`+`, U+2212 `−`); the positive tone when ≥ 0, the negative tone otherwise. A chip is **hidden** when its reference month is not in the series — the history is too short to say. In January, 1 mês and No ano compare with the same month-end and both show. |
-| 10 | Sparkline | The series' `total`, as a Recharts area in `--primary` fading to the ground, with the first and last month (`jan/25`, `set/26`) under it and a dot on the last point; a tooltip on hover. `aria-hidden`, with an `sr-only` sentence naming the range and both ends. Drawn only with two points or more. |
+| 10 | Sparkline | The series' `total`, as a Recharts area in `--primary` fading to the ground, with the first and last month (`jan/25`, `set/26`) under it and a dot on the last point; a tooltip on hover. Drawn at once, with no draw-in animation (012 keeps motion to hover and focus). `aria-hidden`, with an `sr-only` sentence naming the range and both ends. Drawn only with two points or more. |
 | 11 | Accounts list | Stays in the hero, compact: a grid under the KPI row (one column on a phone, two from `sm`, three from `lg`), same rows, same `account-balance-<id>` test ids, same card-debt colour. |
 | 12 | What leaves | The 012 "Investido … sobre o custo" chip (`hero-invested`, decision 7 of 012). The invested total moves into the "Em contas · investido" line, linked to `/investments`, and keeps the `hero-invested` test id; the unrealised gain stays on `/investments`. **(review)** |
 | 13 | Loading, errors, empty | The page waits for the series as it waits for the summary and the monthly chart, and a failed series is the page's error message. The empty state now also needs an empty series: someone with investments and no account sees the dashboard. |
@@ -66,8 +66,11 @@ Route `/`, the hero card (`components/dashboard/Balances.tsx`), after mockup N4:
 - **Right:** the sparkline (`net-worth-chart`) with its two month labels.
 - **Below both:** the accounts list (decision 11).
 
-At 390 px the columns stack, the chips wrap, and nothing scrolls sideways (grid children take
-`min-w-0`). Both themes, from the theme tokens only.
+The two columns sit side by side from 1280 px (`xl`); beside the sidebar a narrower card would
+squeeze the figure into wrapping, so below that the sparkline runs full width under the left
+column. The large figure steps down a size on a phone. At 390 px the chips wrap, the "Em contas ·
+investido" line breaks at the dot, and nothing scrolls sideways (grid children take `min-w-0`).
+Both themes, from the theme tokens only.
 
 ## Test plan
 

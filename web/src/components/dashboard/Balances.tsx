@@ -16,8 +16,8 @@ import SectionHeading from './SectionHeading';
  * month-end sparkline; then one row per account.
  *
  * Every figure is today's and matches another screen: Em contas is the summary's total
- * (the rows below add up to it), investido the series' last point (what `/investments`
- * shows). The chips compare their sum with earlier month-ends of the series.
+ * (the BRL rows below add up to it), investido the series' last point (what
+ * `/investments` shows). The chips compare their sum with earlier month-ends of the series.
  *
  * A credit card in debt is drawn in the destructive colour on top of `Amount`'s own
  * minus sign: money owed on a card reads differently from a checking account that
