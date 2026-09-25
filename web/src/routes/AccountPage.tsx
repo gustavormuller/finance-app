@@ -4,12 +4,14 @@ import AccountDetails from '@/components/accounts/AccountDetails';
 import AccountTransactions from '@/components/accounts/AccountTransactions';
 import { useAccounts, useBalances } from '@/components/accounts/queries';
 import Card from '@/components/Card';
+import AccountImport from '@/components/import/AccountImport';
 import type { AccountTab } from '@/lib/accounts';
 import { accountTypeLabels } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
 const TABS: [AccountTab, string][] = [
   ['transactions', 'Lançamentos'],
+  ['import', 'Importar extrato'],
   ['details', 'Detalhes da conta'],
 ];
 
@@ -74,6 +76,8 @@ export default function AccountPage(): React.JSX.Element | null {
       </nav>
 
       {tab === 'transactions' && <AccountTransactions accountId={account.id} />}
+      {/* Keyed, so another account starts its own wizard instead of inheriting a step. */}
+      {tab === 'import' && <AccountImport key={account.id} account={account} />}
       {tab === 'details' && <AccountDetails key={account.id} account={account} />}
     </Card>
   );
