@@ -1,0 +1,119 @@
+# 018 — Performance, measured
+
+## Goal
+
+Find out, with numbers taken on the owner's own data, which requests and pages are slow, and
+fix those and only those. Every change comes with its before and after, and none changes what
+the app answers or shows.
+
+## Decisions made in this spec
+
+Marked **(review)** where the spec picked a default a person should confirm.
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | What is measured on | `financas_perf`, a `pg_dump` copy of `financas` (the owner: 1 419 transactions over 21 months, 13 assets, 550 movements, 22 662 daily rows over 5 years). Then the same database with synthetic volume, **"scaled"**: the owner's transactions copied five times further back (8 514 rows, 10 years) and 20 more users, each a copy of the owner (179 k transactions and 476 k daily rows in all). `financas` is only ever read, by `pg_dump`. |
+| 2 | How it is timed | The API from a scratch build, `Development`, SQL logging off, on :5093. A Node script signs in with `dev-login` and times each route 20 times after 3 warm-ups, each on a fresh connection, and reports the median. The machine is shared with other work, so a before and its after are always taken back to back, never across hours. |
+| 3 | What counts as slow | A route whose median is well above the ~5 ms a plain filtered read costs here, and a cause `EXPLAIN (ANALYZE, BUFFERS)` or a timer can name. Anything at that floor is left alone. |
+| 4 | Rewriting a query | Only behind a test that pins its result first, and in the same layer and tool it was in: EF LINQ stays LINQ (the query filters keep applying), Dapper SQL stays SQL naming `"UserId"` in every statement. |
+| 5 | Indexes | Only where a plan shows the index used and the time gone. No index is added "in case". |
+| 6 | The snapshot rebuild's insert | Written with PostgreSQL's binary `COPY` on the context's own connection and transaction, instead of `SaveChanges` over thousands of tracked rows. Same rows, same transaction, same advisory lock. **(review)** |
+| 7 | Web bundle | Each page is its own chunk, loaded on navigation (TanStack Router's `lazyRouteComponent`), and Recharts with its dependencies is a separate `charts` chunk. |
+| 8 | React Query defaults | `staleTime` of 30 s, so a page mounted again within 30 s, or a tab focused again, does not refetch what it just read. Correctness after a write is kept by construction: **every** mutation, when it settles, marks every query stale (without refetching). The explicit invalidations stay and still refetch what the page shows. **(review)** |
+| 9 | Response compression | Caddy already has `encode gzip`. See "Measured, not worth doing". |
+| 10 | Test-suite speed | Vitest's pool/isolation changed only if every test stays green and isolated; measured below. |
+
+## Out of scope
+
+- Any change to what an endpoint answers, its shape, status codes or messages, and any UI copy
+- New infrastructure (cache servers, read replicas, a CDN), per ADR-001 and ADR-003
+- Caching computed returns between requests (see "Proposals")
+- A new route that answers several assets' returns at once (an API change; see "Proposals")
+
+## Method
+
+- Scripts, kept outside the repository: `bench.mjs` (the timings), `requests.cjs` (headless
+  Playwright: API requests and script bytes per page load, and on client-side navigation),
+  `synthetic.sql` (the scaled data, refusing any database but `financas_perf`).
+- SQL came from EF Core's command log (`Microsoft.EntityFrameworkCore.Database.Command` at
+  `Information`) and from the Dapper statements in `DashboardQueries`.
+- In-process time (materialising rows, the returns maths, `SaveChanges`) was split with a
+  throwaway `Stopwatch` build that was never committed.
+
+## Baseline
+
+Median of 20, milliseconds, one run each; "real" is the copy of `financas`, "scaled" adds the
+synthetic volume (decision 1).
+
+| Route | real | scaled |
+|---|---:|---:|
+| `GET /api/dashboard/summary` | 7.7 | 10.4 |
+| `GET /api/dashboard/monthly?months=12` | 5.2 | 5.1 |
+| `GET /api/dashboard/by-category` | 4.5 | 4.5 |
+| `GET /api/dashboard/net-worth` (24) | 13.5 | 17.4 |
+| `GET /api/dashboard/net-worth?months=120` | 18.7 | 22.4 |
+| `GET /api/transactions` page 1 / page 20 | 7.3 / 7.3 | 12.9 / 12.9 |
+| `GET /api/transactions` date range / account / category | 6.0 / 5.4 / 4.9 | 6.0 / 10.5 / 4.8 |
+| `GET /api/categories` / `usage` | 3.3 / 3.7 | 3.4 / 3.5 |
+| `GET /api/investments/summary` | **71.6** | **65.3** |
+| `GET /api/investments/assets` (positions) | **81.1** | **71.5** |
+| `GET /api/returns/portfolio` inception / 12m / ytd | **125.0** / 41.5 / 36.8 | **84.3** / 33.4 / 28.3 |
+| `GET /api/returns/assets/{id}` (13 assets) | 27–37 | 21–30 |
+| `GET /api/investments/assets/{id}/daily` | 10.8 | 7.4 |
+| `POST /api/investments/rebuild` (13 assets, 22 662 rows) | **2 458** | **2 498** |
+
+Web: one script of 1 050 kB (314 kB gzip) for every page, the sign-in page included.
+
+## Changes
+
+Filled in per checkpoint, each with its before and after taken back to back.
+
+## Measured, not worth doing
+
+Filled in as measured.
+
+## Proposals
+
+Filled in as measured.
+
+## Data model changes
+
+None planned; an index lands here only under decision 5.
+
+## API surface
+
+None. Every response is byte-for-byte what it was on the same data: the timing script saves
+every body, and a before and an after are compared with `diff`.
+
+## Test plan
+
+### Integration — `api.tests`
+
+1. The summary and the positions take each asset's latest daily row **per user**: two assets
+   whose rows end on different days, and another user's later rows for the same instrument,
+   which count for nobody but that user (pins the query before it is rewritten)
+2. The net-worth series opens at the first daily row when it predates every transaction
+   (014's tests 3 and 5 already pin it; kept green)
+3. The snapshot rebuild writes exactly the rows `SnapshotBuilder` builds, in the caller's
+   transaction, and a failure rolls back the delete with it (007's rebuild tests kept green,
+   plus one for the rollback)
+4. 008's returns tests kept green unchanged
+
+### Unit — `web`
+
+5. A mutation, when it settles, marks every cached query stale, and the queries on screen still
+   refetch through their explicit invalidations
+6. Every existing page test passes with the pages loaded lazily
+
+### E2E
+
+7. Every existing test passes, on an isolated database (`financas_e2e_perf`)
+
+## Verification
+
+```
+bash scripts/verify.sh
+```
+
+E2E on :5093/:5193 against `financas_e2e_perf` (never `scripts/verify-e2e.sh`, which stops
+the shared PostgreSQL). The before/after tables above were taken with the scripts in "Method".
