@@ -85,15 +85,16 @@ function Ring({ rows }: { rows: CategoryTotal[] }) {
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const gap = rows.length > 1 ? 4 : 0;
-  let offset = 0;
+  // Where each arc starts: the sum of the shares before it.
+  const starts = rows.map((_, index) => rows.slice(0, index).reduce((sum, row) => sum + row.share, 0) * circumference);
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="shrink-0">
       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--secondary)" strokeWidth={stroke} />
       {rows.map((row, index) => {
-        const length = row.share * circumference;
-        const dash = Math.max(length - gap, 0.5);
-        const arc = (
+        const dash = Math.max(row.share * circumference - gap, 0.5);
+
+        return (
           <circle
             key={row.categoryId}
             cx={size / 2}
@@ -103,12 +104,10 @@ function Ring({ rows }: { rows: CategoryTotal[] }) {
             stroke={seriesColour(index)}
             strokeWidth={stroke}
             strokeDasharray={`${dash} ${circumference - dash}`}
-            strokeDashoffset={-offset}
+            strokeDashoffset={-starts[index]!}
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
         );
-        offset += length;
-        return arc;
       })}
     </svg>
   );
