@@ -46,6 +46,10 @@ internal static class Problems
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);
     }
 
+    /// <inheritdoc cref="Validation(ReadOnlySpan{RuleViolation?})"/>
+    public static IResult? Validation(IEnumerable<RuleViolation> violations) =>
+        Validation([.. violations.Select(violation => (RuleViolation?)violation)]);
+
     /// <summary>
     /// A refusal the caller could resolve by doing something else first — deleting
     /// the children, moving the transactions, picking another name. The reason is in

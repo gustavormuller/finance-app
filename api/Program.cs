@@ -5,6 +5,7 @@ using Finance.Api.Application.Categories;
 using Finance.Api.Application.Dashboard;
 using Finance.Api.Application.Investments;
 using Finance.Api.Application.Returns;
+using Finance.Api.Application.Transactions;
 using Finance.Api.Endpoints;
 using Finance.Api.Infrastructure;
 using Finance.Api.Infrastructure.Ai;
@@ -38,8 +39,9 @@ builder.Services.AddFinanceForwardedHeaders();
 builder.Services.AddFinanceAuthentication();
 builder.Services.AddAuthorization();
 
-// 003's category rules and 004's use cases. Scoped, like the context they take (ADR-016).
+// 003's category and transaction rules, and 004's use cases. Scoped, like the context they take (ADR-016).
 builder.Services.AddScoped<CategoryRules>();
+builder.Services.AddScoped<TransactionInputRules>();
 builder.Services.AddScoped<ImportStaging>();
 builder.Services.AddScoped<ImportCommands>();
 

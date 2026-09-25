@@ -123,7 +123,7 @@ public static class CsvTemplateEndpoints
             request.CreditColumn,
             request.DescriptionColumns);
 
-        var violations = new List<RuleViolation?>();
+        var violations = new List<RuleViolation>();
 
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > NameLength)
         {
@@ -135,9 +135,9 @@ public static class CsvTemplateEndpoints
             violations.Add(new RuleViolation("delimiter", "O delimitador é um único caractere."));
         }
 
-        violations.AddRange(mapping.Validate(table: null).Select(violation => (RuleViolation?)violation));
+        violations.AddRange(mapping.Validate(table: null));
 
-        return Problems.Validation([.. violations]);
+        return Problems.Validation(violations);
     }
 
     private static TemplateResponse Describe(CsvTemplate template) => new(

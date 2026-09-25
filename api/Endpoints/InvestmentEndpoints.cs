@@ -221,7 +221,7 @@ public static class InvestmentEndpoints
     private static IResult Answer(MovementWrite write, Func<Movement, IResult> done) => write switch
     {
         { Outcome: MovementOutcome.NotFound } => Results.NotFound(),
-        { Outcome: MovementOutcome.Invalid } => Problems.Validation([.. write.Violations!.Select(violation => (RuleViolation?)violation)])!,
+        { Outcome: MovementOutcome.Invalid } => Problems.Validation(write.Violations!)!,
         _ => done(write.Movement!),
     };
 

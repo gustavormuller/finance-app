@@ -359,7 +359,7 @@ public static class ImportEndpoints
 
         if (violations.Count > 0)
         {
-            return (null, Problems.Validation([.. violations.Select(violation => (RuleViolation?)violation)]));
+            return (null, Problems.Validation(violations));
         }
 
         return (CsvRowInterpreter.Interpret(table, mapping), null);
