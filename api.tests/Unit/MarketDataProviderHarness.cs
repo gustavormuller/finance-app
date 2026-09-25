@@ -36,6 +36,7 @@ internal static class MarketDataProviderHarness
             MaxHistoryDays = 365,
         },
         TwelveData = new TwelveDataOptions { BaseUrl = "https://api.twelvedata.com/", Key = "twelvedata-test-key" },
+        Binance = new BinanceOptions { BaseUrl = "https://api.binance.com/api/v3/" },
     };
 }
 

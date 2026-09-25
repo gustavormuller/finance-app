@@ -42,6 +42,8 @@ public sealed class MarketDataOptions
 
     public TwelveDataOptions TwelveData { get; set; } = new();
 
+    public BinanceOptions Binance { get; set; } = new();
+
     public MarketDataResilienceOptions Resilience { get; set; } = new();
 }
 
@@ -141,4 +143,10 @@ public sealed class TwelveDataOptions
 
     /// <summary>Sent as <c>Authorization: apikey ...</c>, never in the query string.</summary>
     public string Key { get; set; } = "";
+}
+
+/// <summary>Binance's public market data: no key, so only where it lives.</summary>
+public sealed class BinanceOptions
+{
+    public string BaseUrl { get; set; } = "";
 }
