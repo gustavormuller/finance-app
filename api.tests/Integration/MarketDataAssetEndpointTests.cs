@@ -91,30 +91,30 @@ public sealed class MarketDataAssetEndpointTests(PostgresFixture postgres)
     }
 
     /// <summary>019 test 21: a Binance asset is a pair quoted in reais, stored as Binance spells it.</summary>
-    [Theory]
-    [InlineData("BRL", "btcbrl", null)]
-    [InlineData("USD", "BTCBRL", "currency")]
-    [InlineData("BRL", "BTCUSDT", "providerSymbol")]
-    [InlineData("BRL", "BRL", "providerSymbol")]
-    public async Task A_Binance_asset_is_a_pair_quoted_in_reais(string currency, string symbol, string? refused)
+    [Fact]
+    public async Task A_Binance_asset_is_a_pair_quoted_in_reais()
     {
         var ct = TestContext.Current.CancellationToken;
         var (api, client) = await StartAsync(postgres, ct);
         await using var _ = api;
 
-        using var response = await client.SendAsync(TransactionsFixtures.Post("/api/market-data/assets", new
-        {
-            ticker = "BTC", @class = "Crypto", provider = "Binance", providerSymbol = symbol, currency,
-        }), ct);
+        Task<HttpResponseMessage> Register(string currency, string symbol) =>
+            client.SendAsync(TransactionsFixtures.Post("/api/market-data/assets", new
+            {
+                ticker = "BTC", @class = "Crypto", provider = "Binance", providerSymbol = symbol, currency,
+            }), ct);
 
-        if (refused is null)
+        using var created = await Register("BRL", "btcbrl");
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var asset = (await created.Content.ReadFromJsonAsync<AssetItem>(ct))!;
+        Assert.Equal(("Binance", "BTCBRL", "BRL"), (asset.Provider, asset.ProviderSymbol, asset.Currency));
+
+        foreach (var (currency, symbol, refused) in new[]
         {
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var asset = (await response.Content.ReadFromJsonAsync<AssetItem>(ct))!;
-            Assert.Equal(("Binance", "BTCBRL", "BRL"), (asset.Provider, asset.ProviderSymbol, asset.Currency));
-        }
-        else
+            ("USD", "ETHBRL", "currency"), ("BRL", "BTCUSDT", "providerSymbol"), ("BRL", "BRL", "providerSymbol"),
+        })
         {
+            using var response = await Register(currency, symbol);
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             Assert.Equal([refused], await TransactionsFixtures.ProblemFieldsAsync(response, ct));
         }
