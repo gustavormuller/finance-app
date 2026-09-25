@@ -31,6 +31,7 @@ Each spec contains:
 | 009 | ai-analysis | categorization cascade, monthly analysis, budget cap |
 | 010 | deploy | Oracle instance, Caddy, Tunnel, backups |
 | 011 | import-excel | `.xls`/`.xlsx` through the CSV mapping |
+| 012 | design-obsidiana | the Obsidiana look, dark and light themes |
 
 One number per session set. If a feature needs more than three sessions, it was scoped
 too large — split it.
