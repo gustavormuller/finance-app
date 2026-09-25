@@ -1,7 +1,7 @@
 namespace Finance.Api.Application.MarketData;
 
 /// <summary>
-/// The <c>MarketData</c> configuration section (006). Series codes, endpoints and keys
+/// The <c>MarketData</c> configuration section. Series codes, endpoints and keys
 /// are configuration, not code: a wrong SGS code is a config edit. Defaults live in
 /// <c>appsettings.json</c>; keys come from user secrets or the environment.
 /// </summary>

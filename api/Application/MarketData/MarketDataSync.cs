@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Finance.Api.Application.MarketData;
 
 /// <summary>
-/// The market-data sync (006): every active asset's closes, then every benchmark series,
+/// The market-data sync: every active asset's closes, then every benchmark series,
 /// each fetched from the day after its latest stored row (or <c>BackfillYears</c> back)
 /// through yesterday and upserted. One <see cref="SyncRun"/> row records the run.
 /// </summary>

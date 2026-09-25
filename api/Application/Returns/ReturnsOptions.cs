@@ -3,7 +3,7 @@ using Finance.Api.Domain.Returns;
 
 namespace Finance.Api.Application.Returns;
 
-/// <summary>The <c>Returns</c> configuration section (008): the benchmarks a return is compared with.</summary>
+/// <summary>The <c>Returns</c> configuration section: the benchmarks a return is compared with.</summary>
 public sealed class ReturnsOptions
 {
     public const string Section = "Returns";

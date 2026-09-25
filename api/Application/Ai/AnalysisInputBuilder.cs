@@ -23,8 +23,8 @@ public sealed record AnalysisAggregates(
     PortfolioSummary Investments);
 
 /// <summary>
-/// 009's <c>AnalysisInputBuilder</c>: decision 7's aggregates as one JSON document, the
-/// analysis prompt's user message. Aggregates only: per-category totals and income and
+/// The aggregates of 009, decision 7, as one JSON document, the analysis prompt's user
+/// message. Aggregates only: per-category totals and income and
 /// expense for three months, the month-over-month changes, the top merchants by spend,
 /// balances and 007's portfolio summary. No transaction row and no description beyond a
 /// merchant's normalized name.

@@ -27,9 +27,9 @@ public enum MovementOutcome
 public sealed record MovementWrite(MovementOutcome Outcome, Movement? Movement = null, IReadOnlyList<RuleViolation>? Violations = null);
 
 /// <summary>
-/// Movement writes (007): each one validated against the rules and the asset's whole
+/// Movement writes: each one validated against the rules and the asset's whole
 /// history, then saved and followed by <see cref="SnapshotRebuild"/> from
-/// <c>min(oldDate, newDate)</c>, in one transaction, synchronously (decision 9).
+/// <c>min(oldDate, newDate)</c>, in one transaction, synchronously (007, decision 9).
 /// </summary>
 /// <remarks>
 /// Fields that mean nothing for the kind are stored as zero, as the data model says:
