@@ -5,29 +5,23 @@ import type { PortfolioSummary, Position } from '@/api/finance';
 import Alert from '@/components/Alert';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDate } from '@/lib/labels';
-import {
-  STALE_AFTER_BUSINESS_DAYS,
-  formatMoney,
-  formatPercent,
-  formatQuantity,
-  formatSignedMoney,
-  formatUnitPrice,
-  isStalePrice,
-  localToday,
-} from '@/lib/money';
+import { STALE_AFTER_BUSINESS_DAYS, formatPercent, formatQuantity, formatUnitPrice, isStalePrice, localToday } from '@/lib/money';
 
 import { usePortfolioSummary, usePositions } from './queries';
+import { useDisplayCurrency, type Display } from './useDisplayCurrency';
 
 /**
  * The positions table (spec 007 UI), in the API's order, by value.
  *
  * A position at zero — an asset just added, or one sold down to nothing — is hidden
  * until asked for (DEFERRED, 007 · CP4): the table is what you hold. The total row is
- * the API's summary, never a sum made here.
+ * the API's summary, never a sum made here. Money is in the page's currency (016);
+ * a unit price stays in the asset's own.
  */
 export default function Positions() {
   const positions = usePositions();
   const summary = usePortfolioSummary();
+  const display = useDisplayCurrency();
   const [showClosed, setShowClosed] = useState(false);
 
   if (positions.isError || summary.isError) {
@@ -63,13 +57,23 @@ export default function Positions() {
       {shown.length === 0 ? (
         <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">Nenhuma posição em aberto.</p>
       ) : (
-        <PositionsTable positions={shown} summary={summary.data} today={today} />
+        <PositionsTable positions={shown} summary={summary.data} today={today} display={display} />
       )}
     </div>
   );
 }
 
-function PositionsTable({ positions, summary, today }: { positions: Position[]; summary: PortfolioSummary; today: string }) {
+function PositionsTable({
+  positions,
+  summary,
+  today,
+  display,
+}: {
+  positions: Position[];
+  summary: PortfolioSummary;
+  today: string;
+  display: Display;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -114,9 +118,9 @@ function PositionsTable({ positions, summary, today }: { positions: Position[]; 
                 </>
               )}
             </TableCell>
-            <TableCell className="text-right tabular-nums">{position.valueBrl === null ? '—' : formatMoney(position.valueBrl)}</TableCell>
+            <TableCell className="text-right tabular-nums">{position.valueBrl === null ? '—' : display.money(position.valueBrl)}</TableCell>
             <TableCell className="text-right tabular-nums">
-              {position.unrealisedBrl === null ? '—' : formatSignedMoney(position.unrealisedBrl)}
+              {position.unrealisedBrl === null ? '—' : display.signedMoney(position.unrealisedBrl)}
               {position.unrealisedPct !== null && (
                 <span className="text-muted-foreground block text-xs">{formatPercent(position.unrealisedPct)}</span>
               )}
@@ -130,8 +134,8 @@ function PositionsTable({ positions, summary, today }: { positions: Position[]; 
           <TableCell />
           <TableCell className="hidden md:table-cell" />
           <TableCell className="hidden sm:table-cell" />
-          <TableCell className="text-right font-medium tabular-nums">{formatMoney(summary.totalBrl)}</TableCell>
-          <TableCell className="text-right font-medium tabular-nums">{formatSignedMoney(summary.unrealisedBrl)}</TableCell>
+          <TableCell className="text-right font-medium tabular-nums">{display.money(summary.totalBrl)}</TableCell>
+          <TableCell className="text-right font-medium tabular-nums">{display.signedMoney(summary.unrealisedBrl)}</TableCell>
         </TableRow>
       </TableFooter>
     </Table>

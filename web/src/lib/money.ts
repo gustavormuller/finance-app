@@ -27,6 +27,26 @@ export function formatSignedMoney(value: number, currency = 'BRL'): string {
   return moneyFormat(currency, true).format(value);
 }
 
+const compactFormats = new Map<string, Intl.NumberFormat>();
+
+/** A figure beside another, where the cents are noise: `R$ 39 mil`, `US$ 3,5 mil` (016). */
+export function formatCompactMoney(value: number, currency = 'BRL'): string {
+  let format = compactFormats.get(currency);
+  if (!format) {
+    format = new Intl.NumberFormat('pt-BR', { style: 'currency', currency, notation: 'compact' });
+    compactFormats.set(currency, format);
+  }
+
+  return format.format(value);
+}
+
+const share = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** A part of a whole, unsigned: `0.7581` as `75,8%`. */
+export function formatShare(fraction: number): string {
+  return share.format(fraction);
+}
+
 /** A price per unit, to the `numeric(18,8)` column's eighth place, never below the cent. */
 export function formatUnitPrice(value: number, currency: string): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 8 });

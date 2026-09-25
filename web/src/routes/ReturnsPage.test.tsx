@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Position, Returns } from '@/api/finance';
+import { chooseCurrency } from '@/lib/currency';
 import { routeTree } from '@/routeTree';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
@@ -70,7 +71,7 @@ function stubReturns(
       case 'GET /api/investments/assets':
         return { body: positions };
       case 'GET /api/investments/summary':
-        return { body: { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0 } };
+        return { body: { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0, allocation: [], usdBrl: null } };
       case 'GET /api/market-data/assets':
         return { body: [] };
       default:
@@ -413,5 +414,75 @@ describe('AssetReturnsPage', () => {
     renderAt('/investments/a-gone/returns');
 
     expect(await screen.findByText('Ativo não encontrado.')).toBeInTheDocument();
+  });
+});
+
+describe('ReturnsPage: in dollars (016)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    act(() => chooseCurrency('BRL'));
+    localStorage.clear();
+  });
+
+  /** Spec 016 web test 12. */
+  it('shows the headline, the chart and the benchmarks in dollars, and XIRR and the timing effect in reais', async () => {
+    localStorage.setItem('currency', 'USD');
+    stubReturns(() => ({ body: halfYear }), [aapl, petr4], assetAnswers);
+    renderAt('/investments/returns');
+
+    expect(within(await screen.findByRole('group', { name: 'Moeda' })).getByRole('button', { name: 'US$' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // 105.12 / 97.85 - 1.
+    const twr = await screen.findByTestId('headline-twr');
+    expect(twr).toHaveTextContent('Rentabilidade em dólar (TWR)');
+    expect(plain(twr)).toContain('+7,43% no período');
+    const xirr = screen.getByTestId('headline-xirr');
+    expect(xirr).toHaveTextContent('Retorno do dinheiro (XIRR), em reais');
+    expect(plain(xirr)).toContain('+8,31% a.a.');
+    expect(screen.getByTestId('headline-timing')).toHaveTextContent('Efeito do timing, em reais');
+
+    // 103.21 / 97.85 - 1, and 7.4297 - 5.4778 points.
+    const cdi = screen.getByTestId('benchmark-row-CDI');
+    expect(plain(cdi)).toContain('+5,48%');
+    expect(plain(cdi)).toContain('+1,95 p.p.');
+    expect(plain(screen.getByTestId('benchmark-row-portfolio'))).toContain('+7,43%');
+    expect(screen.queryByTestId('benchmark-row-USDBRL')).not.toBeInTheDocument();
+
+    const chart = screen.getByTestId('comparison-chart');
+    expect(within(chart).getByRole('heading', { name: 'Carteira e referências em dólar, base 100' })).toBeInTheDocument();
+    expect(within(within(chart).getByRole('group', { name: 'Referências no gráfico' })).queryByRole('button', { name: 'Dólar' })).toBeNull();
+
+    // Each asset's TWR from its own series; its XIRR as sent.
+    const usd = screen.getByTestId('asset-returns-a-aapl');
+    await vi.waitFor(() => expect(plain(usd)).toContain('+7,43%'));
+    expect(plain(usd)).toContain('+47,51% a.a.');
+    expect(screen.getByRole('columnheader', { name: 'XIRR (em reais)' })).toBeInTheDocument();
+  });
+
+  it('stays in reais, and says why, when the dollar could not anchor the period', async () => {
+    localStorage.setItem('currency', 'USD');
+    const noDollar: Returns = {
+      ...halfYear,
+      benchmarks: { ...halfYear.benchmarks, USDBRL: null },
+      series: halfYear.series.map((point) => ({ date: point.date, portfolio: point.portfolio, CDI: point.CDI! })),
+    };
+    stubReturns(() => ({ body: noDollar }));
+    renderAt('/investments/returns');
+
+    expect(await screen.findByText('Rentabilidade em reais: sem cotação do dólar no início do período.')).toBeInTheDocument();
+    expect(plain(screen.getByTestId('headline-twr'))).toContain('+5,12% no período');
+    expect(screen.getByTestId('headline-twr')).toHaveTextContent('Rentabilidade (TWR)');
+  });
+
+  it('shows an asset\'s own report in dollars, its FX split as sent', async () => {
+    localStorage.setItem('currency', 'USD');
+    stubReturns(() => ({ body: halfYear }), [aapl, petr4], assetAnswers);
+    renderAt('/investments/a-aapl/returns');
+
+    expect(within(await screen.findByRole('group', { name: 'Moeda' })).getByRole('button', { name: 'US$' })).toBeInTheDocument();
+    expect(plain(await screen.findByTestId('headline-twr'))).toContain('+7,43% no período');
+    expect(plain(within(screen.getByTestId('fx-split')).getByTestId('fx-total'))).toContain('+21,00%');
   });
 });

@@ -1,4 +1,5 @@
-﻿using Finance.Api.Domain.Investments;
+﻿using Finance.Api.Application.Dashboard;
+using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
@@ -32,7 +33,24 @@ public sealed record PositionView(
     decimal? DividendsBrl);
 
 /// <summary><c>GET /api/investments/summary</c>: the latest daily row of every held asset, added up.</summary>
-public sealed record PortfolioSummary(decimal TotalBrl, decimal TotalCostBrl, decimal UnrealisedBrl);
+/// <remarks>
+/// 016 adds the allocation by class and the latest USDBRL, which the screens convert with.
+/// They are init-only so 009's analysis input, which reads the totals alone, builds one as before.
+/// </remarks>
+public sealed record PortfolioSummary(decimal TotalBrl, decimal TotalCostBrl, decimal UnrealisedBrl)
+{
+    /// <summary>By value, highest first; a class worth zero is left out. Shares sum to exactly 1.</summary>
+    public IReadOnlyList<AllocationView> Allocation { get; init; } = [];
+
+    /// <summary>The latest stored USDBRL row, shared market data; <c>null</c> when none was ever synced.</summary>
+    public UsdBrlView? UsdBrl { get; init; }
+}
+
+/// <summary>One asset class's part of the summary's total (016).</summary>
+public sealed record AllocationView(MarketAssetClass Class, decimal ValueBrl, decimal Share);
+
+/// <summary>BRL per US dollar, and the day of that rate (016).</summary>
+public sealed record UsdBrlView(decimal Rate, DateOnly Date);
 
 /// <summary>The current user's positions: movements through the calculator, valued by the latest daily row.</summary>
 public sealed class PositionQueries(AppDbContext db)
@@ -84,17 +102,40 @@ public sealed class PositionQueries(AppDbContext db)
 
     /// <summary>
     /// Sums the latest <see cref="PortfolioDaily"/> row of each asset (spec test 26). An
-    /// asset with no row yet adds nothing, and so does a position sold down to zero.
+    /// asset with no row yet adds nothing, and so does a position sold down to zero. The
+    /// same rows, by class, are the allocation (016).
     /// </summary>
     public async Task<PortfolioSummary> SummaryAsync(CancellationToken cancellationToken)
     {
-        var latest = await db.PortfolioDaily.AsNoTracking()
-            .Where(row => row.Date == db.PortfolioDaily.Where(other => other.AssetId == row.AssetId).Max(other => other.Date))
-            .Select(row => new { row.ValueBrl, row.CostBasisBrl })
+        var latest = await (
+                from row in db.PortfolioDaily.AsNoTracking()
+                where row.Date == db.PortfolioDaily.Where(other => other.AssetId == row.AssetId).Max(other => other.Date)
+                join held in db.Assets on row.AssetId equals held.Id
+                join market in db.MarketAssets on held.MarketAssetId equals market.Id
+                select new { row.ValueBrl, row.CostBasisBrl, market.Class })
             .ToListAsync(cancellationToken);
         var total = latest.Sum(row => row.ValueBrl);
         var cost = latest.Sum(row => row.CostBasisBrl);
-        return new PortfolioSummary(total, cost, total - cost);
+
+        var classes = latest.GroupBy(row => row.Class)
+            .Select(group => (Class: group.Key, Value: group.Sum(row => row.ValueBrl)))
+            .Where(item => item.Value > 0m)
+            .OrderByDescending(item => item.Value)
+            .ThenBy(item => item.Class)
+            .ToList();
+        var shares = Shares.Of([.. classes.Select(item => item.Value)]);
+
+        var usdBrl = await db.Benchmarks.AsNoTracking()
+            .Where(rate => rate.Code == SnapshotRebuild.UsdBrl)
+            .OrderByDescending(rate => rate.Date)
+            .Select(rate => new UsdBrlView(rate.Value, rate.Date))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new PortfolioSummary(total, cost, total - cost)
+        {
+            Allocation = [.. classes.Select((item, index) => new AllocationView(item.Class, item.Value, shares[index]))],
+            UsdBrl = usdBrl,
+        };
     }
 
     /// <summary>

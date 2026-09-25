@@ -15,13 +15,16 @@ const shortDay = (isoDay: string) => formatDate(isoDay).slice(0, 5);
  * One series, so no legend: the heading names it. Hovering gives the day's value; the
  * visually hidden table gives the value at each month's last row, since a row per
  * calendar day would be thousands of cells to a screen reader.
+ *
+ * Always in reais: a dollar history needs a rate per day, which a BRL asset's rows do not
+ * carry, so the heading says so when the page shows dollars (016, decision 16).
  */
-export default function ValueChart({ rows }: { rows: DailyRow[] }) {
+export default function ValueChart({ rows, inReais = false }: { rows: DailyRow[]; inReais?: boolean }) {
   const monthEnds = rows.filter((row, index) => rows[index + 1]?.date.slice(0, 7) !== row.date.slice(0, 7));
 
   return (
     <section aria-labelledby="value-heading" className="glass grid gap-3 rounded-2xl p-5 sm:p-6">
-      <SectionHeading id="value-heading">Valor ao longo do tempo</SectionHeading>
+      <SectionHeading id="value-heading">Valor ao longo do tempo{inReais && ', em reais'}</SectionHeading>
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground py-12 text-center text-sm">Sem histórico de valor ainda.</p>
