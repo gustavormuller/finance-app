@@ -24,6 +24,22 @@ public sealed class ProviderRateLimitedException(string provider, TimeSpan? retr
 }
 
 /// <summary>
+/// The provider refused a request (<c>401</c> or <c>403</c>) and no key for it is
+/// configured (019): brapi outside its four keyless tickers, Twelve Data for anything,
+/// CoinGecko if it stops serving keyless calls. With a key configured, the same refusal
+/// is about that key and stays an <see cref="HttpRequestException"/>.
+/// </summary>
+public sealed class ProviderKeyMissingException(string provider, string symbol, string setting)
+    : MarketDataProviderException(provider, $"{provider} refused {symbol} and no key is configured; set {setting}.")
+{
+    /// <summary>What the provider was asked for, e.g. <c>BBAS3</c> or <c>bitcoin</c>.</summary>
+    public string Symbol { get; } = symbol;
+
+    /// <summary>The configuration key to fill in, e.g. <c>MarketData:Brapi:Token</c>.</summary>
+    public string Setting { get; } = setting;
+}
+
+/// <summary>
 /// The provider answered with a body that is not the documented shape: malformed JSON, a
 /// missing field, a value that is not a number or a date (006, test 8).
 /// </summary>

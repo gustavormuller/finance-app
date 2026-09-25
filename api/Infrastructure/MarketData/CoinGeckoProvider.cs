@@ -49,6 +49,7 @@ public sealed class CoinGeckoProvider(HttpClient http, IOptions<MarketDataOption
 
         using var response = await http.SendAsync(request, ct);
         ProviderResponse.ThrowIfRateLimited(response, Name);
+        ProviderResponse.ThrowIfKeyMissing(response, Name, coinGecko.DemoKey, providerSymbol, CoinGeckoOptions.DemoKeySetting);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return [];

@@ -34,3 +34,5 @@ line breaks between candles. These are real responses.
 |---|---|---|
 | `binance-klines-btcbrl.json` | Binance · `klines?symbol=BTCBRL&interval=1d&startTime=1789862400000&endTime=1790294399999&limit=1000` (20–24 Sep 2026) | captured, HTTP 200 |
 | `binance-klines-invalid-symbol.json` | Binance · `klines?symbol=NOPEBRL&interval=1d&limit=3` | captured, HTTP 400 |
+| `brapi-quote-missing-token.json` | brapi · `quote/BBAS3?range=5d&interval=1d`, no token | captured, HTTP 401 |
+| `twelvedata-missing-apikey.json` | Twelve Data · `time_series?symbol=AAPL&interval=1day&…`, no key | captured, HTTP 401 |
