@@ -30,14 +30,14 @@ export default function AssetPage() {
   });
 
   return (
-    <section className="mx-auto grid max-w-5xl gap-10 px-4 py-8">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div>
         <Link to="/investments" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
           ← Investimentos
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">{position?.ticker ?? 'Ativo'}</h2>
+            <h2 className="text-3xl font-semibold tracking-tight">{position?.ticker ?? 'Ativo'}</h2>
             {position && (
               <p className="text-muted-foreground mt-1 text-sm">
                 {position.nickname ?? position.name} · {marketAssetClassLabels[position.class]} · {position.currency}
@@ -102,11 +102,11 @@ function Summary({ position }: { position: Position }) {
   ];
 
   return (
-    <dl data-testid="asset-summary" className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <dl data-testid="asset-summary" className="glass grid grid-cols-2 gap-4 rounded-2xl p-5 sm:grid-cols-4 sm:p-6">
       {items.map(([label, value]) => (
         <div key={label}>
           <dt className="text-muted-foreground text-xs">{label}</dt>
-          <dd className="font-medium tabular-nums">{value}</dd>
+          <dd className="font-display text-lg font-semibold tabular-nums">{value}</dd>
         </div>
       ))}
     </dl>

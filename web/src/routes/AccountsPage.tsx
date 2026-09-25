@@ -5,6 +5,7 @@ import { api, ApiError, type Account, type AccountInput, type AccountType } from
 import Alert from '@/components/Alert';
 import Amount from '@/components/Amount';
 import { accountTypeLabels, accountTypes } from '@/lib/labels';
+import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,9 +18,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const selectClasses =
-  'border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 ' +
-  'text-base shadow-xs outline-none md:text-sm';
 
 /** The fields this form renders, so a 400 naming one is shown under it. */
 const FIELDS = ['name', 'type', 'currency', 'openingBalance'] as const;
@@ -94,16 +92,16 @@ export default function AccountsPage() {
   });
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Contas</h2>
+    <section className="grid gap-6 [&>*]:min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-3xl font-semibold tracking-tight">Contas</h2>
 
         {!creating && !editing && <Button onClick={() => setCreating(true)}>Nova conta</Button>}
       </div>
 
       {(creating || editing) && (
         <form
-          className="border-border mb-8 grid gap-4 border-b pb-8 sm:grid-cols-4"
+          className="glass grid gap-4 rounded-2xl p-5 sm:grid-cols-4 sm:p-6"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -184,7 +182,7 @@ export default function AccountsPage() {
       {failure && <Alert>{failure}</Alert>}
 
       {accounts.data?.length === 0 ? (
-        <p className="text-muted-foreground border-border border-t py-16 text-center text-sm">
+        <p className="text-muted-foreground glass rounded-2xl py-16 text-center text-sm">
           Nenhuma conta ainda. Cadastre a primeira para começar a registrar lançamentos.
         </p>
       ) : (
@@ -210,7 +208,7 @@ export default function AccountsPage() {
                   <Amount value={account.openingBalance} />
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-wrap justify-end gap-1">
+                  <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="sm" onClick={() => setEditing(account)}>
                       Editar
                     </Button>

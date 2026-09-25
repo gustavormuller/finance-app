@@ -13,7 +13,7 @@ export default function FxSplit({ fx, currency }: { fx: Split; currency: string 
   ];
 
   return (
-    <dl data-testid="fx-split" className="grid grid-cols-3 gap-3 rounded-lg border p-4">
+    <dl data-testid="fx-split" className="grid grid-cols-3 gap-3 glass rounded-2xl p-5">
       {parts.map(([testId, label, rate]) => (
         <div key={testId} data-testid={testId}>
           <dt className="text-muted-foreground text-sm">{label}</dt>

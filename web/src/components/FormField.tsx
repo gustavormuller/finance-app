@@ -30,5 +30,5 @@ export default function FormField({
 
 /** The class stack shadcn/ui's Input uses, so a native select sits level with one. */
 export const selectClasses =
-  'border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 ' +
-  'text-base shadow-xs outline-none md:text-sm';
+  'border-input bg-card h-10 w-full rounded-xl border px-3 py-1 ' +
+  'text-base shadow-xs outline-none md:text-sm focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50';

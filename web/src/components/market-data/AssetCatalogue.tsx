@@ -52,7 +52,7 @@ export default function AssetCatalogue() {
       <form
         ref={form}
         aria-label="Cadastrar ativo"
-        className="grid gap-4 sm:grid-cols-3"
+        className="glass grid gap-4 rounded-2xl p-5 sm:grid-cols-3 sm:p-6"
         onSubmit={(event) => {
           event.preventDefault();
           register.mutate(readRegistration(event.currentTarget));
@@ -88,7 +88,7 @@ export default function AssetCatalogue() {
       {assets.isError && <Alert>Não foi possível carregar os ativos.</Alert>}
 
       {assets.data?.length === 0 ? (
-        <p className="text-muted-foreground border-border border-t py-12 text-center text-sm">
+        <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">
           {q ? 'Nenhum ativo corresponde a esta busca.' : 'Nenhum ativo cadastrado ainda.'}
         </p>
       ) : (

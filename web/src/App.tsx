@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 
+import ThemeToggle from './components/ThemeToggle';
 import { router } from './router';
 import HealthRoute from './routes/HealthRoute';
 
@@ -9,25 +10,31 @@ import HealthRoute from './routes/HealthRoute';
 const queryClient = new QueryClient();
 
 /*
- * The application shell: a header that does not change per route, the router's
- * output, and the readiness readout pinned to the bottom.
+ * The application shell: a top bar that does not change per route, the router's
+ * output, and the readiness readout at the bottom.
  *
  * The heading and the readout sit outside the router on purpose. They render on the
  * first paint instead of after the router mounts, and an unauthenticated visit to /
  * ends up on /login — where 001's e2e specs still expect to find both after
- * navigating to /.
+ * navigating to /. The theme choice (012) is here too, for the same reason: it has to
+ * be reachable on the sign-in page as well.
  *
  * The navigation is not here: it lives in ProtectedLayout, because it needs the
- * router's context and must not appear to someone who is not signed in. It is styled
- * as a second row of this header so the two read as one bar.
+ * router's context and must not appear to someone who is not signed in.
  */
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="bg-background text-foreground flex min-h-screen flex-col">
-        <header className="bg-card border-b">
-          <div className="mx-auto max-w-5xl px-4 py-3">
-            <h1 className="text-base font-semibold tracking-tight">Finanças Pessoais</h1>
+      <div className="text-foreground flex min-h-screen flex-col">
+        <header className="px-4 pt-5 pb-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4">
+            <h1 className="font-display text-xl font-semibold tracking-tight">
+              Finanças Pessoais
+              <span aria-hidden="true" className="text-primary">
+                .
+              </span>
+            </h1>
+            <ThemeToggle className="ml-auto" />
           </div>
         </header>
 
@@ -35,10 +42,8 @@ export default function App() {
           <RouterProvider router={router} />
         </main>
 
-        <footer className="bg-card border-t">
-          <div className="mx-auto max-w-5xl px-4 py-3">
-            <HealthRoute />
-          </div>
+        <footer className="px-4 py-4 sm:px-6 lg:px-8">
+          <HealthRoute />
         </footer>
       </div>
     </QueryClientProvider>

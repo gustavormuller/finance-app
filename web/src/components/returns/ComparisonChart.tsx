@@ -4,6 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import type { ReturnsPoint } from '@/api/finance';
 import SectionHeading from '@/components/dashboard/SectionHeading';
 import { Button } from '@/components/ui/button';
+import { axisTick, tooltipProps } from '@/lib/chart';
 import { benchmarkLabel, formatDate } from '@/lib/labels';
 import { formatIndexTick } from '@/lib/rates';
 
@@ -26,7 +27,7 @@ export default function ComparisonChart({ series, codes }: { series: ReturnsPoin
   const monthEnds = series.filter((point, i) => series[i + 1]?.date.slice(0, 7) !== point.date.slice(0, 7));
 
   return (
-    <section aria-labelledby="comparison-heading" data-testid="comparison-chart" className="grid gap-3">
+    <section aria-labelledby="comparison-heading" data-testid="comparison-chart" className="glass grid gap-3 rounded-2xl p-5 sm:p-6">
       <SectionHeading id="comparison-heading">Carteira e referências, base 100</SectionHeading>
 
       <div role="group" aria-label="Referências no gráfico" className="flex flex-wrap gap-1">
@@ -48,15 +49,13 @@ export default function ComparisonChart({ series, codes }: { series: ReturnsPoin
         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 640, height: 288 }}>
           <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--border)" />
-            <XAxis dataKey="date" tickFormatter={shortDay} tickLine={false} axisLine={false} minTickGap={32} />
-            <YAxis tickFormatter={formatIndexTick} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
+            <XAxis dataKey="date" tickFormatter={shortDay} tickLine={false} axisLine={false} minTickGap={32} tick={axisTick} />
+            <YAxis tickFormatter={formatIndexTick} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} tick={axisTick} />
             <Tooltip
+              {...tooltipProps}
               cursor={{ stroke: 'var(--border)' }}
               labelFormatter={(date) => formatDate(String(date))}
               formatter={(value) => index(Number(value))}
-              separator=": "
-              itemStyle={{ color: 'var(--foreground)' }}
-              contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8 }}
             />
             {shown.map((code) => (
               <Line
@@ -76,29 +75,32 @@ export default function ComparisonChart({ series, codes }: { series: ReturnsPoin
         </ResponsiveContainer>
       </div>
 
-      <table className="sr-only">
-        <caption>Carteira e referências no último ponto de cada mês, base 100</caption>
-        <thead>
-          <tr>
-            <th scope="col">Data</th>
-            <th scope="col">Carteira</th>
-            {shown.map((code) => (
-              <th key={code} scope="col">{benchmarkLabel(code)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {monthEnds.map((point) => (
-            <tr key={point.date}>
-              <th scope="row">{formatDate(point.date)}</th>
-              <td>{index(point.portfolio)}</td>
+      {/* A table does not shrink to sr-only's 1px, so the wrapper carries it. */}
+      <div className="sr-only">
+        <table>
+          <caption>Carteira e referências no último ponto de cada mês, base 100</caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Carteira</th>
               {shown.map((code) => (
-                <td key={code}>{typeof point[code] === 'number' ? index(point[code]) : ''}</td>
+                <th key={code} scope="col">{benchmarkLabel(code)}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {monthEnds.map((point) => (
+              <tr key={point.date}>
+                <th scope="row">{formatDate(point.date)}</th>
+                <td>{index(point.portfolio)}</td>
+                {shown.map((code) => (
+                  <td key={code}>{typeof point[code] === 'number' ? index(point[code]) : ''}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

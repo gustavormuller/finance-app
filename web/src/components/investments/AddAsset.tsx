@@ -56,7 +56,7 @@ export default function AddAsset() {
   });
 
   return (
-    <section aria-labelledby="add-asset-heading" className="grid gap-4">
+    <section aria-labelledby="add-asset-heading" className="glass grid gap-4 rounded-2xl p-5 sm:p-6">
       <SectionHeading id="add-asset-heading">Adicionar ativo</SectionHeading>
 
       <form
@@ -84,7 +84,7 @@ export default function AddAsset() {
       )}
 
       {results.data && results.data.length > 0 && (
-        <ul className="border-border border-t">
+        <ul className="bg-secondary rounded-xl px-4">
           {results.data.map((asset) => (
             <li key={asset.id} data-testid={`catalogue-result-${asset.id}`} className="border-border flex items-center justify-between gap-4 border-b py-2">
               <span>

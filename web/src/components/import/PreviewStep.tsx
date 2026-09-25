@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { categorySourceLabels, formatDate, stagedRowStatusLabels } from '@/lib/labels';
 
-import { selectClasses } from './FileStep';
+import { selectClasses } from '@/components/FormField';
 
 const STATUSES: StagedRowStatus[] = ['Ready', 'Duplicate', 'Invalid'];
 
@@ -124,8 +124,8 @@ export default function PreviewStep({
 
       {error && <Alert>{error}</Alert>}
 
-      <div className="overflow-x-auto rounded-md border">
-        <Table>
+      <div className="overflow-x-auto">
+        <Table bare>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[60px]">#</TableHead>

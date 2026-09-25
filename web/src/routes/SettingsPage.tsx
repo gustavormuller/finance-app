@@ -38,16 +38,16 @@ export default function SettingsPage() {
   const aiEnabled = saving ?? me.data?.aiEnabled ?? false;
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8">
-      <h2 className="mb-6 text-2xl font-semibold tracking-tight">Configurações</h2>
+    <section className="grid max-w-3xl gap-6 [&>*]:min-w-0">
+      <h2 className="text-3xl font-semibold tracking-tight">Configurações</h2>
 
-      <div className="grid gap-8">
-        <section aria-labelledby="ai-heading" className="grid gap-4">
+      <div className="grid gap-6">
+        <section aria-labelledby="ai-heading" className="glass grid gap-4 rounded-2xl p-5 sm:p-6">
           <SectionHeading id="ai-heading">Inteligência artificial</SectionHeading>
 
           {toggle.isError && <Alert>{toggle.error.message}</Alert>}
 
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+          <div className="bg-secondary flex items-center justify-between gap-4 rounded-xl p-4">
             <div>
               <label htmlFor="ai-enabled" className="text-sm font-medium">
                 Usar IA nesta conta
@@ -79,7 +79,7 @@ export default function SettingsPage() {
           <Disclosure />
         </section>
 
-        <section aria-labelledby="ai-spend-heading" className="grid gap-2">
+        <section aria-labelledby="ai-spend-heading" className="glass grid gap-2 rounded-2xl p-5 sm:p-6">
           <SectionHeading id="ai-spend-heading">Gasto com IA neste mês</SectionHeading>
 
           {usage.isError && <Alert>Não foi possível carregar o gasto com IA.</Alert>}

@@ -40,7 +40,7 @@ export default function Headline({
 
 function Stat({ testId, label, note, children }: { testId: string; label: string; note: string; children: React.ReactNode }) {
   return (
-    <div data-testid={testId} className="grid content-start gap-1 rounded-lg border p-4">
+    <div data-testid={testId} className="grid content-start gap-1 glass rounded-2xl p-5">
       <dt className="text-muted-foreground text-sm">{label}</dt>
       <dd className="text-2xl font-semibold tabular-nums">{children}</dd>
       <dd className="text-muted-foreground text-xs">{note}</dd>

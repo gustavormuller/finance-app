@@ -14,7 +14,7 @@ export default function EmptyState({
   children?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="border-border text-muted-foreground border-t py-16 text-center">
+    <div className="text-muted-foreground glass rounded-2xl py-16 text-center">
       <p className="text-foreground text-sm font-medium">
         {filtered ? 'Nenhum lançamento corresponde a este filtro' : 'Nenhum lançamento ainda'}
       </p>

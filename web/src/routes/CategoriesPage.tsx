@@ -4,13 +4,11 @@ import { useState } from 'react';
 import { api, type Category, type CategoryInput, type CategoryKind } from '@/api/finance';
 import Alert from '@/components/Alert';
 import { categoryKindLabels, categoryKindPlurals, categoryKinds } from '@/lib/labels';
+import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const selectClasses =
-  'border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 ' +
-  'text-base shadow-xs outline-none md:text-sm';
 
 /** Parents in name order, each followed by its own children. Two levels, so no recursion. */
 function asTree(categories: Category[], kind: CategoryKind) {
@@ -62,16 +60,16 @@ export default function CategoriesPage() {
   const possibleParents = (categories.data ?? []).filter((category) => category.parentId === null);
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Categorias</h2>
+    <section className="grid gap-6 [&>*]:min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-3xl font-semibold tracking-tight">Categorias</h2>
 
         {!creating && !editing && <Button onClick={() => setCreating(true)}>Nova categoria</Button>}
       </div>
 
       {(creating || editing) && (
         <form
-          className="border-border mb-8 grid gap-4 border-b pb-8 sm:grid-cols-3"
+          className="glass grid gap-4 rounded-2xl p-5 sm:grid-cols-3 sm:p-6"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -138,28 +136,30 @@ export default function CategoriesPage() {
       {failure && <Alert>{failure}</Alert>}
 
       {categoryKinds.map((kind) => (
-        <div key={kind} className="mb-8">
-          <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-[0.1em] uppercase">
-            {categoryKindPlurals[kind]}
-          </h3>
+        <div key={kind} className="grid gap-2">
+          <h3 className="text-muted-foreground font-sans text-sm font-semibold">{categoryKindPlurals[kind]}</h3>
 
-          <ul className="border-border border-t">
-            {asTree(categories.data ?? [], kind).map(({ parent, children }) => (
-              <li key={parent.id}>
-                <Row category={parent} onEdit={setEditing} onDelete={remove.mutate} />
+          {asTree(categories.data ?? [], kind).length === 0 ? (
+            <p className="text-muted-foreground glass rounded-2xl px-4 py-3 text-sm">Nenhuma categoria deste tipo.</p>
+          ) : (
+            <ul className="glass rounded-2xl px-4">
+              {asTree(categories.data ?? [], kind).map(({ parent, children }) => (
+                <li key={parent.id}>
+                  <Row category={parent} onEdit={setEditing} onDelete={remove.mutate} />
 
-                {children.map((child) => (
-                  <Row
-                    key={child.id}
-                    category={child}
-                    indented
-                    onEdit={setEditing}
-                    onDelete={remove.mutate}
-                  />
-                ))}
-              </li>
-            ))}
-          </ul>
+                  {children.map((child) => (
+                    <Row
+                      key={child.id}
+                      category={child}
+                      indented
+                      onEdit={setEditing}
+                      onDelete={remove.mutate}
+                    />
+                  ))}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ))}
     </section>

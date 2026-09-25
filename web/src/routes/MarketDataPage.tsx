@@ -7,9 +7,9 @@ import SyncRuns from '@/components/market-data/SyncRuns';
  */
 export default function MarketDataPage() {
   return (
-    <section className="mx-auto grid max-w-5xl gap-10 px-4 py-8">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Dados de mercado</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Dados de mercado</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Cotações e índices compartilhados por todos os usuários, atualizados todas as noites.
         </p>

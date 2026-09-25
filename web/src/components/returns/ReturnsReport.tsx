@@ -46,7 +46,7 @@ export default function ReturnsReport({
 
       {data &&
         (data.period === null || data.twr === null ? (
-          <p className="border-border text-muted-foreground border-t py-12 text-center text-sm">Nenhuma posição valorizada neste período.</p>
+          <p className="text-muted-foreground glass rounded-2xl py-12 text-center text-sm">Nenhuma posição valorizada neste período.</p>
         ) : (
           <>
             <p data-testid="returns-period" className="text-muted-foreground -mt-4 text-sm">

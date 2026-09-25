@@ -16,12 +16,12 @@ export default function AssetReturnsPage() {
   const ticker = position?.ticker ?? 'Ativo';
 
   return (
-    <section className="mx-auto grid max-w-5xl gap-8 px-4 py-8">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div>
         <Link to="/investments/$assetId" params={{ assetId }} className="text-muted-foreground text-sm underline-offset-4 hover:underline">
           ← {ticker}
         </Link>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight">{ticker} · Rentabilidade</h2>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight">{ticker} · Rentabilidade</h2>
       </div>
 
       <ReturnsReport

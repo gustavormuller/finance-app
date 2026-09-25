@@ -4,7 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CategoryTotal, DashboardSummary, MonthTotals } from '@/api/finance';
+import type { CategoryTotal, DashboardSummary, MonthTotals, PortfolioSummary } from '@/api/finance';
 import { routeTree } from '@/routeTree';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
@@ -50,7 +50,11 @@ const expenses: CategoryTotal[] = [
 
 const incomes: CategoryTotal[] = [{ categoryId: 'c-salary', name: 'Salário', amount: 5000, share: 1 }];
 
-function stubApi(overrides: { summary?: DashboardSummary; monthly?: MonthTotals[] } = {}) {
+const noPortfolio: PortfolioSummary = { totalBrl: 0, totalCostBrl: 0, unrealisedBrl: 0 };
+
+function stubApi(
+  overrides: { summary?: DashboardSummary; monthly?: MonthTotals[]; portfolio?: PortfolioSummary } = {},
+) {
   return stubFetch((request: SeenRequest) => {
     const url = new URL(request.url, 'http://localhost');
 
@@ -67,6 +71,8 @@ function stubApi(overrides: { summary?: DashboardSummary; monthly?: MonthTotals[
         return { body: { items: [], page: 1, pageSize: 10, total: 0 } };
       case '/api/ai/analyses':
         return { body: [] };
+      case '/api/investments/summary':
+        return { body: overrides.portfolio ?? noPortfolio };
       default:
         return undefined;
     }
@@ -191,5 +197,23 @@ describe('DashboardPage', () => {
       '2026-09',
       '2026-08',
     ]);
+  });
+
+  /** Spec 012 web unit test 6: the hero adds what is invested, only when something is. */
+  it('shows the invested total in the hero when there are positions, and not otherwise', async () => {
+    stubApi({ portfolio: { totalBrl: 25300, totalCostBrl: 19014.1, unrealisedBrl: 6285.9 } });
+    renderDashboard();
+
+    const invested = await screen.findByTestId('hero-invested');
+    expect(invested).toHaveTextContent('25.300,00');
+    expect(invested).toHaveTextContent('6.285,90');
+
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    stubApi();
+    renderDashboard();
+
+    await screen.findByTestId('total-balance');
+    await waitFor(() => expect(screen.queryByTestId('hero-invested')).not.toBeInTheDocument());
   });
 });

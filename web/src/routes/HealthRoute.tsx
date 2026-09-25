@@ -63,7 +63,7 @@ function Dot({ ok }: { ok: boolean }) {
       aria-hidden="true"
       className={
         ok
-          ? 'size-1.5 rounded-full bg-green-600'
+          ? 'bg-positive size-1.5 rounded-full'
           : 'size-1.5 rounded-xs bg-amber-600'
       }
     />

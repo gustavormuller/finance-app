@@ -17,12 +17,12 @@ export default function ReturnsPage() {
   const positions = usePositions();
 
   return (
-    <section className="mx-auto grid max-w-5xl gap-8 px-4 py-8">
+    <section className="grid gap-6 [&>*]:min-w-0">
       <div>
         <Link to="/investments" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
           ← Investimentos
         </Link>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight">Rentabilidade</h2>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight">Rentabilidade</h2>
       </div>
 
       <ReturnsReport query={query} onQuery={setQuery} returns={returns} />
