@@ -4,13 +4,11 @@ import { useState } from 'react';
 import { api, type Category, type CategoryInput, type CategoryKind } from '@/api/finance';
 import Alert from '@/components/Alert';
 import { categoryKindLabels, categoryKindPlurals, categoryKinds } from '@/lib/labels';
+import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const selectClasses =
-  'border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 ' +
-  'text-base shadow-xs outline-none md:text-sm';
 
 /** Parents in name order, each followed by its own children. Two levels, so no recursion. */
 function asTree(categories: Category[], kind: CategoryKind) {

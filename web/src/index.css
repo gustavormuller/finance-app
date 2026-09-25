@@ -4,67 +4,91 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * shadcn/ui's stock "neutral" theme, unmodified. Variant C in the design preview is
- * supposed to show what the defaults look like with no direction applied, so nothing
- * here is tuned. The chosen direction's decisions land on top of this in checkpoint 5.
+ * 012: the Obsidiana direction. `:root` is the light theme (Quartzo), `.dark` the dark
+ * one (Obsidiana); `lib/theme.ts` and the script in index.html put `dark` on <html>.
  *
- * Deliberately not Inter: the brief rules it out, and the stock stack is the system
- * UI font anyway.
+ * Every text pair here reaches 4.5:1 on both the ground and a card. Chart series differ
+ * in lightness as well as hue, so they stay apart in greyscale and under every
+ * colour-vision deficiency; a chart never relies on hue alone.
+ *
+ * Deliberately not Inter: the brief rules it out. Manrope for the interface, Space
+ * Grotesk for headings and large figures, both self-hosted (spec 012, decision 4).
  */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  /* 005 dashboard series. Blue and orange rather than green and red: the pair keeps
-     its separation under every colour-vision deficiency, which green/red does not. */
-  --chart-income: #2a78d6;
-  --chart-expense: #eb6834;
+  --radius: 0.75rem;
+  --background: #f1f2f7;
+  --glow: rgb(220 214 255 / 0.9);
+  --foreground: #0b0d12;
+  --card: rgb(255 255 255 / 0.72);
+  --card-foreground: #0b0d12;
+  --popover: #ffffff;
+  --popover-foreground: #0b0d12;
+  --primary: #5b3ff0;
+  --primary-foreground: #ffffff;
+  --secondary: rgb(11 13 18 / 0.05);
+  --secondary-foreground: #0b0d12;
+  --muted: rgb(11 13 18 / 0.04);
+  --muted-foreground: #5a6172;
+  --accent: rgb(91 63 240 / 0.1);
+  --accent-foreground: #0b0d12;
+  --destructive: #c42842;
+  --border: rgb(11 13 18 / 0.09);
+  --input: rgb(11 13 18 / 0.16);
+  --ring: #5b3ff0;
+  /* The 1px light along a glass panel's top edge. */
+  --edge: rgb(255 255 255 / 0.9);
+  /* Money arriving and money lost. A sign always travels with them (Amount). */
+  --positive: #0a7552;
+  --negative: #c42842;
+  --chart-income: #0e7490;
+  --chart-expense: #a08cff;
+  --chart-1: #5b3ff0;
+  --chart-2: #0891b2;
+  --chart-3: #059669;
+  --chart-4: #d97706;
+  --chart-5: #db2777;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-income: #3987e5;
-  --chart-expense: #d95926;
+  --background: #0b0c12;
+  --glow: #1b1f3b;
+  --foreground: #f4f5f8;
+  --card: rgb(255 255 255 / 0.045);
+  --card-foreground: #f4f5f8;
+  --popover: #161822;
+  --popover-foreground: #f4f5f8;
+  --primary: #8b73ff;
+  --primary-foreground: #0b0c12;
+  --secondary: rgb(255 255 255 / 0.06);
+  --secondary-foreground: #f4f5f8;
+  --muted: rgb(255 255 255 / 0.04);
+  --muted-foreground: #9097a8;
+  --accent: rgb(139 115 255 / 0.16);
+  --accent-foreground: #f4f5f8;
+  --destructive: #fb7185;
+  --border: rgb(255 255 255 / 0.09);
+  --input: rgb(255 255 255 / 0.14);
+  --ring: #8b73ff;
+  --edge: rgb(255 255 255 / 0.08);
+  --positive: #34d399;
+  --negative: #fb7185;
+  --chart-income: #22d3ee;
+  --chart-expense: #8b73ff;
+  --chart-1: #8b73ff;
+  --chart-2: #22d3ee;
+  --chart-3: #34d399;
+  --chart-4: #fbbf24;
+  --chart-5: #f472b6;
 }
 
 @theme inline {
+  --font-sans: 'Manrope Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Manrope Variable', ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -83,8 +107,28 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
   --color-chart-income: var(--chart-income);
   --color-chart-expense: var(--chart-expense);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+/*
+ * A glass panel: the translucent card colour over the page's glow, a hairline border
+ * and a lit top edge. The blur only shows where something sits behind it.
+ */
+@utility glass {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 var(--edge),
+    0 1px 2px rgb(0 0 0 / 0.04);
+  backdrop-filter: blur(20px) saturate(140%);
 }
 
 @layer base {
@@ -93,7 +137,15 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image: radial-gradient(900px 540px at 16% -12%, var(--glow), transparent 70%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
   }
 
   /*

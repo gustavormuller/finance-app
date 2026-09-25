@@ -28,7 +28,7 @@ export default function Amount({
       data-testid="amount"
       className={cn(
         'amount tabular-nums',
-        value < 0 ? 'text-foreground' : 'text-green-700 dark:text-green-500',
+        value < 0 ? 'text-foreground' : 'text-positive',
         className,
       )}
     >

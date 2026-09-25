@@ -2,13 +2,10 @@ import { useState } from 'react';
 
 import type { Account } from '@/api/finance';
 import Alert from '@/components/Alert';
+import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-export const selectClasses =
-  'border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 ' +
-  'text-base shadow-xs outline-none md:text-sm';
 
 /**
  * Step 1: pick an account, pick a file. The extension decides where the file goes

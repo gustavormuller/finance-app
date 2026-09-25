@@ -5,6 +5,7 @@ import { api, ApiError, type Account, type AccountInput, type AccountType } from
 import Alert from '@/components/Alert';
 import Amount from '@/components/Amount';
 import { accountTypeLabels, accountTypes } from '@/lib/labels';
+import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,9 +18,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const selectClasses =
-  'border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 ' +
-  'text-base shadow-xs outline-none md:text-sm';
 
 /** The fields this form renders, so a 400 naming one is shown under it. */
 const FIELDS = ['name', 'type', 'currency', 'openingBalance'] as const;

@@ -21,7 +21,7 @@ import {
 } from '@/lib/csvPreview';
 import { amountCultureLabels, signModeLabels } from '@/lib/labels';
 
-import { selectClasses } from './FileStep';
+import { selectClasses } from '@/components/FormField';
 
 const DATE_FORMATS = ['dd/MM/yyyy', 'MM/dd/yyyy', 'yyyy-MM-dd', 'd/M/yyyy', 'dd/MM/yy', 'dd/MM/yyyy HH:mm'];
 

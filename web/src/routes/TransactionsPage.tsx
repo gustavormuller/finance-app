@@ -8,6 +8,7 @@ import Alert from '@/components/Alert';
 import EmptyState from '@/components/EmptyState';
 import { formatDate } from '@/lib/labels';
 import TransactionForm from '@/components/TransactionForm';
+import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -300,7 +301,7 @@ function FilterSelect({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-base shadow-xs outline-none md:text-sm"
+        className={selectClasses}
       >
         <option value="">{allLabel}</option>
         {options.map(([optionValue, optionLabel]) => (

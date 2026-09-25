@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { categorySourceLabels, formatDate, stagedRowStatusLabels } from '@/lib/labels';
 
-import { selectClasses } from './FileStep';
+import { selectClasses } from '@/components/FormField';
 
 const STATUSES: StagedRowStatus[] = ['Ready', 'Duplicate', 'Invalid'];
 

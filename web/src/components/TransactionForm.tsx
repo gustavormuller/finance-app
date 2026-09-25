@@ -3,6 +3,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
 import type { Account, Category, TransactionInput } from '@/api/finance';
+import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -73,11 +74,6 @@ const schema = z.object({
   direction: z.enum(['out', 'in']),
 });
 
-/** The class stack shadcn/ui's Input uses, so a native select sits level with one. */
-const selectClasses =
-  'border-input bg-transparent dark:bg-input/30 flex h-9 w-full min-w-0 rounded-md border ' +
-  'px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm ' +
-  'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]';
 
 /**
  * Create and edit, one form.
