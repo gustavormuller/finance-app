@@ -122,17 +122,19 @@ public static class AccountEndpoints
                 return Results.NotFound();
             }
 
-            // Checked rather than left to the RESTRICT constraint, so the answer is a
-            // sentence the UI can show instead of a constraint name. The constraint is
-            // still there underneath, which is what makes this a courtesy.
-            var referencing = await database.Transactions
+            // Checked rather than left to the RESTRICT constraints, so the answer is a
+            // sentence the UI can show instead of a constraint name. The constraints are
+            // still there underneath, which is what makes this a courtesy. A batch
+            // counts whatever its status (003 amendment 1): one with no transactions
+            // left holds the account just the same.
+            var transactions = await database.Transactions
                 .CountAsync(transaction => transaction.AccountId == id, cancellationToken);
+            var imports = await database.ImportBatches
+                .CountAsync(batch => batch.AccountId == id, cancellationToken);
 
-            if (referencing > 0)
+            if (DeleteRefusal(account.Name, transactions, imports) is { } refusal)
             {
-                return Problems.Conflict(
-                    $"'{account.Name}' ainda tem {referencing} lançamento(s). "
-                    + "Mova ou exclua os lançamentos antes de excluir a conta.");
+                return Problems.Conflict(refusal);
             }
 
             database.Accounts.Remove(account);
@@ -152,6 +154,22 @@ public static class AccountEndpoints
             request.Currency is not null && !Money.IsIsoCode(request.Currency)
                 ? new RuleViolation("currency", "A moeda deve ser um código ISO 4217 de três letras maiúsculas.")
                 : null);
+
+    /// <summary>
+    /// Why the account cannot go yet, or null when nothing holds it. Both obstacles in
+    /// one sentence, imports first: undoing an import takes its transactions with it.
+    /// </summary>
+    private static string? DeleteRefusal(string name, int transactions, int imports) =>
+        (transactions, imports) switch
+        {
+            (0, 0) => null,
+            (_, 0) => $"'{name}' ainda tem {transactions} lançamento(s). "
+                + "Mova ou exclua os lançamentos antes de excluir a conta.",
+            (0, _) => $"'{name}' ainda tem {imports} importação(ões) no histórico. "
+                + "Desfaça ou descarte as importações antes de excluir a conta.",
+            _ => $"'{name}' ainda tem {transactions} lançamento(s) e {imports} importação(ões) no histórico. "
+                + "Desfaça ou descarte as importações e mova ou exclua os lançamentos restantes antes de excluir a conta.",
+        };
 
     private static AccountResponse Describe(Account account) =>
         new(account.Id, account.Name, account.Type, account.Currency, account.CreatedAt, account.OpeningBalance);
