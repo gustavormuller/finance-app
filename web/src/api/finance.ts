@@ -295,6 +295,19 @@ export interface CategoryTotal {
   share: number;
 }
 
+/**
+ * 014: what was owned at the end of a month — the summary's accounts as they stood that
+ * day, plus the portfolio's value. The current month is month-to-date.
+ */
+export interface NetWorthPoint {
+  /** `YYYY-MM`. */
+  month: string;
+  accounts: number;
+  investments: number;
+  /** `accounts + investments`. */
+  total: number;
+}
+
 /** The kinds the breakdown accepts; a Transfer is neither and the API refuses it. */
 export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
 
@@ -686,6 +699,9 @@ export const api = {
 
   dashboardMonthly: (months: number) =>
     request<MonthTotals[]>(`/api/dashboard/monthly?${searchParams({ months })}`),
+
+  dashboardNetWorth: (months: number) =>
+    request<NetWorthPoint[]>(`/api/dashboard/net-worth?${searchParams({ months })}`),
 
   dashboardByCategory: (month: string, kind: BreakdownKind) =>
     request<CategoryTotal[]>(`/api/dashboard/by-category?${searchParams({ month, kind })}`),
