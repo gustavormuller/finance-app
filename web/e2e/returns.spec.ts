@@ -28,7 +28,7 @@ function utcDaysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** Spec E2E test 36. */
+/** Spec E2E test 36, and 016's test 14 on the way. */
 test('a buy 30 days back shows a non-zero TWR and the comparison chart', async ({ page }) => {
   await devLogin(page, uniqueEmail('e2e-returns'), 'Ada Lovelace');
 
@@ -53,7 +53,13 @@ test('a buy 30 days back shows a non-zero TWR and the comparison chart', async (
   await movement.getByRole('button', { name: 'Registrar movimentação' }).click();
   await expect(movement).toBeHidden();
 
+  // Spec 016 E2E test 14: the investments page leads with the same figures.
   await page.getByRole('link', { name: '← Investimentos' }).click();
+  const hero = page.getByTestId('returns-hero');
+  await expect(hero.getByTestId('hero-twr')).toHaveText('+2,99%');
+  await expect(hero.getByTestId('hero-xirr')).toContainText('+43,05% a.a.');
+  await expect(hero.getByTestId('comparison-chart')).toBeVisible();
+
   await page.getByRole('link', { name: 'Rentabilidade' }).click();
   await expect(page.getByRole('heading', { name: 'Rentabilidade' })).toBeVisible();
 
