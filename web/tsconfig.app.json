@@ -25,5 +25,7 @@
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Checked by tsconfig.sw.json against the WebWorker lib instead.
+  "exclude": ["src/sw/sw.ts"]
 }
