@@ -133,7 +133,7 @@ All routes require authentication; unauthenticated is `401`.
 GET    /api/accounts              200  [{ id, name, type, currency, createdAt }]
 POST   /api/accounts              201  Location + body
 PUT    /api/accounts/{id}         200
-DELETE /api/accounts/{id}         204 | 409 if transactions reference it
+DELETE /api/accounts/{id}         204 | 409 if transactions or import batches reference it (amendment 1)
 ```
 
 ### Categories
@@ -285,3 +285,46 @@ Step 6 is the one that proves the decimal chain held from the browser to the dis
 - Migration SQL reviewed before applying
 - `pg_typeof("Amount")` is `numeric`
 - No `float`, `double`, or `real` appears anywhere in the transaction path
+
+## Amendments
+
+1. **Import batches also keep an account from being deleted.** *(Added 2026-09-25, after 004
+   and 011.)* `ImportBatches.AccountId` is a `RESTRICT` foreign key (004), but `DELETE
+   /api/accounts/{id}` only counted transactions. An account with a batch and no transactions
+   passed that check, and `SaveChanges` then broke the constraint: a `500`. It happens when:
+   - a committed batch's transactions were all deleted by hand, or moved to another account;
+   - a committed batch wrote no rows (every row excluded or invalid);
+   - a batch is still in review (`Staged`) for the account.
+
+   Undo is not one of them: it deletes the batch along with its transactions (004).
+
+   **Rule: refuse with `409`, the same way transactions are refused.** **(review)** Every
+   batch that names the account counts, whatever its status. Deleting the batches along with
+   the account was the other option. It was turned down for three reasons. A batch whose
+   transactions moved to another account cannot be deleted anyway, since those transactions
+   still point at it, so a refusal would be needed regardless. Discarding a batch in review
+   would throw away the user's review without asking. And 004 keeps every import deletion
+   explicit. The way out already exists: undo a committed batch, or discard one in review.
+
+   **Messages** (`detail`, shown verbatim; the existing sentence is unchanged):
+   - transactions only: `'<conta>' ainda tem N lançamento(s). Mova ou exclua os lançamentos antes de excluir a conta.`
+   - batches only: `'<conta>' ainda tem N importação(ões) no histórico. Desfaça ou descarte as importações antes de excluir a conta.`
+   - both: `'<conta>' ainda tem N lançamento(s) e M importação(ões) no histórico. Desfaça ou descarte as importações e mova ou exclua os lançamentos restantes antes de excluir a conta.`
+
+   When there are both, one sentence names both **(review)**. Undoing an import removes its
+   transactions too, so that is where to start. A refusal that clears one blocker only to
+   reveal the next is the pattern `Problems.Validation` already avoids for fields.
+
+   The check is still a courtesy over the constraint, not a lock. A batch uploaded between
+   the count and the delete still fails as before. That takes two tabs racing on one
+   account, and the risk is accepted.
+
+   **Web:** no change. The accounts page already shows a 409's `detail` above the list
+   (`ApiError.message`), so the new sentences appear there as the old one does.
+
+   **Tests** (`api.tests/Integration/AccountEndpointTests.cs`):
+   16a. Import and commit, then `DELETE` the account → `409` naming both. Delete the
+        transactions by hand, then `DELETE` → `409` naming the import (this was the `500`).
+        Undo, then `DELETE` → `204`.
+   16b. An upload still in review → `DELETE` the account → `409` naming the import. Discard,
+        then `DELETE` → `204`.
