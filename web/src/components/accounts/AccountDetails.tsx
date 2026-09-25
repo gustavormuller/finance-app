@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { api, type Account } from '@/api/finance';
 import Alert from '@/components/Alert';
 import { Button } from '@/components/ui/button';
-import { accountRefusal, type Refusal } from '@/lib/accounts';
+import { accountRefusal } from '@/lib/accounts';
+import type { Refusal } from '@/lib/refusal';
 
 import AccountForm from './AccountForm';
 

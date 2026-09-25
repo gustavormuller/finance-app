@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { currentMonth, formatMonth, lastMonths, shiftMonth, shortMonth } from './months';
+import { currentMonth, formatMonth, lastMonths, monthDays, shiftMonth, shortMonth } from './months';
 
 describe('months', () => {
   afterEach(() => {
@@ -11,6 +11,12 @@ describe('months', () => {
    * The local calendar month, not the UTC one: at 22:00 on 30 September in Brasília
    * it is already October in UTC, and the dashboard must still say September.
    */
+  it('spans a month from its first day to its last, leap years included', () => {
+    expect(monthDays('2026-09')).toEqual({ from: '2026-09-01', to: '2026-09-30' });
+    expect(monthDays('2026-12')).toEqual({ from: '2026-12-01', to: '2026-12-31' });
+    expect(monthDays('2028-02')).toEqual({ from: '2028-02-01', to: '2028-02-29' });
+  });
+
   it('reads the current month from the local date', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 8, 30, 23, 59));

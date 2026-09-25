@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Plus } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
@@ -6,6 +6,7 @@ import { api, type Category, type CategoryInput, type CategoryKind } from '@/api
 import Alert from '@/components/Alert';
 import { Actions, FormRow, UseCells } from '@/components/categories/CategoryCells';
 import CategoryForm from '@/components/categories/CategoryForm';
+import { useCategories, useCategoryUsage } from '@/components/categories/queries';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,8 +41,8 @@ export default function CategoriesPage() {
   const [form, setForm] = useState<Form | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  const categories = useQuery({ queryKey: ['categories'], queryFn: api.listCategories });
-  const usage = useQuery({ queryKey: ['categories', 'usage'], queryFn: api.categoryUsage });
+  const categories = useCategories();
+  const usage = useCategoryUsage();
 
   const close = () => {
     setForm(null);

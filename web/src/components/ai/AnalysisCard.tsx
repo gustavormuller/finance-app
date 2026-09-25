@@ -8,6 +8,7 @@ import SectionHeading from '@/components/dashboard/SectionHeading';
 import { Button } from '@/components/ui/button';
 import { analysisStatusLabels } from '@/lib/labels';
 import { formatMonth } from '@/lib/months';
+import { refusalMessage } from '@/lib/refusal';
 
 import Markdown from './Markdown';
 
@@ -16,13 +17,6 @@ export const POLL_MS = 3000;
 
 const inProgress = (analysis: AiAnalysis | undefined) =>
   analysis?.status === 'Pending' || analysis?.status === 'Running';
-
-/** The sentence a refused POST becomes: a 400's field messages, or the problem's detail. */
-function describe(error: Error): string {
-  const fields = error instanceof ApiError ? Object.values(error.fields).flat() : [];
-
-  return fields.length > 0 ? fields.join(' ') : error.message;
-}
 
 /**
  * The dashboard's "Análise do mês" for the selected month.
@@ -84,7 +78,7 @@ export default function AnalysisCard({ month }: { month: string }) {
     <section aria-labelledby="analysis-heading" data-testid="analysis-card" className="glass grid content-start gap-3 rounded-2xl p-5 sm:p-6">
       <SectionHeading id="analysis-heading">Análise do mês</SectionHeading>
 
-      {generate.isError && <Alert>{describe(generate.error)}</Alert>}
+      {generate.isError && <Alert>{refusalMessage(generate.error)}</Alert>}
 
       {analyses.isError ? (
         <Alert>Não foi possível carregar a análise do mês.</Alert>

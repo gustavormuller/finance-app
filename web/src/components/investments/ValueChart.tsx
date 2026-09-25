@@ -2,12 +2,9 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 
 import type { DailyRow } from '@/api/finance';
 import SectionHeading from '@/components/dashboard/SectionHeading';
-import { axisTick, tooltipProps, wholeMoney } from '@/lib/chart';
+import { axisTick, shortDay, tooltipProps, wholeMoney } from '@/lib/chart';
 import { formatDate } from '@/lib/labels';
 import { formatMoney } from '@/lib/money';
-
-/** `2026-09-24` as `24/09`, for the axis. */
-const shortDay = (isoDay: string) => formatDate(isoDay).slice(0, 5);
 
 /**
  * The asset's `ValueBrl` per day: a simple line over a fill that fades to the ground.
