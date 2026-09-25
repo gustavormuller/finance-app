@@ -359,8 +359,13 @@ export default function AccountImport({ account }: { account: Account }): React.
       </div>
 
       {/* One container for the current step, so its buttons are distinguishable from
-          the history's, which offers the same verbs for other batches. */}
-      <div data-testid="import-step" className="-mt-3">
+          the history's, which offers the same verbs for other batches. `data-wide` asks
+          the accounts page for the whole width while a table is the work. */}
+      <div
+        data-testid="import-step"
+        data-wide={step.kind === 'mapping' || step.kind === 'preview' ? '' : undefined}
+        className="-mt-3"
+      >
       {step.kind === 'file' &&
         (inReview && inReview.accountId !== account.id ? (
           <p className="bg-accent grid gap-2 rounded-2xl p-4 text-sm">

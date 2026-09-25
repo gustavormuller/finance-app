@@ -65,31 +65,35 @@ export default function AccountList({
                 <Icon className="size-5" aria-hidden="true" />
               </span>
 
+              {/* The balance shares the name's line, so the line under it has the card's
+                  whole width: the last import is that line's news, and it wraps rather
+                  than being cut. */}
               <span className="min-w-0 flex-1">
-                <Link
-                  to="/accounts/$accountId"
-                  params={{ accountId: account.id }}
-                  // Switching accounts keeps the tab: importing several statements in a row.
-                  search={tab ? { tab } : {}}
-                  activeOptions={{ includeSearch: false }}
-                  className="block truncate text-[0.9375rem] font-bold outline-none after:absolute after:inset-0 after:rounded-2xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
-                >
-                  {account.name}
-                </Link>
-                <span className="text-muted-foreground block truncate text-xs">
+                <span className="flex items-baseline justify-between gap-3">
+                  <Link
+                    to="/accounts/$accountId"
+                    params={{ accountId: account.id }}
+                    // Switching accounts keeps the tab: importing several statements in a row.
+                    search={tab ? { tab } : {}}
+                    activeOptions={{ includeSearch: false }}
+                    className="min-w-0 truncate text-[0.9375rem] font-bold outline-none after:absolute after:inset-0 after:rounded-2xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+                  >
+                    {account.name}
+                  </Link>
+                  {balance !== undefined && (
+                    <Amount
+                      value={balance}
+                      className={cn(
+                        'shrink-0 text-sm font-bold',
+                        account.type === 'CreditCard' && balance < 0 && 'text-destructive',
+                      )}
+                    />
+                  )}
+                </span>
+                <span className="text-muted-foreground block text-xs">
                   {accountTypeLabels[account.type]} · {lastImportLine(batches, account.id)}
                 </span>
               </span>
-
-              {balance !== undefined && (
-                <Amount
-                  value={balance}
-                  className={cn(
-                    'shrink-0 text-sm font-bold',
-                    account.type === 'CreditCard' && balance < 0 && 'text-destructive',
-                  )}
-                />
-              )}
             </li>
           );
         })}

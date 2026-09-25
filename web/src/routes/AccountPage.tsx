@@ -93,13 +93,15 @@ function Balance({ value, currency }: { value: number; currency: string }) {
     .split(',');
 
   return (
-    <p data-testid="account-balance" className="font-display flex items-baseline gap-1 tracking-tight tabular-nums sm:justify-end">
+    <p data-testid="account-balance" className="font-display flex items-baseline gap-1.5 tracking-tight tabular-nums sm:justify-end">
       <span className="text-muted-foreground text-base">{currency === 'BRL' ? 'R$' : currency}</span>{' '}
-      <span className={cn('text-4xl leading-none font-semibold', value < 0 && 'text-negative')}>
-        {value < 0 ? '−' : '+'}
-        {whole}
+      <span className="flex items-baseline">
+        <span className={cn('text-4xl leading-none font-semibold', value < 0 && 'text-negative')}>
+          {value < 0 ? '−' : '+'}
+          {whole}
+        </span>
+        <span className="text-muted-foreground text-xl font-semibold">,{cents}</span>
       </span>
-      <span className="text-muted-foreground text-xl font-semibold">,{cents}</span>
     </p>
   );
 }

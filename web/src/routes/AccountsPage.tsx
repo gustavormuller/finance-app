@@ -98,14 +98,18 @@ export default function AccountsPage(): React.JSX.Element {
       )}
 
       {accounts.data && accounts.data.length > 0 && (
-        <div className="grid gap-6 xl:grid-cols-[20rem_minmax(0,1fr)] xl:items-start [&>*]:min-w-0">
-          <AccountList
-            accounts={accounts.data}
-            summary={summary.data}
-            batches={imports.data ?? []}
-            selectedId={accountId}
-            tab={tab}
-          />
+        // While the import maps columns or reviews rows (its step says `data-wide`), the
+        // list steps aside and the detail takes the width: those tables are the work.
+        <div className="group/accounts grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start xl:has-[[data-wide]]:grid-cols-1 [&>*]:min-w-0">
+          <div className="group-has-[[data-wide]]/accounts:hidden">
+            <AccountList
+              accounts={accounts.data}
+              summary={summary.data}
+              batches={imports.data ?? []}
+              selectedId={accountId}
+              tab={tab}
+            />
+          </div>
           {/* Hidden while creating, so the page never shows two account forms at once. */}
           {!creating && <Outlet />}
         </div>

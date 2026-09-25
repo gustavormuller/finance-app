@@ -87,11 +87,14 @@ describe('AccountImport, the file step', () => {
     expect(screen.getByText(/OFX, CSV ou planilha do Excel/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Conta')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enviar' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('import-step')).not.toHaveAttribute('data-wide');
 
     await user.upload(screen.getByLabelText('Escolher arquivo'), ofx());
 
     expect(await screen.findByTestId('staged-row-Ready')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '3. Revisão' })).toBeInTheDocument();
+    // Spec 015 decision 14: the review asks for the page's width.
+    expect(screen.getByTestId('import-step')).toHaveAttribute('data-wide');
     expect(posts(seen)).toEqual(['/api/imports']);
     expect(formField('/api/imports', 'accountId')).toBe('acc-1');
     expect(formField('/api/imports', 'source')).toBe('Ofx');
