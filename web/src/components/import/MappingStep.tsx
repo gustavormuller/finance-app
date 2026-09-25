@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { AmountCulture, CsvMappingInput, CsvPreview, CsvTemplate, SignMode } from '@/api/finance';
 import Alert from '@/components/Alert';
@@ -59,10 +59,14 @@ function fromTemplate(template: CsvTemplate): MappingDraft {
 }
 
 /**
- * Step 2, CSV only: the real headers and first rows of the file as a table, the
- * controls that say how to read them, and — the feature that makes this usable — a
+ * Step 2, CSV or spreadsheet: the real headers and first rows of the file as a table,
+ * the controls that say how to read them, and — the feature that makes this usable — a
  * live rendering of those rows as they would be interpreted. Choosing `dd/MM/yyyy`
  * against `MM/dd/yyyy` is invisible until `03/04` shows as 3 abr rather than 4 mar.
+ *
+ * A spreadsheet (011) comes with `delimiter` null and `onFormatChange`: its typed
+ * cells are written by the API in the chosen culture and date format, so a change
+ * asks for the preview again instead of only re-rendering it.
  */
 export default function MappingStep({
   preview,
@@ -71,15 +75,17 @@ export default function MappingStep({
   busy,
   error,
   onDelimiterChange,
+  onFormatChange,
   onBack,
   onSubmit,
 }: {
   preview: CsvPreview;
   templates: CsvTemplate[];
-  delimiter: string;
+  delimiter: string | null;
   busy: boolean;
   error: React.ReactNode;
   onDelimiterChange: (delimiter: string) => void;
+  onFormatChange?: ((culture: AmountCulture, dateFormat: string) => void) | undefined;
   onBack: () => void;
   onSubmit: (mapping: CsvMappingInput, saveAsTemplate: string | null) => void;
 }): React.JSX.Element {
@@ -103,6 +109,25 @@ export default function MappingStep({
 
   const update = (change: Partial<MappingDraft>) => setDraft((current) => ({ ...current, ...change }));
 
+  // The first preview was rendered in the defaults; only a change is worth a request,
+  // and only once the typing stops and the format can name a day, month and year.
+  const rendered = useRef({ culture: emptyDraft.culture, dateFormat: emptyDraft.dateFormat });
+  useEffect(() => {
+    const dateFormat = draft.dateFormat.trim();
+    const unchanged = rendered.current.culture === draft.culture && rendered.current.dateFormat === dateFormat;
+
+    if (!onFormatChange || unchanged || !/d/.test(dateFormat) || !/M/.test(dateFormat) || !/y/.test(dateFormat)) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      rendered.current = { culture: draft.culture, dateFormat };
+      onFormatChange(draft.culture, dateFormat);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [draft.culture, draft.dateFormat, onFormatChange]);
+
   const toggleDescription = (value: string) =>
     setDraft((current) => ({
       ...current,
@@ -122,7 +147,7 @@ export default function MappingStep({
 
     onSubmit(
       {
-        delimiter,
+        delimiter: delimiter ?? ';',
         hasHeader: draft.hasHeader,
         culture: draft.culture,
         dateFormat: draft.dateFormat.trim(),
@@ -185,7 +210,7 @@ export default function MappingStep({
                 if (template) {
                   setDraft(fromTemplate(template));
 
-                  if (template.delimiter !== delimiter) {
+                  if (delimiter !== null && template.delimiter !== delimiter) {
                     onDelimiterChange(template.delimiter);
                   }
                 }
@@ -201,22 +226,24 @@ export default function MappingStep({
           </Field>
         )}
 
-        <Field id="mapping-delimiter" label="Delimitador">
-          <Input
-            id="mapping-delimiter"
-            value={delimiter === '\t' ? 'tab' : delimiter}
-            maxLength={3}
-            onChange={(event) => {
-              const typed = event.target.value;
+        {delimiter !== null && (
+          <Field id="mapping-delimiter" label="Delimitador">
+            <Input
+              id="mapping-delimiter"
+              value={delimiter === '\t' ? 'tab' : delimiter}
+              maxLength={3}
+              onChange={(event) => {
+                const typed = event.target.value;
 
-              if (typed.toLowerCase() === 'tab') {
-                onDelimiterChange('\t');
-              } else if (typed.length === 1) {
-                onDelimiterChange(typed);
-              }
-            }}
-          />
-        </Field>
+                if (typed.toLowerCase() === 'tab') {
+                  onDelimiterChange('\t');
+                } else if (typed.length === 1) {
+                  onDelimiterChange(typed);
+                }
+              }}
+            />
+          </Field>
+        )}
 
         <div className="flex items-end gap-2 pb-2">
           <input
@@ -255,6 +282,12 @@ export default function MappingStep({
               <option key={format} value={format} />
             ))}
           </datalist>
+          {delimiter === null && (
+            <p className="text-muted-foreground text-sm">
+              Células de data e número da planilha são convertidas para o formato escolhido;
+              células de texto precisam estar nesse formato.
+            </p>
+          )}
         </Field>
 
         <Field id="mapping-sign-mode" label="Sinal">

@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 
 type Step =
   | { kind: 'file' }
-  | { kind: 'mapping'; accountId: string; file: File; preview: CsvPreview; delimiter: string }
+  | { kind: 'mapping'; accountId: string; file: File; preview: CsvPreview; delimiter: string | null }
   | { kind: 'preview'; batchId: string }
   | { kind: 'done'; batch: ImportBatch; result: CommitResult };
 
@@ -119,8 +119,9 @@ export default function ImportPage(): React.JSX.Element {
   const start = useMutation({
     mutationFn: async ({ accountId, file }: { accountId: string; file: File }) => {
       // The extension decides the path: an OFX carries its own structure and goes
-      // straight to staging; a CSV needs the user to say which column is what.
-      if (file.name.toLowerCase().endsWith('.csv')) {
+      // straight to staging; a CSV or a spreadsheet needs the user to say which
+      // column is what. A spreadsheet's preview has no delimiter (011).
+      if (/\.(csv|xlsx?)$/i.test(file.name)) {
         const preview = await api.previewCsv(file);
 
         return { kind: 'mapping' as const, accountId, file, preview, delimiter: preview.delimiter };
@@ -144,8 +145,18 @@ export default function ImportPage(): React.JSX.Element {
   });
 
   const rePreview = useMutation({
-    mutationFn: async ({ file, delimiter }: { file: File; delimiter: string }) => ({
-      preview: await api.previewCsv(file, delimiter),
+    mutationFn: async ({
+      file,
+      delimiter,
+      culture,
+      dateFormat,
+    }: {
+      file: File;
+      delimiter: string | null;
+      culture?: string;
+      dateFormat?: string;
+    }) => ({
+      preview: await api.previewCsv(file, { delimiter: delimiter ?? undefined, culture, dateFormat }),
       delimiter,
     }),
     onSuccess: ({ preview, delimiter }) =>
@@ -166,7 +177,9 @@ export default function ImportPage(): React.JSX.Element {
         await queryClient.invalidateQueries({ queryKey: ['csv-templates'] });
       }
 
-      return api.uploadImport({ file: step.file, accountId: step.accountId, source: 'Csv', mapping });
+      const source = step.delimiter === null ? 'Spreadsheet' : 'Csv';
+
+      return api.uploadImport({ file: step.file, accountId: step.accountId, source, mapping });
     },
     onSuccess: async (staged) => {
       await refresh();
@@ -328,6 +341,11 @@ export default function ImportPage(): React.JSX.Element {
           busy={busy}
           error={error}
           onDelimiterChange={(delimiter) => rePreview.mutate({ file: step.file, delimiter })}
+          onFormatChange={
+            step.delimiter === null
+              ? (culture, dateFormat) => rePreview.mutate({ file: step.file, delimiter: null, culture, dateFormat })
+              : undefined
+          }
           onBack={() => { setFailure(null); setStep({ kind: 'file' }); }}
           onSubmit={(mapping, saveAs) => uploadCsv.mutate({ mapping, saveAs })}
         />

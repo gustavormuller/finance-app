@@ -11,6 +11,7 @@ import { createAccount, devLogin, uniqueEmail } from './support';
 
 const OFX = fileURLToPath(new URL('./fixtures/extrato.ofx', import.meta.url));
 const CSV = fileURLToPath(new URL('./fixtures/nubank.csv', import.meta.url));
+const XLSX = fileURLToPath(new URL('./fixtures/bb-extrato.xlsx', import.meta.url));
 
 /** Step 1 through to the review, for an OFX. */
 async function uploadOfx(page: Page, account: string) {
@@ -127,4 +128,42 @@ test('undoing a committed batch removes its rows from the list', async ({ page }
   await page.goto('/transactions');
   await expect(page.getByText(/nenhum lançamento/i)).toBeVisible();
   await expect(page.getByRole('row', { name: /NETFLIX\.COM/ })).toHaveCount(0);
+});
+
+/**
+ * Spec 011 E2E test 18: typed date and number cells, two lines above the table and
+ * two balance lines without a value, through the same mapping as a CSV.
+ */
+test('an .xlsx is mapped, reviewed and committed', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-import-xlsx'), 'Grace Hopper');
+  await createAccount(page, 'Banco do Brasil');
+
+  await page.goto('/import');
+  await page.getByLabel('Conta').selectOption({ label: 'Banco do Brasil' });
+  await page.getByLabel('Arquivo').setInputFiles(XLSX);
+  await page.getByRole('button', { name: 'Enviar' }).click();
+
+  await expect(page.getByRole('heading', { name: '2. Mapeamento' })).toBeVisible();
+  await expect(page.getByLabel('Delimitador')).toHaveCount(0);
+
+  await page.getByLabel('Coluna de data').selectOption('Data');
+  await page.getByLabel('Coluna de valor').selectOption('Valor (R$)');
+  await page.getByLabel('Lançamento', { exact: true }).check();
+  await page.getByLabel('Detalhes', { exact: true }).check();
+
+  const preview = page.getByTestId('mapping-preview');
+  await expect(preview.getByText('3 ago 2026')).toBeVisible();
+  await expect(preview.getByText('−187,43')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Continuar' }).click();
+
+  await expect(page.getByRole('heading', { name: '3. Revisão' })).toBeVisible();
+  await expect(page.getByTestId('preview-counts')).toHaveText(/8 prontas/);
+
+  await commit(page);
+  await expect(page.getByTestId('commit-summary')).toHaveText('8 lançamentos importados');
+
+  await page.getByRole('link', { name: 'Ver lançamentos' }).click();
+  await expect(page.getByRole('row', { name: /SUPERMERCADO ZONA SUL/ }).getByTestId('amount')).toHaveText('−187,43');
+  await expect(page.getByRole('row', { name: /Rende Fácil/ }).getByTestId('amount')).toHaveText('+0,30');
 });

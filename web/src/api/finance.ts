@@ -97,7 +97,7 @@ export interface TransactionQuery {
 
 // ---- 004: import ------------------------------------------------------------
 
-export type ImportSource = 'Ofx' | 'Csv';
+export type ImportSource = 'Ofx' | 'Csv' | 'Spreadsheet';
 
 export type ImportBatchStatus = 'Staged' | 'Committed';
 
@@ -119,7 +119,8 @@ export interface CsvPreview {
   /** The first row of the table, header or not; the mapping step decides. */
   headers: string[];
   sampleRows: string[][];
-  delimiter: string;
+  /** Null for a spreadsheet (011), which has none. */
+  delimiter: string | null;
   skippedRows: number;
   rowCount: number;
 }
@@ -615,12 +616,21 @@ export const api = {
   deleteTransaction: (id: string) =>
     request<void>(`/api/transactions/${id}`, { method: 'DELETE' }),
 
-  previewCsv: (file: File, delimiter?: string) => {
+  /**
+   * A CSV's or a spreadsheet's first rows. `culture` and `dateFormat` only matter to a
+   * spreadsheet, whose typed cells the API writes in them (011).
+   */
+  previewCsv: (
+    file: File,
+    options: { delimiter?: string | undefined; culture?: string | undefined; dateFormat?: string | undefined } = {},
+  ) => {
     const body = new FormData();
     body.append('file', file, file.name);
 
-    if (delimiter) {
-      body.append('delimiter', delimiter);
+    for (const [name, value] of Object.entries(options)) {
+      if (value) {
+        body.append(name, value);
+      }
     }
 
     return request<CsvPreview>('/api/imports/preview-csv', { method: 'POST', body });

@@ -12,8 +12,8 @@ export const selectClasses =
 
 /**
  * Step 1: pick an account, pick a file. The extension decides where the file goes
- * next — `.ofx` straight to the preview, `.csv` to the mapping step — and that
- * decision is the page's, so this component only hands the file over.
+ * next — `.ofx` straight to the preview, `.csv`, `.xls` and `.xlsx` to the mapping
+ * step — and that decision is the page's, so this component only hands the file over.
  */
 export default function FileStep({
   accounts,
@@ -73,12 +73,13 @@ export default function FileStep({
         <Input
           id="import-file"
           type="file"
-          accept=".ofx,.csv,.txt"
+          accept=".ofx,.csv,.txt,.xls,.xlsx"
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
         />
         <p className="text-muted-foreground text-sm">
-          OFX ou CSV exportado do banco, até 2 MB e 5.000 lançamentos. Um OFX vai direto
-          para a revisão; um CSV passa antes pelo mapeamento das colunas.
+          OFX, CSV ou planilha do Excel (.xls, .xlsx) exportada do banco, até 2 MB e 5.000
+          lançamentos. Um OFX vai direto para a revisão; CSV e planilhas passam antes pelo
+          mapeamento das colunas.
         </p>
         {missingFile && (
           <p role="alert" className="text-destructive text-sm">

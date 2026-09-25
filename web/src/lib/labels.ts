@@ -50,6 +50,7 @@ export const categoryKinds: CategoryKind[] = ['Income', 'Expense', 'Transfer'];
 export const importSourceLabels: Record<ImportSource, string> = {
   Ofx: 'OFX',
   Csv: 'CSV',
+  Spreadsheet: 'Planilha',
 };
 
 export const importBatchStatusLabels: Record<ImportBatchStatus, string> = {

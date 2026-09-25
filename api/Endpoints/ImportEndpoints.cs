@@ -25,7 +25,7 @@ public static class ImportEndpoints
     private sealed record CsvPreviewResponse(
         IReadOnlyList<string> Headers,
         IReadOnlyList<IReadOnlyList<string>> SampleRows,
-        string Delimiter,
+        string? Delimiter,
         int SkippedRows,
         int RowCount);
 
@@ -167,8 +167,28 @@ public static class ImportEndpoints
             return tooLarge;
         }
 
-        var delimiter = ReadDelimiter(form["delimiter"]) ?? CsvStatementParser.DetectDelimiter(upload.Text);
-        var table = CsvStatementParser.Parse(upload.Text, delimiter, hasHeader: false);
+        CsvTable table;
+        string? delimiter = null;
+
+        if (SpreadsheetStatementReader.IsSpreadsheet(upload.Bytes) || IsSpreadsheetName(upload.FileName))
+        {
+            // Typed cells are written the way the mapping will declare them, so the
+            // live preview shows what the upload will stage (spec 011, decision 7).
+            var read = SpreadsheetStatementReader.Read(upload.Bytes, form["culture"], form["dateFormat"], hasHeader: false);
+
+            if (read.Problem is { } problem)
+            {
+                return SpreadsheetProblemResult(problem);
+            }
+
+            table = read.Table!;
+        }
+        else
+        {
+            var separator = ReadDelimiter(form["delimiter"]) ?? CsvStatementParser.DetectDelimiter(upload.Text);
+            table = CsvStatementParser.Parse(upload.Text, separator, hasHeader: false);
+            delimiter = separator.ToString();
+        }
 
         if (table.Records.Count == 0)
         {
@@ -178,7 +198,7 @@ public static class ImportEndpoints
         return Results.Ok(new CsvPreviewResponse(
             table.Records[0].Fields,
             table.Records.Skip(1).Take(PreviewRows).Select(record => record.Fields).ToList(),
-            delimiter.ToString(),
+            delimiter,
             table.SkippedRows,
             table.Records.Count));
     }
@@ -217,12 +237,12 @@ public static class ImportEndpoints
 
         if (!Enum.TryParse<ImportSource>(form["source"], ignoreCase: true, out var source))
         {
-            return Problems.Validation("source", "A origem precisa ser Ofx ou Csv.");
+            return Problems.Validation("source", "A origem precisa ser Ofx, Csv ou Spreadsheet.");
         }
 
         var parsed = source == ImportSource.Ofx
             ? ParseOfx(upload.Text)
-            : await ParseCsvAsync(upload.Text, form, database, cancellationToken);
+            : await ParseTableAsync(upload, source, form, database, cancellationToken);
 
         if (parsed.Problem is { } invalid)
         {
@@ -272,11 +292,14 @@ public static class ImportEndpoints
     }
 
     /// <summary>
-    /// A saved template by id, or the mapping fields inline. Either way the mapping
-    /// is validated against the real headers of this file before a row is read.
+    /// A CSV or a spreadsheet, through a saved template by id or the mapping fields
+    /// inline. Either way the mapping is validated against the real headers of this
+    /// file before a row is read. A spreadsheet has no delimiter; its typed cells are
+    /// written in the mapping's culture and date format (spec 011, decision 5).
     /// </summary>
-    private static async Task<(IReadOnlyList<ParsedRow>? Rows, IResult? Problem)> ParseCsvAsync(
-        string text,
+    private static async Task<(IReadOnlyList<ParsedRow>? Rows, IResult? Problem)> ParseTableAsync(
+        Upload upload,
+        ImportSource source,
         IFormCollection form,
         AppDbContext database,
         CancellationToken cancellationToken)
@@ -302,7 +325,7 @@ public static class ImportEndpoints
             }
 
             mapping = new CsvMapping(
-                ReadDelimiter(form["delimiter"]) ?? CsvStatementParser.DetectDelimiter(text),
+                ReadDelimiter(form["delimiter"]) ?? (source == ImportSource.Csv ? CsvStatementParser.DetectDelimiter(upload.Text) : ';'),
                 !string.Equals(form["hasHeader"], "false", StringComparison.OrdinalIgnoreCase),
                 form["culture"].ToString(),
                 form["dateFormat"].ToString(),
@@ -314,7 +337,24 @@ public static class ImportEndpoints
                 form["descriptionColumns"].ToString());
         }
 
-        var table = CsvStatementParser.Parse(text, mapping.Delimiter, mapping.HasHeader);
+        CsvTable table;
+
+        if (source == ImportSource.Spreadsheet)
+        {
+            var read = SpreadsheetStatementReader.Read(upload.Bytes, mapping.Culture, mapping.DateFormat, mapping.HasHeader);
+
+            if (read.Problem is { } problem)
+            {
+                return (null, SpreadsheetProblemResult(problem));
+            }
+
+            table = read.Table!;
+        }
+        else
+        {
+            table = CsvStatementParser.Parse(upload.Text, mapping.Delimiter, mapping.HasHeader);
+        }
+
         var violations = mapping.Validate(table);
 
         if (violations.Count > 0)
@@ -431,9 +471,15 @@ public static class ImportEndpoints
         return Results.Ok(Describe(row));
     }
 
-    private sealed record Upload(string FileName, string Text, IResult? TooLarge);
+    /// <summary>The uploaded bytes; <see cref="Text"/> decodes them once, for the text formats.</summary>
+    private sealed record Upload(string FileName, byte[] Bytes, IResult? TooLarge)
+    {
+        private string? text;
 
-    /// <summary>Null when there is no file; otherwise the decoded text, or the 413 it earned.</summary>
+        public string Text => text ??= StatementText.Decode(Bytes);
+    }
+
+    /// <summary>Null when there is no file; otherwise its bytes, or the 413 it earned.</summary>
     private static async Task<Upload?> ReadUploadAsync(IFormFile? file, CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
@@ -445,7 +491,7 @@ public static class ImportEndpoints
 
         if (file.Length > MaxFileBytes)
         {
-            return new Upload(fileName, "", Results.Problem(
+            return new Upload(fileName, [], Results.Problem(
                 title: "Arquivo muito grande",
                 detail: $"O arquivo tem {file.Length / 1024.0m / 1024.0m:0.0} MB; o limite é {MaxFileBytes / 1024 / 1024} MB.",
                 statusCode: StatusCodes.Status413PayloadTooLarge));
@@ -456,8 +502,25 @@ public static class ImportEndpoints
         await using var stream = file.OpenReadStream();
         await stream.ReadExactlyAsync(bytes, cancellationToken);
 
-        return new Upload(fileName, StatementText.Decode(bytes), null);
+        return new Upload(fileName, bytes, null);
     }
+
+    private static bool IsSpreadsheetName(string fileName) =>
+        fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
+        || fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Spec 011, decisions 10 and 11. Rendered verbatim.</summary>
+    private static IResult SpreadsheetProblemResult(SpreadsheetProblem problem) => problem switch
+    {
+        SpreadsheetProblem.TooLarge => Results.Problem(
+            title: "Arquivo muito grande",
+            detail: "A planilha é grande demais depois de descompactada; o limite é 20 MB. Exporte um período menor.",
+            statusCode: StatusCodes.Status413PayloadTooLarge),
+        SpreadsheetProblem.PasswordProtected => Problems.Validation(
+            "file", "A planilha está protegida por senha. Remova a senha no Excel e envie de novo."),
+        _ => Problems.Validation(
+            "file", "O arquivo não é uma planilha do Excel (.xls ou .xlsx) válida. Se o banco oferece CSV ou OFX, exporte nesse formato."),
+    };
 
     private static char? ReadDelimiter(string? value) =>
         value is { Length: 1 } ? value[0] : value?.ToLowerInvariant() switch

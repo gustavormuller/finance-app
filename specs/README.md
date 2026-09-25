@@ -30,6 +30,7 @@ Each spec contains:
 | 008 | returns | TWR, XIRR, benchmark comparison |
 | 009 | ai-analysis | categorization cascade, monthly analysis, budget cap |
 | 010 | deploy | Oracle instance, Caddy, Tunnel, backups |
+| 011 | import-excel | `.xls`/`.xlsx` through the CSV mapping |
 
 One number per session set. If a feature needs more than three sessions, it was scoped
 too large — split it.
