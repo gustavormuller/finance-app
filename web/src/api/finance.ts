@@ -204,14 +204,14 @@ export interface StagedRow {
   issues: string[];
 }
 
-export interface StagedRowCounts {
+interface StagedRowCounts {
   ready: number;
   duplicates: number;
   invalid: number;
   included: number;
 }
 
-export interface StagedRowPage {
+interface StagedRowPage {
   items: StagedRow[];
   page: number;
   pageSize: number;
@@ -345,7 +345,7 @@ export interface MarketAssetInput {
 }
 
 /** An item that failed, and why; `error` is already pt-BR. */
-export interface SyncFailure {
+interface SyncFailure {
   item: string;
   error: string;
 }
@@ -398,7 +398,7 @@ export interface Position {
 }
 
 /** One asset class's part of the total; `share` is a fraction, and the shares sum to 1. */
-export interface AllocationItem {
+interface AllocationItem {
   class: MarketAssetClass;
   valueBrl: number;
   share: number;
@@ -761,7 +761,4 @@ export const api = {
 
   createCsvTemplate: (input: CsvTemplateInput) =>
     request<CsvTemplate>('/api/csv-templates', { method: 'POST', body: JSON.stringify(input) }),
-
-  deleteCsvTemplate: (id: string) =>
-    request<void>(`/api/csv-templates/${id}`, { method: 'DELETE' }),
 };

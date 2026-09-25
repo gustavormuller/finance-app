@@ -11,9 +11,9 @@ import { stubFetch, type SeenRequest } from '@/test-utils';
  * it. Not a test file: vitest only runs `*.test.tsx`.
  */
 
-export const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: true };
+const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: true };
 
-export const categories: Category[] = [
+const categories: Category[] = [
   { id: 'cat-food', name: 'Alimentação', kind: 'Expense', parentId: null, createdAt: '' },
   { id: 'cat-other', name: 'Outros', kind: 'Expense', parentId: null, createdAt: '' },
 ];

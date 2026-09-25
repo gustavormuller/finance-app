@@ -21,7 +21,7 @@ export interface Display {
   compactMoney: (brl: number) => string;
 }
 
-export function displayIn(chosen: Currency, fx: UsdBrl | null, missingRate = false): Display {
+function displayIn(chosen: Currency, fx: UsdBrl | null, missingRate = false): Display {
   const currency: Currency = fx ? 'USD' : 'BRL';
   const convert = (brl: number) => (fx ? brlToUsd(brl, fx.rate) : brl);
 

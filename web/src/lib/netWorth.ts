@@ -13,7 +13,7 @@ export function addMoney(a: number, b: number): number {
   return (cents(a) + cents(b)) / 100;
 }
 
-export type NetWorthChangeKey = 'month' | 'year' | 'twelve';
+type NetWorthChangeKey = 'month' | 'year' | 'twelve';
 
 export interface NetWorthChange {
   key: NetWorthChangeKey;

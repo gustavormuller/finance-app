@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { categoryKindLabels, categoryKinds } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
-export interface TransactionFormValues {
+interface TransactionFormValues {
   accountId: string;
   categoryId: string;
   /**

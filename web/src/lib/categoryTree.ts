@@ -2,7 +2,7 @@ import type { Category, CategoryKind, CategoryUsage } from '@/api/finance';
 
 /** A category's transactions in the range: how many, and their signed sum. */
 export type Use = { count: number; total: number };
-export type Leaf = { category: Category; use: Use };
+type Leaf = { category: Category; use: Use };
 /** A main category; its rollup is its own use plus its subcategories'. */
 export type Main = { category: Category; rollup: Use; children: Leaf[] };
 

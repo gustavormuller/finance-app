@@ -13,7 +13,6 @@ export default function Amount({
   className,
 }: {
   value: number;
-  currency?: string;
   className?: string;
 }): React.JSX.Element {
   const magnitude = Math.abs(value).toLocaleString('pt-BR', {

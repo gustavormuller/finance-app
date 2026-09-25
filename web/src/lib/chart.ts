@@ -25,6 +25,6 @@ export const money = (value: number) =>
 export const wholeMoney = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 
 /** The category ring's colours, in rank order; past five the rest share the muted ink. */
-export const seriesColours = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
+const seriesColours = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
 export const seriesColour = (index: number) => seriesColours[index] ?? 'var(--muted-foreground)';
