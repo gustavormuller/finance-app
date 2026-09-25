@@ -6,6 +6,7 @@ import '@fontsource-variable/space-grotesk';
 
 import App from './App';
 import './index.css';
+import { registerServiceWorker } from './lib/serviceWorker';
 
 const rootElement = document.getElementById('root');
 
@@ -18,3 +19,5 @@ createRoot(rootElement).render(
     <App />
   </StrictMode>,
 );
+
+registerServiceWorker();

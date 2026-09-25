@@ -23,6 +23,7 @@ describe('ThemeToggle (012)', () => {
     vi.restoreAllMocks();
     localStorage.clear();
     document.documentElement.classList.remove('dark');
+    document.head.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.remove());
   });
 
   /** Spec 012 test 1. */
@@ -59,6 +60,30 @@ describe('ThemeToggle (012)', () => {
 
     expect(document.documentElement).toHaveClass('dark');
     expect(localStorage.getItem('theme')).toBe('system');
+  });
+
+  /** Spec 022 test 5: the toolbar follows the theme applied, not only the system's. */
+  it("sets both theme-color metas to the applied theme's ground", async () => {
+    prefers(false);
+    document.head.insertAdjacentHTML(
+      'beforeend',
+      '<meta name="theme-color" content="#f1f2f7" media="(prefers-color-scheme: light)">' +
+        '<meta name="theme-color" content="#0b0c12" media="(prefers-color-scheme: dark)">',
+    );
+    const themeColors = () =>
+      [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].map((meta) => meta.content);
+    const user = userEvent.setup();
+    render(<ThemeToggle />);
+
+    await user.click(screen.getByRole('button', { name: 'Escuro' }));
+    expect(themeColors()).toEqual(['#0b0c12', '#0b0c12']);
+
+    await user.click(screen.getByRole('button', { name: 'Claro' }));
+    expect(themeColors()).toEqual(['#f1f2f7', '#f1f2f7']);
+
+    prefers(true);
+    await user.click(screen.getByRole('button', { name: 'Sistema' }));
+    expect(themeColors()).toEqual(['#0b0c12', '#0b0c12']);
   });
 
   /** Spec 012 test 3. */

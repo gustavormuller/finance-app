@@ -4,14 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Finanças Pessoais</title>
+    <!-- 022: the installable app. The PNG favicon is for browsers without SVG ones. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Finanças" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Each theme's ground in index.css. Before the script below, which overrides both
+         with the theme actually applied: Claro and Escuro overrule the system. -->
+    <meta name="theme-color" content="#f1f2f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0c12" media="(prefers-color-scheme: dark)" />
     <!-- 012: the stored theme, applied before the first paint so a dark page never
-         flashes white. Same key and values as src/lib/theme.ts. -->
+         flashes white. Same key, values and colours as src/lib/theme.ts. -->
     <script>
       try {
         var t = localStorage.getItem('theme');
         var d = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList.toggle('dark', d);
         document.documentElement.style.colorScheme = d ? 'dark' : 'light';
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+          m.content = d ? '#0b0c12' : '#f1f2f7';
+        });
       } catch (e) {}
     </script>
   </head>
