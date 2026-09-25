@@ -18,14 +18,19 @@ function uniqueTicker() {
   return `E2E${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
 }
 
-async function registerAsset(page: Page, ticker: string, name: string) {
+async function registerAsset(
+  page: Page,
+  ticker: string,
+  name: string,
+  { provider = 'Brapi', assetClass = 'StockBr', symbol = ticker } = {},
+) {
   const form = page.getByRole('form', { name: 'Cadastrar ativo' });
   await form.getByLabel('Ticker').fill(ticker);
   await form.getByLabel('Nome (opcional)').fill(name);
-  await form.getByLabel('Classe').selectOption('StockBr');
+  await form.getByLabel('Classe').selectOption(assetClass);
   // Exact: "Símbolo no provedor" contains the word too.
-  await form.getByLabel('Provedor', { exact: true }).selectOption('Brapi');
-  await form.getByLabel('Símbolo no provedor').fill(ticker);
+  await form.getByLabel('Provedor', { exact: true }).selectOption(provider);
+  await form.getByLabel('Símbolo no provedor').fill(symbol);
   await form.getByLabel('Moeda').selectOption('BRL');
   await form.getByRole('button', { name: 'Cadastrar ativo' }).click();
 }
@@ -58,6 +63,10 @@ test('a manual sync on the fake providers appears as Succeeded, by provider', as
   // At least one asset, so brapi is in the summary whatever the catalogue held before.
   await registerAsset(page, uniqueTicker(), 'Ativo sincronizado E2E');
   await expect(page.getByLabel('Ticker')).toHaveValue('');
+  // 019: a Binance pair too, so Binance is in the summary as well.
+  const pair = uniqueTicker();
+  await registerAsset(page, pair, 'Cripto em reais E2E', { provider: 'Binance', assetClass: 'Crypto', symbol: `${pair}BRL` });
+  await expect(page.getByLabel('Ticker')).toHaveValue('');
 
   const accepted = page.waitForResponse(
     (response) => response.url().endsWith('/api/market-data/sync') && response.request().method() === 'POST',
@@ -73,6 +82,7 @@ test('a manual sync on the fake providers appears as Succeeded, by provider', as
   await expect(run).toContainText('Manual');
   await expect(run.getByTestId('provider-summary-Brapi')).toContainText('brapi');
   await expect(run.getByTestId('provider-summary-Brapi')).toContainText('itens sincronizados');
+  await expect(run.getByTestId('provider-summary-Binance')).toContainText('itens sincronizados');
   await expect(run.getByTestId('provider-summary-Bcb')).toContainText('Banco Central (SGS)');
   await expect(run.getByText('com falha')).toHaveCount(0);
 

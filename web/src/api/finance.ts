@@ -319,7 +319,7 @@ export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
 
 export type MarketAssetClass = 'StockBr' | 'Fii' | 'EtfBr' | 'Bdr' | 'StockUs' | 'Crypto';
 
-export type ProviderKind = 'Brapi' | 'CoinGecko' | 'TwelveData';
+export type ProviderKind = 'Brapi' | 'CoinGecko' | 'TwelveData' | 'Binance';
 
 export type SyncTrigger = 'Scheduled' | 'Manual';
 

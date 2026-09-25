@@ -20,6 +20,9 @@ public static class MarketDataEndpoints
 
     private static readonly string[] Currencies = ["BRL", "USD"];
 
+    /// <summary>The quote currency of every Binance pair the adapter serves (019).</summary>
+    private const string BinanceQuote = "BRL";
+
     /// <remarks>
     /// <c>Name</c> is not in the spec's body, but the column is required: when omitted,
     /// the ticker stands in for it. Internal, with <see cref="Validate"/> and
@@ -175,6 +178,7 @@ public static class MarketDataEndpoints
     internal static MarketAsset NewAsset(AssetRequest request, TimeProvider clock)
     {
         var ticker = request.Ticker!.Trim().ToUpperInvariant();
+        var symbol = request.ProviderSymbol!.Trim();
         return new MarketAsset
         {
             Id = Guid.NewGuid(),
@@ -183,7 +187,8 @@ public static class MarketDataEndpoints
             Class = request.Class,
             Currency = request.Currency!.Trim().ToUpperInvariant(),
             Provider = request.Provider,
-            ProviderSymbol = request.ProviderSymbol!.Trim(),
+            // Binance spells its symbols in capitals only; one spelling keeps one row per pair.
+            ProviderSymbol = request.Provider == ProviderKind.Binance ? symbol.ToUpperInvariant() : symbol,
             IsActive = true,
             CreatedAt = clock.GetUtcNow(),
         };
@@ -210,7 +215,9 @@ public static class MarketDataEndpoints
                 : null,
             string.IsNullOrWhiteSpace(request.ProviderSymbol) || request.ProviderSymbol.Trim().Length > 50
                 ? new RuleViolation("providerSymbol", "O símbolo no provedor é obrigatório e deve ter até 50 caracteres.")
-                : null,
+                : request.Provider == ProviderKind.Binance && !IsBrlPair(request.ProviderSymbol.Trim())
+                    ? new RuleViolation("providerSymbol", "Use um par da Binance cotado em reais, terminado em BRL (ex.: BTCBRL).")
+                    : null,
             currency is null || !Currencies.Contains(currency)
                 ? new RuleViolation("currency", "A moeda deve ser BRL ou USD.")
                 : request.Provider == ProviderKind.CoinGecko
@@ -218,8 +225,14 @@ public static class MarketDataEndpoints
                     ? new RuleViolation(
                         "currency",
                         $"Ativos do CoinGecko são cotados em {options.CoinGecko.VsCurrency.ToUpperInvariant()}.")
-                    : null);
+                    : request.Provider == ProviderKind.Binance && currency != BinanceQuote
+                        ? new RuleViolation("currency", $"Ativos da Binance são cotados em {BinanceQuote}.")
+                        : null);
     }
+
+    /// <summary>A pair quoted in reais: a base asset, then <c>BRL</c>. A USDT pair stored as reais would be off fivefold.</summary>
+    private static bool IsBrlPair(string symbol) =>
+        symbol.Length > BinanceQuote.Length && symbol.EndsWith(BinanceQuote, StringComparison.OrdinalIgnoreCase);
 
     private static string EscapeLike(string text) =>
         text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

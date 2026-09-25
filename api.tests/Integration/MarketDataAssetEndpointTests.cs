@@ -90,6 +90,36 @@ public sealed class MarketDataAssetEndpointTests(PostgresFixture postgres)
         }
     }
 
+    /// <summary>019 test 21: a Binance asset is a pair quoted in reais, stored as Binance spells it.</summary>
+    [Theory]
+    [InlineData("BRL", "btcbrl", null)]
+    [InlineData("USD", "BTCBRL", "currency")]
+    [InlineData("BRL", "BTCUSDT", "providerSymbol")]
+    [InlineData("BRL", "BRL", "providerSymbol")]
+    public async Task A_Binance_asset_is_a_pair_quoted_in_reais(string currency, string symbol, string? refused)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (api, client) = await StartAsync(postgres, ct);
+        await using var _ = api;
+
+        using var response = await client.SendAsync(TransactionsFixtures.Post("/api/market-data/assets", new
+        {
+            ticker = "BTC", @class = "Crypto", provider = "Binance", providerSymbol = symbol, currency,
+        }), ct);
+
+        if (refused is null)
+        {
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var asset = (await response.Content.ReadFromJsonAsync<AssetItem>(ct))!;
+            Assert.Equal(("Binance", "BTCBRL", "BRL"), (asset.Provider, asset.ProviderSymbol, asset.Currency));
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal([refused], await TransactionsFixtures.ProblemFieldsAsync(response, ct));
+        }
+    }
+
     [Fact]
     public async Task Every_invalid_field_is_reported_at_once()
     {
