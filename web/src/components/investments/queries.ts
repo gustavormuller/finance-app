@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/finance';
 
 /**
- * Every 007 query sits under `['investments']`: a movement write changes the positions,
+ * Every investments query sits under `['investments']`: a movement write changes the positions,
  * the summary and the daily series at once, so one invalidation refreshes them all.
  */
 export const INVESTMENTS = ['investments'] as const;

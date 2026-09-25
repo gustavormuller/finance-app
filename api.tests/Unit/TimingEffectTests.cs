@@ -8,19 +8,18 @@ namespace Finance.Api.Tests.Unit;
 /// the timing of the deposits helped or hurt against a passive investor in the same assets.
 /// </summary>
 /// <remarks>
-/// DEVIATION, PENDING HUMAN SIGN-OFF (DEFERRED, "008 · checkpoint 3", option (a)). The spec
-/// runs scenario 3 over four consecutive days. Its XIRR root is then 1 + r ≈ 5.9e-87, and its
-/// mirror's is about 2.7e79. Both are outside decision 5's bracket [-0.99, 10] and the decimal
-/// range, so XIRR is null and so is the timing effect. Tests 15 and 16 below keep the same
-/// moves and the same TWR of exactly 0, but put the four moves on days 0, 91, 182 and 365.
-/// The literal four-day scenarios are pinned too, as null.
+/// Deviation from the spec: it runs scenario 3 over four consecutive days. Its XIRR root is
+/// then 1 + r ≈ 5.9e-87, and its mirror's is about 2.7e79. Both are outside decision 5's
+/// bracket [-0.99, 10] and the decimal range, so XIRR is null and so is the timing effect.
+/// Tests 15 and 16 below keep the same moves and the same TWR of exactly 0, but put the four
+/// moves on days 0, 91, 182 and 365. The literal four-day scenarios are pinned too, as null.
 /// XIRR expected values: Python decimal at 50 digits and LibreOffice Calc's XIRR() agree.
 /// </remarks>
 public sealed class TimingEffectTests
 {
     private static readonly DateOnly Day0 = new(2020, 1, 1);
 
-    /// <summary>The moves' dates, as day offsets from the base day: spread over a year (option (a)), and the spec's four days.</summary>
+    /// <summary>The moves' dates, as day offsets from the base day: spread over a year, and the spec's four days.</summary>
     private static readonly int[] OverAYear = [1, 92, 183, 366];
     private static readonly int[] FourDays = [1, 2, 3, 4];
 

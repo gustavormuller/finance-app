@@ -2,8 +2,8 @@ import AssetCatalogue from '@/components/market-data/AssetCatalogue';
 import SyncRuns from '@/components/market-data/SyncRuns';
 
 /**
- * 006's plumbing screen: whether the market-data sync works. Not in the navigation; the
- * spec reaches it from settings later, and until then by its address, `/market-data`.
+ * A plumbing screen: whether the market-data sync works. Not in the navigation; it is
+ * reached by its address, `/market-data`.
  */
 export default function MarketDataPage() {
   return (

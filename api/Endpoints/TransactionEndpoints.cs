@@ -83,7 +83,7 @@ public static class TransactionEndpoints
                 query = query.Where(transaction => transaction.CategoryId == onlyCategory);
             }
 
-            // 004: the "see what this import wrote" link from the done step.
+            // The "see what this import wrote" link from the done step.
             if (importBatchId is { } onlyBatch)
             {
                 query = query.Where(transaction => transaction.ImportBatchId == onlyBatch);

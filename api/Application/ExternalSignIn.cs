@@ -3,7 +3,6 @@ using Finance.Api.Domain.Identity;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 
 namespace Finance.Api.Application;
 

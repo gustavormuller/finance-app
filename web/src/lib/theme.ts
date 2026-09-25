@@ -1,5 +1,5 @@
 /**
- * The theme choice (012): Claro, Escuro, or whatever the system prefers. A per-device
+ * The theme choice: Claro, Escuro, or whatever the system prefers. A per-device
  * convenience in `localStorage`, never a server setting; storage that cannot be read
  * or written — a private window, blocked site data — behaves as `system`.
  *

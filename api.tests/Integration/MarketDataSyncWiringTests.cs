@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 006 checkpoint 3 in the real host: the sync resolves from the container, and the test
+/// The market-data sync in the real host: it resolves from the container, and the test
 /// hosts keep the nightly job off, so no integration test ever syncs against the network.
 /// </summary>
 [Collection(nameof(PostgresCollection))]

@@ -31,7 +31,7 @@ public sealed class Account : IUserOwned
     public string Currency { get; set; } = DefaultCurrency;
 
     /// <summary>
-    /// The balance before every recorded transaction (005). The dashboard's balance is
+    /// The balance before every recorded transaction. The dashboard's balance is
     /// this plus the sum of the account's transactions. No date: importing older data
     /// later means adjusting it by hand.
     /// </summary>

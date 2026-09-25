@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { categoryKindLabels, categoryKinds } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
-export interface TransactionFormValues {
+interface TransactionFormValues {
   accountId: string;
   categoryId: string;
   /**
@@ -34,8 +34,6 @@ export interface TransactionFormProps {
 }
 
 /**
- * Parses what was typed into a magnitude.
- *
  * A comma is accepted as the decimal separator because the app formats in pt-BR and
  * people type back what they are shown. Any sign typed is discarded rather than
  * honoured — see the schema below.
@@ -81,7 +79,7 @@ const schema = z.object({
  * The amount field takes an unsigned number and the sign is derived from the selected
  * category's kind, so "Salary: −3000" is not a mistake the interface lets you make.
  * The API enforces the same rule; this keeps the user from ever meeting it.
- * A Transfer (005) has no direction of its own, so for one the form asks: Saída or
+ * A Transfer has no direction of its own, so for one the form asks: Saída or
  * Entrada.
  *
  * Native `select` rather than the Radix one: `optgroup` gives the spec's "grouped by

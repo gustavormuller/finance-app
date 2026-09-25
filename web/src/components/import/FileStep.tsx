@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /**
- * Step 1: a file for the account the page is about (015), dropped on the zone or
+ * Step 1: a file for the account the page is about, dropped on the zone or
  * chosen with the button, and either starts at once. The extension decides where the
  * file goes next — `.ofx` straight to the preview, `.csv`, `.xls` and `.xlsx` to the
  * mapping step — and that decision is the caller's, so this component only hands the

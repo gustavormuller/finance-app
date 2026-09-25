@@ -4,7 +4,7 @@ import { formatUnitPrice } from '@/lib/money';
 import type { Display } from './useDisplayCurrency';
 
 /**
- * The line under an investments page's title that says what the money is in (016):
+ * The line under an investments page's title that says what the money is in:
  * the rate and its day in dollars, why it is still reais when there is no rate, and
  * nothing in reais by choice.
  */

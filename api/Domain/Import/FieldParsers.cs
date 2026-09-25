@@ -74,7 +74,7 @@ public static class AmountParser
     /// <summary>
     /// The inverse of <see cref="TryParse"/>: every digit of <paramref name="amount"/>,
     /// the culture's decimal separator and no grouping, so it parses back to exactly
-    /// the same value. How a spreadsheet's number cell enters the CSV path (spec 011).
+    /// the same value. How a spreadsheet's number cell enters the CSV path.
     /// </summary>
     public static string Format(decimal amount, string culture)
     {

@@ -12,7 +12,7 @@ import SectionHeading from './SectionHeading';
  * its magnitude, so both series rise from one baseline; the only thing done to the
  * number is dropping its sign.
  *
- * 012: two lines over fills that fade to the ground, the Obsidiana chart. The same
+ * Two lines over fills that fade to the ground, the Obsidiana chart. The same
  * figures are in a visually hidden table, so a screen reader gets the values the
  * hover tooltip gives everyone else.
  */

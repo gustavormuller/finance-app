@@ -1,7 +1,7 @@
 import type { ReturnsPeriod } from '@/api/finance';
 
 /**
- * How 008's rates are written on screen. Display only: every rate arrives computed by
+ * How rates are written on screen. Display only: every rate arrives computed by
  * the API, and the one figure made here, a difference, is made exactly in `decimal.ts`.
  */
 
@@ -35,15 +35,15 @@ export function formatPoints(hundredths: bigint): string {
 }
 
 /**
- * The spec's annualisation rule: "annualise when the period exceeds one year". A year
- * or less shows the period's return only (DEFERRED, 008 · CP4 and CP5).
+ * Spec 008's annualisation rule: "annualise when the period exceeds one year". A year
+ * or less shows the period's return only.
  */
 export const showsAnnualised = (period: ReturnsPeriod) => period.days > 365;
 
 /** A year's rate: `+8,31% a.a.`, or "Sem dados" with no suffix. */
 export const perYear = (rate: number | null) => (rate === null ? formatRate(null) : `${formatRate(rate)} a.a.`);
 
-/** Spec 008 UI, in 012's tokens: a gain positive, a loss negative, zero and no data in ink. */
+/** A gain positive, a loss negative, zero and no data in ink. */
 export function signTone(rate: number | null): string | undefined {
   if (rate === null || rate === 0) {
     return undefined;

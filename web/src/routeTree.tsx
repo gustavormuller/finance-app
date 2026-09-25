@@ -47,21 +47,18 @@ const protectedRoute = createRoute({
   component: ProtectedLayout,
 });
 
-// 005: the dashboard is the landing page after sign-in.
 const homeRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/',
   component: DashboardPage,
 });
 
-// 003's three screens, all nested under the pathless protected layout so they are
-// guarded by construction rather than by each page remembering to check.
 const transactionsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/transactions',
 
-  // 004's done step links here with the batch it just wrote, so the list opens on
-  // exactly those rows; 015's account page with the account. Anything else in the
+  // The import's done step links here with the batch it just wrote, so the list opens
+  // on exactly those rows; the account page with the account. Anything else in the
   // query string is dropped.
   validateSearch: (search: Record<string, unknown>): { importBatchId?: string; accountId?: string } => ({
     ...(typeof search.importBatchId === 'string' ? { importBatchId: search.importBatchId } : {}),
@@ -77,7 +74,7 @@ const importRoute = createRoute({
   component: ImportPage,
 });
 
-// 015: the accounts beside the selected one, whose tab is a search parameter so a
+// The accounts beside the selected one, whose tab is a search parameter so a
 // reload or a link opens it. Declared here, it is inherited by both children.
 const accountsRoute = createRoute({
   getParentRoute: () => protectedRoute,
@@ -107,23 +104,21 @@ const categoriesRoute = createRoute({
   component: CategoriesPage,
 });
 
-// 006: not in the navigation (spec: reachable from settings later), but guarded like
-// every other page.
+// Not in the navigation, but guarded like every other page.
 const marketDataRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/market-data',
   component: MarketDataPage,
 });
 
-// 007: in the navigation (spec: "Route `/investments`, in the nav").
 const investmentsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/investments',
   component: InvestmentsPage,
 });
 
-// 008: "linked from the positions page", not the navigation. A static segment, so it
-// ranks above `$assetId` and no asset id can shadow it.
+// Linked from the positions page, not the navigation. A static segment, so it ranks
+// above `$assetId` and no asset id can shadow it.
 const returnsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/investments/returns',
@@ -136,14 +131,12 @@ const assetRoute = createRoute({
   component: AssetPage,
 });
 
-// 008: "click through to the asset's own returns page".
 const assetReturnsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/investments/$assetId/returns',
   component: AssetReturnsPage,
 });
 
-// 009: "new route, in the nav".
 const settingsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/settings',

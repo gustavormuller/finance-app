@@ -2,7 +2,7 @@ namespace Finance.Api.Domain.Ai;
 
 /// <summary>
 /// A user's AI analysis of one month, and the state of the job that writes it. One per
-/// user per month: regenerating replaces the row (009, unique <c>(UserId, Month)</c>).
+/// user per month: regenerating replaces the row (unique <c>(UserId, Month)</c>).
 /// </summary>
 public sealed class AiAnalysis : IUserOwned
 {

@@ -70,7 +70,6 @@ public sealed class CsvTemplateEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
     }
 
-    /// <summary>Every rule that failed, named at once.</summary>
     [Fact]
     public async Task An_invalid_template_is_a_400_naming_every_bad_field()
     {

@@ -1,6 +1,6 @@
 import { ApiError, type ImportBatch } from '@/api/finance';
 
-/** The account page's tabs (015); `transactions` is the default and is left out of the URL. */
+/** The account page's tabs; `transactions` is the default and is left out of the URL. */
 export type AccountTab = 'transactions' | 'import' | 'details';
 
 export const accountTabs: AccountTab[] = ['transactions', 'import', 'details'];
@@ -53,7 +53,7 @@ export function accountRefusal(error: Error): Refusal {
  * The line under an account's name (015, decision 4): the batch in review, else the
  * day of the latest commit — without the year inside the current one — else none.
  */
-export function lastImportLine(batches: ImportBatch[], accountId: string, now = new Date()): string {
+export function lastImportLine(batches: ImportBatch[], accountId: string): string {
   const own = batches.filter((batch) => batch.accountId === accountId);
 
   if (own.some((batch) => batch.status === 'Staged')) {
@@ -71,7 +71,7 @@ export function lastImportLine(batches: ImportBatch[], accountId: string, now = 
 
   const day = latest.toLocaleDateString(
     'pt-BR',
-    latest.getFullYear() === now.getFullYear()
+    latest.getFullYear() === new Date().getFullYear()
       ? { day: '2-digit', month: '2-digit' }
       : { day: '2-digit', month: '2-digit', year: 'numeric' },
   );

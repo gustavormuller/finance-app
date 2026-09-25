@@ -12,7 +12,7 @@ namespace Finance.Api.Application.Ai;
 /// Loads <see cref="AnalysisAggregates"/> for the scope's user: the request's, or the user the
 /// analysis job's scope acts for (<see cref="ActingUser"/>). The totals and balances are
 /// 005's dashboard queries (each names the user itself), the portfolio is 007's summary only
-/// (the user's decision in CP2: not 008's returns), and the merchants go through the query
+/// (the user's decision: not 008's returns), and the merchants go through the query
 /// filter.
 /// </summary>
 public sealed class AnalysisInputQueries(
@@ -49,7 +49,7 @@ public sealed class AnalysisInputQueries(
 
     /// <summary>
     /// The month's BRL expense, by merchant. A merchant is the row's normalized description
-    /// (digits, dates and ids stripped, 004), or the description normalized here for a row
+    /// (digits, dates and ids stripped), or the description normalized here for a row
     /// entered by hand. Income is never listed: its descriptions name payers.
     /// </summary>
     private async Task<IReadOnlyList<AnalysisMerchant>> MerchantsAsync(DateOnly first, CancellationToken ct)

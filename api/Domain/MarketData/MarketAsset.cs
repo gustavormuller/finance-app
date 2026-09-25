@@ -1,7 +1,7 @@
 namespace Finance.Api.Domain.MarketData;
 
 /// <summary>
-/// One priced instrument in the shared catalogue (006). Deliberately not
+/// One priced instrument in the shared catalogue. Deliberately not
 /// <see cref="IUserOwned"/>: two people holding PETR4 share one row and one price
 /// series, so more users never mean more calls to a provider.
 /// </summary>

@@ -17,7 +17,7 @@ function formatInstant(iso: string): string {
 }
 
 /**
- * One account's past batches (015), newest first. A staged one can be resumed or
+ * One account's past batches, newest first. A staged one can be resumed or
  * discarded; a committed one can be undone.
  */
 export default function ImportHistory({

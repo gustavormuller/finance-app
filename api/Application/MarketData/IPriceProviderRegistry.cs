@@ -4,7 +4,7 @@ namespace Finance.Api.Application.MarketData;
 
 /// <summary>
 /// Picks the <see cref="IPriceProvider"/> for a <see cref="ProviderKind"/>. Adding a
-/// provider is one class and one registration (006).
+/// provider is one class and one registration.
 /// </summary>
 public interface IPriceProviderRegistry
 {

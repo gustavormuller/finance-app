@@ -10,8 +10,7 @@ namespace Finance.Api.Domain.Transactions;
 /// of its own beyond the <c>ComplexProperty</c> that maps it to two columns
 /// (ARCHITECTURE.md §4, ADR-014).
 /// <para>
-/// It exists to stop BRL being added to USD by accident. That bug is invisible today,
-/// with only BRL accounts, and arrives with US stocks and crypto in 007.
+/// It exists to stop BRL being added to USD by accident.
 /// </para>
 /// <para>
 /// Being a struct, <c>default(Money)</c> bypasses the constructor and yields a zero

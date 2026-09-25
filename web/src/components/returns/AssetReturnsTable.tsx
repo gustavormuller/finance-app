@@ -10,11 +10,11 @@ import { NO_DATA, formatRate, perYear } from '@/lib/rates';
 import { RETURNS, retryUnlessRefused } from './queries';
 
 /**
- * Spec 008 "Per asset": each asset's TWR and XIRR for the selected period, and a USD
- * asset's split into the asset's own move and the exchange rate. There is no list route,
- * so it is one `/api/returns/assets/{id}` call per asset (DEFERRED, 008 · CP4 and CP5),
- * under the same keys the asset's own page uses. `inDollars` (016) derives each TWR from
- * the asset's own dollar index; its XIRR stays in reais.
+ * Each asset's TWR and XIRR for the selected period, and a USD asset's split into the
+ * asset's own move and the exchange rate. There is no list route, so it is one
+ * `/api/returns/assets/{id}` call per asset, under the same keys the asset's own page
+ * uses. `inDollars` derives each TWR from the asset's own dollar index; its XIRR stays
+ * in reais.
  */
 export default function AssetReturnsTable({
   positions,

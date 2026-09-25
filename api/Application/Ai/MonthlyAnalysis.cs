@@ -21,7 +21,7 @@ public sealed class MonthlyAnalysis(
 {
     /// <summary>
     /// The answer's ceiling. 400 words is about 700 tokens, and the analysis model's thinking
-    /// counts against it too; an answer cut at the ceiling fails (CP3).
+    /// counts against it too; an answer cut at the ceiling fails.
     /// </summary>
     public const int MaxTokens = 8000;
 

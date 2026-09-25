@@ -1,9 +1,9 @@
 namespace Finance.Api.Application.Ai;
 
 /// <summary>
-/// The <c>Ai</c> configuration section (009). Model identifiers and their prices are
-/// configuration, never code (decision 2). Prices are the providers' USD list prices
-/// (decided by the user in CP2), converted to BRL at the latest <c>USDBRL</c> benchmark or
+/// The <c>Ai</c> configuration section. Model identifiers and their prices are
+/// configuration, never code (009, decision 2). Prices are the providers' USD list prices
+/// (decided by the user), converted to BRL at the latest <c>USDBRL</c> benchmark or
 /// <see cref="UsdBrl"/>. Keys come from user secrets or the environment.
 /// </summary>
 public sealed class AiOptions
@@ -119,7 +119,7 @@ public sealed class AiTaskOptions
     /// <summary>
     /// The whole provider call, enforced by <see cref="AiGateway"/> for every adapter. Past it
     /// the call fails with <c>AiProviderTimeoutException</c>. Categorisation: 30 s
-    /// (decision 4).
+    /// (009, decision 4).
     /// </summary>
     public int TimeoutSeconds { get; set; }
 }
@@ -132,7 +132,6 @@ public sealed class AiModelPrice
     public decimal OutputPerMTokUsd { get; set; }
 }
 
-/// <summary>One provider's adapter settings.</summary>
 public sealed class AiProviderOptions
 {
     /// <summary>Sent in a header only, never in a URL or a log (ADR-015, 006's pattern).</summary>

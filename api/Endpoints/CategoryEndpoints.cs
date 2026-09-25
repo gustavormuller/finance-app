@@ -132,7 +132,7 @@ public static class CategoryEndpoints
             return Results.NoContent();
         });
 
-        // 013: how much each category was used in a range, by default the 12 months
+        // How much each category was used in a range, by default the 12 months
         // ending today. Only categories with a transaction in the range appear; the
         // screen rolls subcategories up into their main category itself.
         categories.MapGet("/usage", async (

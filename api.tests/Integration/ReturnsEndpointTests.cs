@@ -5,8 +5,8 @@ using static Finance.Api.Tests.Integration.InvestmentsApi;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 008 checkpoint 4: <c>GET /api/returns/portfolio</c>. Spec integration tests 27–30, and
-/// the query's validation. Values are written to the database by hand
+/// <c>GET /api/returns/portfolio</c>. Spec 008 integration tests 27–30, and the query's
+/// validation. Values are written to the database by hand
 /// (<see cref="ReturnsFixtures"/>), so every expected number is computed from them.
 /// </summary>
 [Collection(nameof(PostgresCollection))]

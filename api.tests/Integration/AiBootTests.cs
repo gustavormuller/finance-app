@@ -1,8 +1,8 @@
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 009 checkpoint 2, at the host: a configured model with no price fails the boot, with
-/// the key named, before any call could be made at a cost of zero.
+/// At the host: a configured model with no price fails the boot, with the key named, before
+/// any call could be made at a cost of zero.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class AiBootTests(PostgresFixture postgres)

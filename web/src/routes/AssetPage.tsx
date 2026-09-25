@@ -14,9 +14,9 @@ import { formatDate, marketAssetClassLabels } from '@/lib/labels';
 import { formatPercent, formatQuantity, formatUnitPrice } from '@/lib/money';
 
 /**
- * `/investments/{id}` (007): one asset's position, its movements and its value over
- * time. The asset is read from the positions list, which holds everything shown here.
- * Money is in the page's currency (016); prices and movements stay in the asset's own.
+ * `/investments/{id}`: one asset's position, its movements and its value over time.
+ * The asset is read from the positions list, which holds everything shown here.
+ * Money is in the page's currency; prices and movements stay in the asset's own.
  */
 export default function AssetPage() {
   const { assetId } = useParams({ from: '/protected/investments/$assetId' });

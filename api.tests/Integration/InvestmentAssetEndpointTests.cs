@@ -9,8 +9,8 @@ using static Finance.Api.Tests.Integration.TransactionsFixtures;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 007 checkpoint 3: <c>/api/investments/assets</c>. The HTTP halves of spec integration
-/// tests 23 and 24, and the assets part of 16.
+/// <c>/api/investments/assets</c>. The HTTP halves of spec 007 integration tests 23 and
+/// 24, and the assets part of 16.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class InvestmentAssetEndpointTests(PostgresFixture postgres)

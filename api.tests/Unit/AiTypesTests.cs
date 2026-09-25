@@ -3,11 +3,7 @@ using Finance.Api.Domain.Ai;
 
 namespace Finance.Api.Tests.Unit;
 
-/// <summary>
-/// Money is <c>decimal</c>, AI costs included (principle 4). The namespaces 009's later
-/// checkpoints add, prices and the provider adapters among them, are in the scan
-/// already, so a <c>double</c> fails when it is written.
-/// </summary>
+/// <summary>Money is <c>decimal</c>, AI costs included (principle 4).</summary>
 public sealed class AiTypesTests
 {
     private static readonly string[] Namespaces =

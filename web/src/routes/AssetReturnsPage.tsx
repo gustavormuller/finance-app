@@ -9,7 +9,7 @@ import { useAssetReturns } from '@/components/returns/queries';
 import ReturnsReport from '@/components/returns/ReturnsReport';
 import { useCurrencyChoice } from '@/lib/currency';
 
-/** `/investments/{id}/returns` (008): one asset's returns, and its FX split when not in reais. */
+/** `/investments/{id}/returns`: one asset's returns, and its FX split when not in reais. */
 export default function AssetReturnsPage() {
   const { assetId } = useParams({ from: '/protected/investments/$assetId/returns' });
   const [query, setQuery] = useState<ReturnsQuery>({ period: 'inception' });

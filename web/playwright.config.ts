@@ -15,9 +15,9 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: 'on-first-retry',
   },
-  // A manual sync is refused (429) while another is running, and specs 006, 007 and 008
-  // all trigger one. Test 26 asserts the 202, so the syncing specs run one project after
-  // another: market-data, then investments, then returns. Every other spec runs alongside.
+  // A manual sync is refused (429) while another is running, and the market-data,
+  // investments and returns specs all trigger one. Test 26 asserts the 202, so the syncing
+  // specs run one project after another, in that order. Every other spec runs alongside.
   projects: [
     {
       name: 'chromium',

@@ -30,9 +30,8 @@ const STATUSES: StagedRowStatus[] = ['Ready', 'Duplicate', 'Invalid'];
  * duplicate, the checkbox that lets it in. Invalid rows show their reasons and
  * cannot be included; commit stays disabled while nothing would be written.
  *
- * "Sugerir com IA" (009) sends the rows still on the sign default; it stays on screen
- * with AI off, disabled, with the reason as its description (spec: "disabled with a
- * reason otherwise").
+ * "Sugerir com IA" sends the rows still on the sign default; it stays on screen with
+ * AI off, disabled, with the reason as its description.
  */
 export default function PreviewStep({
   detail,
@@ -207,7 +206,7 @@ export default function PreviewStep({
 /**
  * Only categories whose kind agrees with the row's sign are offered: the API
  * refuses the others (003, rule 3), so there is no point listing them. A Transfer
- * category takes either sign (005), so it is offered on every row.
+ * category takes either sign, so it is offered on every row.
  */
 function CategoryCell({
   row,

@@ -10,6 +10,6 @@ public enum ImportSource
     Ofx = 0,
     Csv = 1,
 
-    /// <summary>An <c>.xlsx</c> or <c>.xls</c>, read into the CSV path (spec 011).</summary>
+    /// <summary>An <c>.xlsx</c> or <c>.xls</c>, read into the CSV path.</summary>
     Spreadsheet = 2,
 }

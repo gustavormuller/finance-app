@@ -7,7 +7,7 @@ namespace Finance.Api.Tests.Unit;
 /// <summary>
 /// 009 rung 3, what is sent: one JSON document of <c>{ rowId, description }</c> rows and the
 /// category list (spec), each row with the kind its sign allows, and no amounts. The answer's
-/// ceiling follows the row count, since a truncated answer fails (CP3).
+/// ceiling follows the row count, since a truncated answer fails.
 /// </summary>
 public sealed class AiCategorisationRequestTests
 {

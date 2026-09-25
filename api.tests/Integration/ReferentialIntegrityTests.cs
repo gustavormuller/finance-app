@@ -9,8 +9,8 @@ namespace Finance.Api.Tests.Integration;
 /// to orphan a transaction or a child category.
 /// </summary>
 /// <remarks>
-/// The endpoints will look for references and answer 409 before attempting the
-/// delete, because a readable reason beats a constraint name. These tests exist so
+/// The endpoints look for references and answer 409 before attempting the delete,
+/// because a readable reason beats a constraint name. These tests exist so
 /// that check is a courtesy rather than the only thing between a mistake and lost
 /// history — a code path can be forgotten, and RESTRICT cannot.
 /// </remarks>

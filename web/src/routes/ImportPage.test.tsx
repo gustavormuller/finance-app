@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { account, batch, renderAt, stubAccountsApi } from './accounts-fixtures';
 
 /**
- * `/import` (015): no longer a page, but the links and bookmarks to it keep working.
+ * `/import`: no longer a page, but the links and bookmarks to it keep working.
  * The wizard's own tests moved with it, to `components/import/AccountImport.test.tsx`.
  */
 describe('/import', () => {

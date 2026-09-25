@@ -50,12 +50,12 @@ export async function createAccount(page: Page, name: string, openingBalance?: s
   }
   await page.getByRole('button', { name: 'Criar conta' }).click();
 
-  // 015: a new account is selected, so its name becomes the detail's heading.
+  // A new account is selected, so its name becomes the detail's heading.
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 }
 
 /**
- * An account's "Importar extrato" tab, reached the way a person reaches it (015): the
+ * An account's "Importar extrato" tab, reached the way a person reaches it: the
  * accounts, the account's card, the tab. Waits for the wizard's first step.
  */
 export async function openImportTab(page: Page, account: string) {
@@ -109,7 +109,7 @@ export async function createTransaction(
  * daily row until the next sync. Posted from the page so the browser sends the Origin
  * header the API's CSRF check requires, then polled until the run has finished. A 429 is
  * waited out: the rebuild after the previous run's sync can still hold the gate for a
- * moment after that run reads `Succeeded` (007 · CP5).
+ * moment after that run reads `Succeeded`.
  */
 export async function syncMarketData(page: Page) {
   const syncRunId = await page.evaluate(async () => {

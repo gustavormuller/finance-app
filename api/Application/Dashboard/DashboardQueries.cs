@@ -36,13 +36,13 @@ public sealed record MonthTotals(string Month, decimal Income, decimal Expense);
 public sealed record CategoryTotal(Guid CategoryId, string Name, decimal Amount, decimal Share);
 
 /// <summary>
-/// 014: what was owned at the end of one calendar month, <c>Month</c> as <c>YYYY-MM</c>.
+/// What was owned at the end of one calendar month, <c>Month</c> as <c>YYYY-MM</c>.
 /// <c>Total</c> is <c>Accounts + Investments</c>.
 /// </summary>
 public sealed record NetWorthPoint(string Month, decimal Accounts, decimal Investments, decimal Total);
 
 /// <summary>
-/// The dashboard's three aggregations (005), in SQL through Dapper on the context's
+/// The dashboard's aggregations, in SQL through Dapper on the context's
 /// own connection (ARCHITECTURE.md §6).
 /// </summary>
 /// <remarks>
@@ -123,7 +123,7 @@ public sealed class DashboardQueries(AppDbContext database)
         """;
 
     /// <remarks>
-    /// 014. <c>included</c> is the set of accounts the summary's total adds up, so a
+    /// <c>included</c> is the set of accounts the summary's total adds up, so a
     /// month's <c>Accounts</c> is that total as it stood on the month's last day.
     /// <c>Investments</c> takes each asset's latest <c>PortfolioDaily</c> row on or
     /// before that day, one backwards probe of the primary key per month and asset.
@@ -242,7 +242,7 @@ public sealed class DashboardQueries(AppDbContext database)
     }
 
     /// <summary>
-    /// 014: the month-end net worth of at most <paramref name="months"/> months ending
+    /// The month-end net worth of at most <paramref name="months"/> months ending
     /// with <paramref name="lastMonth"/>, oldest first, from the first month with data.
     /// </summary>
     public async Task<IReadOnlyList<NetWorthPoint>> NetWorthAsync(

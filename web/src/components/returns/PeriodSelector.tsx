@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { returnsPeriodLabels, returnsPeriods } from '@/lib/labels';
 
 /**
- * Spec 008 "Period selector": inception, YTD, 12m, or a custom range. A preset applies
+ * Inception, YTD, 12m, or a custom range. A preset applies
  * on click; a custom range applies on "Aplicar", so typing a date does not fetch on
  * every keystroke. The API's 400s for `from`/`to` show under their dates, as sent.
  */

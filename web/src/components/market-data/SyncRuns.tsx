@@ -18,7 +18,7 @@ function count(value: number, singular: string, plural: string) {
 }
 
 /**
- * The run history (spec 006 UI): when, trigger, status and what each provider did, and
+ * The run history: when, trigger, status and what each provider did, and
  * the button that starts a manual run. The run happens after the API's 202, so the
  * list is polled while the newest run is `Running`. A refusal (the ten-minute limit)
  * is the API's pt-BR sentence, shown as it comes.
