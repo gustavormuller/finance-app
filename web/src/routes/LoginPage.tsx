@@ -12,9 +12,15 @@ const MESSAGES: Record<string, string> = {
     'Não foi possível concluir a entrada. Tente de novo; se continuar acontecendo, o problema é do nosso lado.',
 };
 
+/** Every ?notice= a page can send. Not failures, so they are a status rather than an alert. */
+const NOTICES: Record<string, string> = {
+  deleted: 'Sua conta e todos os dados dela foram excluídos.',
+};
+
 export default function LoginPage() {
-  const { error } = useSearch({ from: '/login' });
+  const { error, notice } = useSearch({ from: '/login' });
   const message = error === undefined ? undefined : MESSAGES[error];
+  const information = notice === undefined ? undefined : NOTICES[notice];
 
   return (
     // 012: a single glass card in the middle of the page; the product name stays in
@@ -33,6 +39,12 @@ export default function LoginPage() {
             className="border-destructive/30 bg-destructive/5 text-destructive mt-6 rounded-xl border p-3 text-sm"
           >
             {message}
+          </p>
+        )}
+
+        {information !== undefined && (
+          <p role="status" className="bg-secondary mt-6 rounded-xl border p-3 text-sm">
+            {information}
           </p>
         )}
 

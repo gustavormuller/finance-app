@@ -79,6 +79,14 @@ public sealed class SnapshotRebuildAfterSync(
             }
             catch (Exception error) when (!cancellationToken.IsCancellationRequested)
             {
+                // 023: the account was deleted after this run listed it. Its assets went with
+                // it, so nothing failed and the summary every user sees must not say so.
+                if (!await db.Users.AnyAsync(user => user.Id == userId, cancellationToken))
+                {
+                    logger.LogInformation("Snapshot rebuild for user {UserId} stopped: the account was deleted.", userId);
+                    return;
+                }
+
                 logger.LogError(error, "Snapshot rebuild of asset {AssetId} for user {UserId} failed.", assetId, userId);
                 part.ItemsFailed++;
                 part.Error = FailureText;

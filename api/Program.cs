@@ -61,6 +61,9 @@ builder.Services.AddScoped<ReturnsQueries>();
 // 009's AI settings, the provider port, the budget and the gateway every call goes through.
 builder.Services.AddAi();
 
+// 023's account deletion (ADR-013).
+builder.Services.AddScoped<UserDeletion>();
+
 var app = builder.Build();
 
 // Everything the process cannot run without, checked once, at boot, with a message

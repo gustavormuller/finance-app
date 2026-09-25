@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,11 +10,17 @@ import { stubFetch, type SeenRequest } from '@/test-utils';
 
 const usage: AiUsage = { month: '2026-09', spentBrl: 0.1234, budgetBrl: 15, calls: 3 };
 
-function stubApi({ aiEnabled = false, patch }: { aiEnabled?: boolean; patch?: { status: number; body: unknown } } = {}) {
+type Answer = { status: number; body: unknown };
+
+function stubApi({ aiEnabled = false, patch, remove }: { aiEnabled?: boolean; patch?: Answer; remove?: Answer } = {}) {
   let me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled };
 
   return stubFetch((request: SeenRequest) => {
     const path = new URL(request.url, 'http://localhost').pathname;
+
+    if (path === '/api/auth/me' && request.method === 'DELETE') {
+      return remove ?? { status: 204 };
+    }
 
     if (path === '/api/auth/me' && request.method === 'PATCH') {
       if (patch) {
@@ -45,6 +51,15 @@ function renderSettings() {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+
+  return { router, client };
+}
+
+/** Types the confirmation and presses the button, as a person would. */
+async function confirmDeletion(email = 'ada@example.com') {
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText('Digite seu e-mail para confirmar'), email);
+  await user.click(screen.getByRole('button', { name: 'Excluir definitivamente' }));
 }
 
 describe('SettingsPage', () => {
@@ -167,5 +182,77 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('ai-state')).toHaveTextContent('Ligada');
     await waitFor(() => expect(toggle).toBeEnabled());
     expect(toggle).toBeChecked();
+  });
+});
+
+describe('Excluir minha conta (023)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Spec test 7. */
+  it('is the last section of the page, and says what deleting takes with it', async () => {
+    stubApi();
+    renderSettings();
+
+    const zone = await screen.findByRole('region', { name: 'Excluir minha conta' });
+    expect(screen.getAllByRole('region').at(-1)).toBe(zone);
+    for (const phrase of ['contas', 'lançamentos', 'importações', 'investimentos', 'análises de IA', 'Não dá para desfazer.']) {
+      expect(zone).toHaveTextContent(phrase);
+    }
+  });
+
+  /** Spec test 8: the signed-in address exactly, only surrounding spaces forgiven. */
+  it('keeps "Excluir definitivamente" off until the signed-in e-mail is typed', async () => {
+    stubApi();
+    renderSettings();
+    const user = userEvent.setup();
+
+    const field = await screen.findByLabelText('Digite seu e-mail para confirmar');
+    const button = screen.getByRole('button', { name: 'Excluir definitivamente' });
+    expect(button).toBeDisabled();
+
+    for (const near of ['ada@example.org', 'Ada@example.com', 'ada@example.co']) {
+      await user.clear(field);
+      await user.type(field, near);
+      expect(button).toBeDisabled();
+    }
+
+    await user.clear(field);
+    await user.type(field, '  ada@example.com ');
+    expect(button).toBeEnabled();
+  });
+
+  /** Spec test 9. */
+  it('deletes the account, empties the cache and lands on the login page with a notice', async () => {
+    const seen = stubApi();
+    const { router, client } = renderSettings();
+
+    await confirmDeletion();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Sua conta e todos os dados dela foram excluídos.');
+    expect(router.state.location.pathname).toBe('/login');
+    expect(seen.filter((request) => request.method === 'DELETE')).toEqual([
+      { method: 'DELETE', url: '/api/auth/me', body: undefined },
+    ]);
+    expect(client.getQueryCache().getAll()).toEqual([]);
+  });
+
+  /**
+   * Spec test 10. `{}` is what the client makes of a response with no body, which is how the
+   * API's 401 and an unhandled 500 arrive.
+   */
+  it.each([
+    ['a problem detail', { status: 409, body: { title: 'Conflito', detail: 'Uma frase da API.' } }, 'Uma frase da API.'],
+    ['a 401', { status: 401, body: {} }, 'Sua sessão terminou. Entre de novo para excluir a conta.'],
+    ['a 500 with no body', { status: 500, body: {} }, 'Não foi possível excluir a conta. Tente de novo.'],
+  ])('shows %s and stays on the page', async (_, remove, message) => {
+    stubApi({ remove });
+    const { router } = renderSettings();
+
+    await confirmDeletion();
+
+    const zone = screen.getByRole('region', { name: 'Excluir minha conta' });
+    expect(await within(zone).findByRole('alert')).toHaveTextContent(message);
+    expect(router.state.location.pathname).toBe('/settings');
+    expect(within(zone).getByRole('button', { name: 'Excluir definitivamente' })).toBeEnabled();
   });
 });

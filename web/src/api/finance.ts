@@ -708,6 +708,9 @@ export const api = {
   updateMe: (input: { aiEnabled: boolean }) =>
     request<AuthenticatedUser>('/api/auth/me', { method: 'PATCH', body: JSON.stringify(input) }),
 
+  /** 023: the account and everything in it, for good. The answer also ends the session. */
+  deleteMe: () => request<void>('/api/auth/me', { method: 'DELETE' }),
+
   requestAnalysis: (month: string) =>
     request<{ analysisId: string }>('/api/ai/analyses', { method: 'POST', body: JSON.stringify({ month }) }),
 
