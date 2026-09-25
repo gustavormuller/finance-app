@@ -31,8 +31,12 @@ const loginRoute = createRoute({
   // The key is omitted rather than set to undefined: under exactOptionalPropertyTypes
   // a present-but-undefined key is still required, and navigating to /login would
   // have to pass a search object every time.
-  validateSearch: (search: Record<string, unknown>): { error?: string } =>
-    typeof search.error === 'string' ? { error: search.error } : {},
+  //
+  // 023: ?notice=deleted after "Excluir minha conta".
+  validateSearch: (search: Record<string, unknown>): { error?: string; notice?: string } => ({
+    ...(typeof search.error === 'string' ? { error: search.error } : {}),
+    ...(typeof search.notice === 'string' ? { notice: search.notice } : {}),
+  }),
 
   component: LoginPage,
 });

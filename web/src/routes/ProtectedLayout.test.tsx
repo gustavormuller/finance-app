@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routeTree } from '../routeTree';
@@ -162,5 +162,20 @@ describe('the login page', () => {
 
     expect(await screen.findByRole('link', { name: 'Entrar com o Google' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  /** Spec 023 test 11: where "Excluir minha conta" ends. A status, not an alert: nothing went wrong. */
+  it('says the account was deleted, and nothing for a notice it does not recognise', async () => {
+    stubMeStatus(401, null);
+    renderAt('/login?notice=deleted');
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Sua conta e todos os dados dela foram excluídos.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    cleanup();
+    renderAt('/login?notice=something-else');
+
+    expect(await screen.findByRole('link', { name: 'Entrar com o Google' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
