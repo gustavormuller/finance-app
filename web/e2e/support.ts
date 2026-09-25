@@ -50,7 +50,8 @@ export async function createAccount(page: Page, name: string, openingBalance?: s
   }
   await page.getByRole('button', { name: 'Criar conta' }).click();
 
-  await expect(page.getByRole('cell', { name })).toBeVisible();
+  // 015: a new account is selected, so its name becomes the detail's heading.
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 }
 
 /**

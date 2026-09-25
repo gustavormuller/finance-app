@@ -61,9 +61,12 @@ const transactionsRoute = createRoute({
   path: '/transactions',
 
   // 004's done step links here with the batch it just wrote, so the list opens on
-  // exactly those rows. Anything else in the query string is dropped.
-  validateSearch: (search: Record<string, unknown>): { importBatchId?: string } =>
-    typeof search.importBatchId === 'string' ? { importBatchId: search.importBatchId } : {},
+  // exactly those rows; 015's account page with the account. Anything else in the
+  // query string is dropped.
+  validateSearch: (search: Record<string, unknown>): { importBatchId?: string; accountId?: string } => ({
+    ...(typeof search.importBatchId === 'string' ? { importBatchId: search.importBatchId } : {}),
+    ...(typeof search.accountId === 'string' ? { accountId: search.accountId } : {}),
+  }),
 
   component: TransactionsPage,
 });

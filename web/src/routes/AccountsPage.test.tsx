@@ -239,3 +239,57 @@ describe('AccountsPage, creating and editing', () => {
     expect(screen.queryByRole('link', { name: 'Cartão' })).not.toBeInTheDocument();
   });
 });
+
+describe('AccountsPage, the Lançamentos tab', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const itau = account('acc-itau', 'Itaú');
+
+  /** Spec 015 test 8. */
+  it("shows the account's latest transactions and opens all of them filtered to it", async () => {
+    const user = userEvent.setup();
+    const seen = stubAccountsApi({
+      accounts: [itau],
+      transactions: [
+        {
+          id: 't1',
+          accountId: 'acc-itau',
+          accountName: 'Itaú',
+          categoryId: 'cat-food',
+          categoryName: 'Alimentação',
+          amount: -12.5,
+          currency: 'BRL',
+          date: '2026-09-20',
+          description: 'Padaria do bairro',
+          createdAt: '2026-09-20T12:00:00Z',
+        },
+      ],
+    });
+    const router = renderAt('/accounts/acc-itau');
+
+    const row = await screen.findByTestId('account-transaction-t1');
+    expect(row).toHaveTextContent('Padaria do bairro');
+    expect(row).toHaveTextContent('20/09/2026 · Alimentação');
+    expect(within(row).getByTestId('amount')).toHaveTextContent('−12,50');
+    expect(seen.map((request) => request.url)).toContain('/api/transactions?accountId=acc-itau&page=1&pageSize=10');
+
+    await user.click(screen.getByRole('link', { name: 'Ver todos os lançamentos da conta' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/transactions'));
+    expect(router.state.location.search).toEqual({ accountId: 'acc-itau' });
+    // The account's, from any date: no range, as for an import batch.
+    await waitFor(() =>
+      expect(seen.map((request) => request.url)).toContain('/api/transactions?accountId=acc-itau&page=1&pageSize=50'),
+    );
+    expect(await screen.findByLabelText('Filtrar por conta')).toHaveValue('acc-itau');
+  });
+
+  it('says so when the account has no transactions yet', async () => {
+    stubAccountsApi({ accounts: [itau] });
+    renderAt('/accounts/acc-itau');
+
+    expect(await screen.findByText('Nenhum lançamento nesta conta ainda.')).toBeInTheDocument();
+  });
+});

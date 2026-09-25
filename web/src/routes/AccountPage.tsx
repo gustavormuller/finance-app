@@ -1,6 +1,7 @@
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 
 import AccountDetails from '@/components/accounts/AccountDetails';
+import AccountTransactions from '@/components/accounts/AccountTransactions';
 import { useAccounts, useBalances } from '@/components/accounts/queries';
 import Card from '@/components/Card';
 import type { AccountTab } from '@/lib/accounts';
@@ -72,6 +73,7 @@ export default function AccountPage(): React.JSX.Element | null {
         ))}
       </nav>
 
+      {tab === 'transactions' && <AccountTransactions accountId={account.id} />}
       {tab === 'details' && <AccountDetails key={account.id} account={account} />}
     </Card>
   );
