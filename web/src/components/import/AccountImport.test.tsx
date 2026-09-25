@@ -110,6 +110,70 @@ describe('AccountImport, the file step', () => {
   });
 });
 
+describe('AccountImport, the history and the one statement in review', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const itau = account('acc-0', 'Itaú');
+
+  /** Spec 015 test 11. */
+  it("lists only this account's imports", async () => {
+    stubAccountsApi({
+      accounts: [itau, nubank],
+      imports: [batch('b-nubank', nubank, { fileName: 'nubank-setembro.ofx' }), batch('b-itau', itau, { fileName: 'itau-setembro.ofx' })],
+    });
+    renderAt('/accounts/acc-1?tab=import');
+
+    const rows = await screen.findAllByTestId('import-history-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('nubank-setembro.ofx');
+    expect(screen.queryByText('itau-setembro.ofx')).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Conta' })).not.toBeInTheDocument();
+  });
+
+  it('says when this account has no imports yet', async () => {
+    stubAccountsApi({ accounts: [itau, nubank], imports: [batch('b-itau', itau)] });
+    renderAt('/accounts/acc-1?tab=import');
+
+    expect(await screen.findByText('Nenhuma importação nesta conta ainda.')).toBeInTheDocument();
+  });
+
+  /** Spec 015 test 12. */
+  it("points to the other account when that account's statement is in review", async () => {
+    const user = userEvent.setup();
+    stubAccountsApi({
+      accounts: [itau, nubank],
+      imports: [batch('b-itau', itau, { fileName: 'itau.ofx', status: 'Staged', committedCount: null, committedAt: null })],
+    });
+    const router = renderAt('/accounts/acc-1?tab=import');
+
+    expect(await screen.findByText(/Há um extrato em revisão na conta Itaú\./)).toBeInTheDocument();
+    expect(screen.queryByTestId('drop-zone')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Abrir a importação da conta Itaú' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accounts/acc-0'));
+    expect(router.state.location.search).toEqual({ tab: 'import' });
+    expect(await screen.findByText('O extrato itau.ofx ainda está em revisão.')).toBeInTheDocument();
+  });
+
+  /** Spec 015 test 13. */
+  it("resumes this account's statement in review instead of taking another", async () => {
+    const user = userEvent.setup();
+    stubAccountsApi({ accounts: [nubank], imports: [staged] }, (_request, url) =>
+      url.pathname === '/api/imports/batch-1' ? { body: detail({}) } : undefined,
+    );
+    renderAt('/accounts/acc-1?tab=import');
+
+    expect(await screen.findByText('O extrato extrato.ofx ainda está em revisão.')).toBeInTheDocument();
+    expect(screen.queryByTestId('drop-zone')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Continuar a revisão' }));
+
+    expect(await screen.findByTestId('staged-row-Ready')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '3. Revisão' })).toBeInTheDocument();
+  });
+});
+
 describe('AccountImport, "Sugerir com IA"', () => {
   afterEach(() => vi.unstubAllGlobals());
 

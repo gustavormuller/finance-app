@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routeTree } from '../routeTree';
@@ -77,6 +77,17 @@ describe('the protected layout', () => {
     renderAt('/');
 
     expect(await screen.findByTestId('current-user')).toHaveTextContent('Ada Lovelace');
+  });
+
+  /** Spec 015 test 17: the import lives in each account, so it has no link of its own. */
+  it('offers the accounts in the navigation, and no Importar', async () => {
+    stubMeStatus(200, signedInUser);
+
+    renderAt('/');
+
+    const navigation = await screen.findByRole('navigation', { name: 'Principal' });
+    expect(within(navigation).getByRole('link', { name: 'Contas' })).toHaveAttribute('href', '/accounts');
+    expect(within(navigation).queryByRole('link', { name: 'Importar' })).not.toBeInTheDocument();
   });
 
   it('redirects to /login when /api/auth/me resolves 401', async () => {

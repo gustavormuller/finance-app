@@ -169,7 +169,8 @@ describe('DashboardPage', () => {
 
     const empty = await screen.findByTestId('dashboard-empty');
     expect(within(empty).getByRole('link', { name: /lançamento/i })).toHaveAttribute('href', '/transactions');
-    expect(within(empty).getByRole('link', { name: /importar/i })).toHaveAttribute('href', '/import');
+    // 015: an import starts from an account, and with none yet that is the first step.
+    expect(within(empty).getByRole('link', { name: /importar/i })).toHaveAttribute('href', '/accounts');
     expect(screen.queryByTestId('total-balance')).not.toBeInTheDocument();
   });
 

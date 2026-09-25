@@ -63,7 +63,7 @@ export default function DashboardPage() {
             <Link to="/transactions" className="text-primary font-semibold hover:underline">
               Registrar um lançamento
             </Link>
-            <Link to="/import" className="text-primary font-semibold hover:underline">
+            <Link to="/accounts" className="text-primary font-semibold hover:underline">
               Importar um extrato
             </Link>
           </p>

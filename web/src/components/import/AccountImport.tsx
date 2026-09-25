@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import {
@@ -92,7 +93,9 @@ export default function AccountImport({ account }: { account: Account }): React.
   const categories = useQuery({ queryKey: ['categories'], queryFn: api.listCategories });
   const templates = useQuery({ queryKey: ['csv-templates'], queryFn: api.listCsvTemplates });
   const history = useImports();
-  const batches = history.data ?? [];
+  const batches = (history.data ?? []).filter((batch) => batch.accountId === account.id);
+  // The API keeps one staged batch per user (004), on whichever account it is.
+  const inReview = history.data?.find((batch) => batch.status === 'Staged') ?? null;
 
   const batchId = step.kind === 'preview' ? step.batchId : null;
   const detail = useQuery({
@@ -104,8 +107,21 @@ export default function AccountImport({ account }: { account: Account }): React.
     retry: false,
   });
 
-  const fail = (error: unknown) =>
-    setFailure({ message: describe(error), openBatchId: error instanceof ApiError ? error.openBatchId : null });
+  const fail = (error: unknown) => {
+    const openBatchId = error instanceof ApiError ? error.openBatchId : null;
+
+    setFailure({ message: describe(error), openBatchId });
+
+    // A batch opened elsewhere (another tab) is news to the history, and to the notice
+    // that replaces the drop zone while it is open.
+    if (openBatchId) {
+      void queryClient.invalidateQueries({ queryKey: ['imports'], exact: true });
+    }
+  };
+
+  /** A batch that has just stopped being staged, out of the history before it is refetched. */
+  const forget = (id: string) =>
+    queryClient.setQueryData<ImportBatch[]>(['imports'], (current) => current?.filter((each) => each.id !== id));
 
   // The dashboard's summary too: the account list shows its balances.
   const refresh = () => Promise.all([
@@ -139,13 +155,16 @@ export default function AccountImport({ account }: { account: Account }): React.
     },
     onSuccess: async (next) => {
       setFailure(null);
-      await refresh();
 
+      // The step first: refreshed while still on the file step, the history's new
+      // staged batch would show the "in review" notice for a moment.
       if (next.kind === 'preview') {
         openPreview(next.batchId);
       } else {
         setStep(next);
       }
+
+      await refresh();
     },
     onError: fail,
   });
@@ -268,10 +287,13 @@ export default function AccountImport({ account }: { account: Account }): React.
     onError: fail,
   });
 
+  // Both remove the batch, so it leaves the history before the file step shows: still
+  // listed as staged, it would put the "in review" notice where the drop zone belongs.
   const discard = useMutation({
     mutationFn: (id: string) => api.discardImport(id),
-    onSuccess: async () => {
+    onSuccess: async (_, id) => {
       setFailure(null);
+      forget(id);
       setStep({ kind: 'file' });
       await refresh();
     },
@@ -280,8 +302,9 @@ export default function AccountImport({ account }: { account: Account }): React.
 
   const undo = useMutation({
     mutationFn: (id: string) => api.undoImport(id),
-    onSuccess: async () => {
+    onSuccess: async (_, id) => {
       setFailure(null);
+      forget(id);
       setStep({ kind: 'file' });
       await refresh();
     },
@@ -298,16 +321,28 @@ export default function AccountImport({ account }: { account: Account }): React.
     discard.isPending ||
     undo.isPending;
 
+  // A 409 names the open batch; one on another account is opened there, not here.
+  const elsewhere = failure?.openBatchId
+    ? history.data?.find((batch) => batch.id === failure.openBatchId && batch.accountId !== account.id)
+    : undefined;
+
   const error = failure && (
     <>
       {failure.message}
-      {failure.openBatchId && (
+      {elsewhere ? (
         <>
           {' '}
-          <button type="button" className="underline" onClick={() => openPreview(failure.openBatchId!)}>
-            Abrir a importação em andamento
-          </button>
+          <InReviewLink batch={elsewhere} />
         </>
+      ) : (
+        failure.openBatchId && (
+          <>
+            {' '}
+            <button type="button" className="underline" onClick={() => openPreview(failure.openBatchId!)}>
+              Abrir a importação em andamento
+            </button>
+          </>
+        )
       )}
     </>
   );
@@ -326,9 +361,26 @@ export default function AccountImport({ account }: { account: Account }): React.
       {/* One container for the current step, so its buttons are distinguishable from
           the history's, which offers the same verbs for other batches. */}
       <div data-testid="import-step" className="-mt-3">
-      {step.kind === 'file' && (
-        <FileStep accountName={account.name} busy={busy} error={error} onFile={(file) => start.mutate(file)} />
-      )}
+      {step.kind === 'file' &&
+        (inReview && inReview.accountId !== account.id ? (
+          <p className="bg-accent grid gap-2 rounded-2xl p-4 text-sm">
+            <span>
+              Há um extrato em revisão na conta {inReview.accountName}. Conclua ou descarte essa importação antes de
+              importar outro.
+            </span>
+            <InReviewLink batch={inReview} />
+          </p>
+        ) : inReview ? (
+          <div className="bg-accent flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-sm">
+            <p>
+              <span>O extrato {inReview.fileName} ainda está em revisão.</span>{' '}
+              <span className="text-muted-foreground">Confirme ou descarte-o antes de enviar outro.</span>
+            </p>
+            <Button onClick={() => openPreview(inReview.id)}>Continuar a revisão</Button>
+          </div>
+        ) : (
+          <FileStep accountName={account.name} busy={busy} error={error} onFile={(file) => start.mutate(file)} />
+        ))}
 
       {step.kind === 'mapping' && (
         <MappingStep
@@ -389,5 +441,19 @@ export default function AccountImport({ account }: { account: Account }): React.
         />
       </div>
     </div>
+  );
+}
+
+/** To the import tab of the account whose statement is in review. */
+function InReviewLink({ batch }: { batch: ImportBatch }) {
+  return (
+    <Link
+      to="/accounts/$accountId"
+      params={{ accountId: batch.accountId }}
+      search={{ tab: 'import' }}
+      className="text-primary font-semibold underline-offset-4 hover:underline"
+    >
+      Abrir a importação da conta {batch.accountName}
+    </Link>
   );
 }
