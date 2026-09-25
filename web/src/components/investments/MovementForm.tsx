@@ -23,12 +23,12 @@ const TOTAL_LABELS: Record<MovementKind, string> = {
 const typed = (value: number | undefined) => (value ? String(value).replace('.', ',') : '');
 
 /**
- * Add or edit one movement (spec 007 UI). The fields follow the kind: Dividend and
- * Jcp take `amount` instead of quantity and price; a Split takes only the quantity,
- * since its price is zero by definition (decision 3) and the calculator ignores its
- * fees. The total is previewed live, exactly (`lib/decimal`), in the asset's currency.
+ * The fields follow the kind: Dividend and Jcp take `amount` instead of quantity and
+ * price; a Split takes only the quantity, since its price is zero by definition (007,
+ * decision 3) and the calculator ignores its fees. The total is previewed live,
+ * exactly (`lib/decimal`), in the asset's currency.
  *
- * Nothing is validated here: the API's rules are the spec's table, and its messages
+ * Nothing is validated here: the API's rules are spec 007's table, and its messages
  * arrive in `errors` and are shown under the field they name.
  */
 export default function MovementForm({

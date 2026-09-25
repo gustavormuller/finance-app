@@ -33,7 +33,7 @@ export function useMonthly(through: string) {
   });
 }
 
-/** 014: the month-ends the hero's sparkline spans, which covers the 12 meses change too. */
+/** The month-ends the hero's sparkline spans, which covers the 12 meses change too. */
 export const NET_WORTH_MONTHS = 24;
 
 /** The net-worth series up to `through`, the local month, read as {@link useMonthly} reads its own. */

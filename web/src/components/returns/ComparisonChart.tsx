@@ -15,11 +15,11 @@ const shortDay = (isoDay: string) => formatDate(isoDay).slice(0, 5);
 const DASHES = ['6 3', '2 3', '10 4', '4 2 1 2', '1 3'];
 
 /**
- * Spec 008 "Comparison chart": base 100 on the base day, the portfolio's TWR index in
- * the primary colour, each benchmark muted and toggleable. `codes` are the benchmarks
- * that could anchor; a null one has no key in `series`. Hovering lists every visible
- * series on that date; the hidden table gives the same at each month's last point.
- * `bare` drops the panel, for a chart that sits inside another card (016's hero).
+ * Base 100 on the base day, the portfolio's TWR index in the primary colour, each
+ * benchmark muted and toggleable. `codes` are the benchmarks that could anchor; a null
+ * one has no key in `series`. Hovering lists every visible series on that date; the
+ * hidden table gives the same at each month's last point. `bare` drops the panel, for a
+ * chart that sits inside another card (the returns hero).
  */
 export default function ComparisonChart({
   series,

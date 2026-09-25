@@ -4,7 +4,7 @@ import * as React from "react"
 import { cn } from "cn"
 
 /**
- * 012: a table is a glass card of its own. `bare` drops the card, for a table that
+ * A table is a glass card of its own. `bare` drops the card, for a table that
  * already sits inside one.
  */
 function Table({ className, bare = false, ...props }: React.ComponentProps<"table"> & { bare?: boolean }) {

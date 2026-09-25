@@ -17,7 +17,7 @@ const ICONS: Record<AccountType, LucideIcon> = {
 };
 
 /**
- * The accounts as cards (015): icon by type, name, type and last import, and the
+ * The accounts as cards: icon by type, name, type and last import, and the
  * current balance, then the total. The name is the card's link and stretches over the
  * whole card, so the card is one click target and the link's name is just the name.
  *

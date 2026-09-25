@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /**
- * The monthly analysis's markdown (009), rendered as React elements.
+ * The monthly analysis's markdown, rendered as React elements.
  *
  * The content is the AI provider's text, and merchant and account names reach it from
  * user data, so it is untrusted. Nothing here builds HTML: every piece of the source

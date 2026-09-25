@@ -5,7 +5,7 @@ import { formatCompactMoney, formatMoney, formatSignedMoney } from '@/lib/money'
 import { usePortfolioSummary } from './queries';
 
 /**
- * How the investments area writes money right now (016): in reais, or in dollars at the
+ * How the investments area writes money right now: in reais, or in dollars at the
  * summary's latest USDBRL. `chosen` is what the toggle says; `currency` is what money is
  * actually shown in, which stays R$ while there is no rate (`missingRate`).
  */
