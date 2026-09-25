@@ -27,7 +27,7 @@ public sealed partial class DashboardSqlTests(PostgresFixture postgres)
     [Fact]
     public void Every_dashboard_query_carries_the_user_predicate()
     {
-        var folder = Path.Combine(RepositoryRoot(), "api", "Application", "Dashboard");
+        var folder = Path.Combine(TestPaths.RepositoryRoot(), "api", "Application", "Dashboard");
         var statements = new List<(string File, string Sql)>();
 
         foreach (var file in Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories))
@@ -136,19 +136,6 @@ public sealed partial class DashboardSqlTests(PostgresFixture postgres)
         string sql,
         object parameters) =>
         [.. (await connection.QueryAsync(sql, parameters)).Cast<IDictionary<string, object>>()];
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "FinanceApp.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("FinanceApp.slnx not found above the test binaries.");
-    }
 
     [GeneratedRegex("\"\"\".*?\"\"\"", RegexOptions.Singleline)]
     private static partial Regex RawLiteral();
