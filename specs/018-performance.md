@@ -18,7 +18,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 4 | Rewriting a query | Only behind a test that pins its result first, and in the same layer and tool it was in: EF LINQ stays LINQ (the query filters keep applying), Dapper SQL stays SQL naming `"UserId"` in every statement. |
 | 5 | Indexes | Only where a plan shows the index used and the time gone. No index is added "in case". |
 | 6 | The snapshot rebuild's insert | One `INSERT … SELECT FROM unnest(arrays)` through `Database.ExecuteSqlAsync`, instead of `SaveChanges` over thousands of tracked rows. Same rows, same transaction (EF enlists raw SQL in it), same advisory lock. A failed insert now surfaces as the `PostgresException` itself rather than wrapped in a `DbUpdateException`; nothing catches either on these paths. Binary `COPY` was the alternative; the database side is dominated by the foreign-key triggers either way. **(review)** |
-| 7 | Web bundle | Each page is its own chunk, loaded on navigation (TanStack Router's `lazyRouteComponent`), and Recharts with its dependencies is a separate `charts` chunk. |
+| 7 | Web bundle | Each page is its own chunk, loaded on navigation (TanStack Router's `lazyRouteComponent`); the sign-in page and the protected layout stay in the entry. Recharts then lands in a chunk of its own through the bundler's own splitting, since only the lazy chart pages reach it. An explicit `charts` group was measured and dropped (see change 5). |
 | 8 | React Query defaults | `staleTime` of 30 s, so a page mounted again within 30 s, or a tab focused again, does not refetch what it just read. Correctness after a write is kept by construction: **every** mutation, when it settles, marks every query stale (without refetching). The explicit invalidations stay and still refetch what the page shows. **(review)** |
 | 9 | Response compression | Caddy already has `encode gzip`. See "Measured, not worth doing". |
 | 10 | Test-suite speed | Vitest's pool/isolation changed only if every test stays green and isolated; measured below. |
@@ -154,6 +154,38 @@ Still Dapper, still `"UserId" = @userId` in each part. Pinned first by
 
 What is left is the all-time sum of the user's transactions per month (8 514 rows at ten years),
 which the balances need too; see "Measured, not worth doing".
+
+### 5. The web bundle, split by page
+
+**Cause.** `vite build` produced one script of 1 050 kB (314 kB gzip) and warned about it: every
+page, the sign-in page included, downloaded every other page, React Hook Form and zod (only the
+transactions form uses them) and Recharts (only the dashboard and the investment pages draw
+charts).
+
+**Change.** Decision 7: lazy routes. The entry is 366 kB (120 kB gzip); Recharts is a 340 kB
+chunk (99 kB gzip) loaded only by the pages that chart; the transactions page carries its form
+libraries (122 kB). The unit tests that render the route tree import every page first
+(`src/test-routes.ts`), as the static route tree used to, so a first lazy import does not
+transform a page's whole graph inside a test's timeout; without it five tests timed out.
+
+Tried and dropped: an explicit `codeSplitting` group `charts` for Recharts and its dependencies.
+Rolldown pulls a group's own dependencies into it (React, `clsx`), so the entry imported the
+charts chunk and the sign-in page loaded 776 kB instead of 404 kB. Turning that off needs
+`strictExecutionOrder`, a runtime cost for a naming nicety.
+
+Scripts per cold page load (headless Chromium, HTTP cache off, sizes from the build output):
+
+| Page | before | after | gzip before → after |
+|---|---:|---:|---:|
+| `/login` (signed out) | 1 026 kB | **404 kB** | 303 → **131 kB** |
+| `/` (dashboard, charts) | 1 026 kB | 791 kB | 303 → 246 kB |
+| `/transactions` | 1 026 kB | 530 kB | 303 → 171 kB |
+| `/categories` | 1 026 kB | 422 kB | 303 → 139 kB |
+| `/settings` | 1 026 kB | 411 kB | 303 → 135 kB |
+| `/investments`, returns, asset pages | 1 026 kB | 769–781 kB | 303 → 241–245 kB |
+
+A client-side navigation to a page not yet visited fetches its chunk: 123 kB for the
+transactions page, 14–39 kB for the others; Recharts is fetched once.
 
 ## Measured, not worth doing
 

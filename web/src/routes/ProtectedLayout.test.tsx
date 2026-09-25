@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routeTree } from '../routeTree';
+import '../test-routes';
 
 const signedInUser = {
   id: '3f1b2c4d-0000-4000-8000-000000000001',
