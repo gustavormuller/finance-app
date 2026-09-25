@@ -9,7 +9,10 @@ export interface SeenRequest {
   body: unknown;
 }
 
-type Responder = (request: SeenRequest) => { status?: number; body?: unknown } | undefined;
+/** `body` is sent as JSON; `text` is sent as it is, with `headers`, for a file. */
+export type StubAnswer = { status?: number; body?: unknown; text?: string; headers?: Record<string, string> };
+
+type Responder = (request: SeenRequest) => StubAnswer | undefined;
 
 /**
  * Replaces `fetch` with one that answers from `respond` and records every request.
@@ -36,6 +39,10 @@ export function stubFetch(respond: Responder) {
       }
 
       const status = answer.status ?? 200;
+
+      if (answer.text !== undefined) {
+        return new Response(answer.text, { status, headers: answer.headers ?? {} });
+      }
 
       return new Response(status === 204 ? null : JSON.stringify(answer.body ?? null), {
         status,

@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Text.Json;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
@@ -128,6 +128,21 @@ internal static class TransactionsFixtures
 
         return document.RootElement.TryGetProperty("errors", out var errors)
             ? [.. errors.EnumerateObject().Select(field => field.Name)]
+            : [];
+    }
+
+    /// <summary>The messages a problem-details response gave for one field; empty when it named no such field.</summary>
+    public static async Task<IReadOnlyList<string>> ProblemMessagesAsync(
+        HttpResponseMessage response,
+        string field,
+        CancellationToken cancellationToken)
+    {
+        using var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync(cancellationToken));
+
+        return document.RootElement.TryGetProperty("errors", out var errors)
+            && errors.TryGetProperty(field, out var messages)
+            ? [.. messages.EnumerateArray().Select(message => message.GetString()!)]
             : [];
     }
 
