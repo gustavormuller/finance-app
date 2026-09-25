@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { MarketAsset, PortfolioSummary, Position } from '@/api/finance';
+import { chooseCurrency } from '@/lib/currency';
 import { routeTree } from '@/routeTree';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
@@ -335,5 +336,61 @@ describe('InvestmentsPage: adding an asset', () => {
     await userEvent.click(within(await screen.findByTestId('catalogue-result-m-petr4')).getByRole('button', { name: 'Adicionar' }));
 
     expect(await screen.findByText(held)).toBeInTheDocument();
+  });
+});
+
+describe('InvestmentsPage: in dollars (016)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    act(() => chooseCurrency('BRL'));
+    localStorage.clear();
+  });
+
+  /** Spec 016 web test 11, the positions. */
+  it('converts every money figure at the latest rate, prices stay in their currency, and says which rate', async () => {
+    localStorage.setItem('currency', 'USD');
+    stubInvestments(() => [aapl, petr4]);
+    renderAt('/investments');
+
+    const row = await screen.findByTestId('position-a-petr4');
+    expect(plain(row)).toContain('US$ 638,18');
+    expect(plain(row)).toContain('+US$ 54,12');
+    expect(plain(row)).toContain('+9,27%');
+    expect(plain(row)).toContain('R$ 35,10');
+    expect(plain(screen.getByTestId('position-a-aapl'))).toContain('US$ 2.000,00');
+
+    const total = screen.getByTestId('positions-total');
+    expect(plain(total)).toContain('US$ 2.638,18');
+    expect(plain(total)).toContain('+US$ 599,57');
+    expect(plain(screen.getByTestId('currency-note'))).toBe('em dólar · US$ 1 = R$ 5,50 em 23/09');
+  });
+
+  /** Spec 016 web test 5, on the page. */
+  it('switches with the R$ | US$ toggle, R$ first, and remembers the choice', async () => {
+    stubInvestments(() => [petr4]);
+    renderAt('/investments');
+
+    const toggle = await screen.findByRole('group', { name: 'Moeda' });
+    expect(within(toggle).getAllByRole('button').map((button) => button.textContent)).toEqual(['R$', 'US$']);
+    expect(within(toggle).getByRole('button', { name: 'R$' })).toHaveAttribute('aria-pressed', 'true');
+    expect(plain(await screen.findByTestId('position-a-petr4'))).toContain('R$ 3.510,00');
+
+    await userEvent.click(within(toggle).getByRole('button', { name: 'US$' }));
+
+    expect(within(toggle).getByRole('button', { name: 'US$' })).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('currency')).toBe('USD');
+    expect(plain(screen.getByTestId('position-a-petr4'))).toContain('US$ 638,18');
+  });
+
+  it('stays in reais, and says why, while no dollar rate was ever synced', async () => {
+    localStorage.setItem('currency', 'USD');
+    stubInvestments(
+      () => [petr4],
+      (_request, url) => (url.pathname === '/api/investments/summary' ? { body: { ...summary, usdBrl: null } } : undefined),
+    );
+    renderAt('/investments');
+
+    expect(await screen.findByText('Sem cotação do dólar sincronizada; valores em reais.')).toBeInTheDocument();
+    expect(plain(screen.getByTestId('position-a-petr4'))).toContain('R$ 3.510,00');
   });
 });

@@ -3,16 +3,20 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router';
 
 import { api, type Position } from '@/api/finance';
 import Alert from '@/components/Alert';
+import CurrencyNote from '@/components/investments/CurrencyNote';
+import CurrencyToggle from '@/components/investments/CurrencyToggle';
 import Movements from '@/components/investments/Movements';
 import { INVESTMENTS, useDaily, usePositions } from '@/components/investments/queries';
+import { useDisplayCurrency, type Display } from '@/components/investments/useDisplayCurrency';
 import ValueChart from '@/components/investments/ValueChart';
 import { Button } from '@/components/ui/button';
 import { formatDate, marketAssetClassLabels } from '@/lib/labels';
-import { formatMoney, formatPercent, formatQuantity, formatSignedMoney, formatUnitPrice } from '@/lib/money';
+import { formatPercent, formatQuantity, formatUnitPrice } from '@/lib/money';
 
 /**
  * `/investments/{id}` (007): one asset's position, its movements and its value over
  * time. The asset is read from the positions list, which holds everything shown here.
+ * Money is in the page's currency (016); prices and movements stay in the asset's own.
  */
 export default function AssetPage() {
   const { assetId } = useParams({ from: '/protected/investments/$assetId' });
@@ -20,6 +24,7 @@ export default function AssetPage() {
   const navigate = useNavigate();
   const positions = usePositions();
   const position = positions.data?.find((candidate) => candidate.assetId === assetId);
+  const display = useDisplayCurrency();
 
   const remove = useMutation({
     mutationFn: () => api.removeAsset(assetId),
@@ -43,12 +48,20 @@ export default function AssetPage() {
                 {position.nickname ?? position.name} · {marketAssetClassLabels[position.class]} · {position.currency}
               </p>
             )}
+            {(display.fx || display.missingRate) && (
+              <p className="text-muted-foreground mt-1 text-sm">
+                <CurrencyNote display={display} />
+              </p>
+            )}
           </div>
-          {position && (
-            <Button variant="outline" disabled={remove.isPending} onClick={() => remove.mutate()}>
-              Remover ativo
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <CurrencyToggle />
+            {position && (
+              <Button variant="outline" disabled={remove.isPending} onClick={() => remove.mutate()}>
+                Remover ativo
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -59,8 +72,8 @@ export default function AssetPage() {
 
       {position && (
         <>
-          <Summary position={position} />
-          <History assetId={assetId} />
+          <Summary position={position} display={display} />
+          <History assetId={assetId} inReais={display.currency === 'USD'} />
           <Movements assetId={assetId} currency={position.currency} />
         </>
       )}
@@ -69,18 +82,18 @@ export default function AssetPage() {
 }
 
 /** The daily series; refreshed with the rest of `['investments']` after every write. */
-function History({ assetId }: { assetId: string }) {
+function History({ assetId, inReais }: { assetId: string; inReais: boolean }) {
   const daily = useDaily(assetId);
 
   if (daily.isError) {
     return <Alert>Não foi possível carregar o histórico de valor.</Alert>;
   }
 
-  return daily.data ? <ValueChart rows={daily.data} /> : null;
+  return daily.data ? <ValueChart rows={daily.data} inReais={inReais} /> : null;
 }
 
-function Summary({ position }: { position: Position }) {
-  const brl = (value: number | null) => (value === null ? '—' : formatMoney(value));
+function Summary({ position, display }: { position: Position; display: Display }) {
+  const money = (value: number | null) => (value === null ? '—' : display.money(value));
   const items: [string, string][] = [
     ['Quantidade', formatQuantity(position.quantity)],
     ['Preço médio', formatUnitPrice(position.averageCost, position.currency)],
@@ -90,15 +103,15 @@ function Summary({ position }: { position: Position }) {
         ? 'Sem cotação'
         : `${formatUnitPrice(position.price, position.currency)} em ${formatDate(position.priceDate)}`,
     ],
-    ['Valor', brl(position.valueBrl)],
+    ['Valor', money(position.valueBrl)],
     [
       'Resultado',
       position.unrealisedBrl === null
         ? '—'
-        : `${formatSignedMoney(position.unrealisedBrl)}${position.unrealisedPct === null ? '' : ` (${formatPercent(position.unrealisedPct)})`}`,
+        : `${display.signedMoney(position.unrealisedBrl)}${position.unrealisedPct === null ? '' : ` (${formatPercent(position.unrealisedPct)})`}`,
     ],
-    ['Resultado realizado', position.realisedBrl === null ? '—' : formatSignedMoney(position.realisedBrl)],
-    ['Proventos', brl(position.dividendsBrl)],
+    ['Resultado realizado', position.realisedBrl === null ? '—' : display.signedMoney(position.realisedBrl)],
+    ['Proventos', money(position.dividendsBrl)],
   ];
 
   return (

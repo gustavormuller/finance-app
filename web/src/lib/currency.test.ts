@@ -6,7 +6,7 @@ import type { AssetReturns, Returns } from '@/api/finance';
 import { brlToUsd, chooseCurrency, readCurrencyChoice, returnsInUsd, useCurrencyChoice } from './currency';
 import { formatMoney, formatSignedMoney } from './money';
 
-const plain = (text: string) => text.replace(/ /g, ' ');
+const plain = (text: string) => text.replace(/\u00a0/g, ' ');
 
 /** Spec 016 web test 3. */
 describe('brlToUsd', () => {
