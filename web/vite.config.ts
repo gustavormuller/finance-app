@@ -38,6 +38,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // 018: each test file still gets its own module graph and globals (a fresh VM
+    // context), but the worker and its jsdom set-up are reused: the suite ran in about
+    // half the time of the default process-per-file pool, every test green.
+    pool: 'vmThreads',
     setupFiles: ['./src/setupTests.ts'],
     // Vitest owns src/. Playwright owns e2e/. Without this split, `vitest run`
     // picks up the Playwright specs and fails on a missing test runner.

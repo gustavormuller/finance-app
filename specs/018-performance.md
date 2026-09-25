@@ -216,6 +216,22 @@ API requests per page, headless Chromium, the owner's data:
 `refetchOnWindowFocus` stays on: past 30 s, coming back to the tab still picks up what another
 tab or the nightly sync changed.
 
+### 7. The web unit suite on `vmThreads`
+
+**Measured** (34 files, 248 tests, same tree, busy machine, several runs each): the default
+`forks` pool 29–60 s, `threads` 32 s, `vmThreads` **12–26 s**. `vmThreads` keeps what isolation
+means here: each test file gets a fresh VM context, so its own modules and globals. Checked
+with a throwaway pair of files in one worker, each writing to a shared module and to
+`globalThis` and expecting to see only its own write: green on `vmThreads`, red with
+`isolate: false`, which the Vitest hint also offered and which is therefore not used.
+
+Found on the way: under load the first test of `AccountsPage.test.tsx` and
+`AccountImport.test.tsx` timed out, because `accounts-fixtures.tsx` renders the route tree
+without importing the pages first (change 5). It now imports `src/test-routes.ts` too; five
+further runs were green. One run under the same load also failed
+`TransactionForm > submits a positive amount for an income category`, which renders no route
+and did not fail again.
+
 ## Measured, not worth doing
 
 Filled in as measured.
