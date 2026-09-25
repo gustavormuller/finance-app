@@ -36,7 +36,18 @@ internal static class MarketDataProviderHarness
             MaxHistoryDays = 365,
         },
         TwelveData = new TwelveDataOptions { BaseUrl = "https://api.twelvedata.com/", Key = "twelvedata-test-key" },
+        Binance = new BinanceOptions { BaseUrl = "https://api.binance.com/api/v3/" },
     };
+
+    /// <summary><see cref="Options"/> as the app runs before the owner has set any key (019).</summary>
+    public static MarketDataOptions Keyless()
+    {
+        var options = Options();
+        options.Brapi.Token = "";
+        options.CoinGecko.DemoKey = "";
+        options.TwelveData.Key = "";
+        return options;
+    }
 }
 
 /// <summary>Answers every request with one status and body, and keeps the requests.</summary>

@@ -96,6 +96,38 @@ describe('AssetCatalogue', () => {
     expect(screen.getByLabelText('Ticker')).toHaveValue('');
   });
 
+  /** Spec 019 web test 22. */
+  it('offers Binance for crypto in reais, each provider with what it covers', async () => {
+    const btcBrl: MarketAsset = { ...btc, id: 'a-btcbrl', currency: 'BRL', provider: 'Binance', providerSymbol: 'BTCBRL' };
+    let catalogue = [petr4];
+    const seen = stubApi(
+      () => {
+        catalogue = [btcBrl, petr4];
+        return { status: 201, body: btcBrl };
+      },
+      () => catalogue,
+    );
+    renderWithClient(<AssetCatalogue />);
+    await screen.findByTestId('market-asset-a-petr4');
+
+    expect(within(screen.getByLabelText('Provedor')).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'brapi (B3: ações, FIIs, ETFs)',
+      'CoinGecko (cripto)',
+      'Twelve Data (ações dos EUA)',
+      'Binance (cripto em reais)',
+    ]);
+
+    await fillRegistration({ ticker: 'BTC', class: 'Crypto', provider: 'Binance', symbol: 'btcbrl', currency: 'BRL' });
+
+    const row = await screen.findByTestId('market-asset-a-btcbrl');
+    expect(row).toHaveTextContent('Binance (BTCBRL)');
+    expect(seen.find((request) => request.method === 'POST')?.body).toMatchObject({
+      provider: 'Binance',
+      providerSymbol: 'btcbrl',
+      currency: 'BRL',
+    });
+  });
+
   it('shows a 400 under the field it names and a 409 verbatim', async () => {
     const currency = 'Ativos do CoinGecko são cotados em USD.';
     const duplicate = "O símbolo 'PETR4' já está cadastrado no provedor Brapi.";

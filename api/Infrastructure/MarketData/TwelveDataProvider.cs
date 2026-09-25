@@ -19,8 +19,9 @@ namespace Finance.Api.Infrastructure.MarketData;
 /// <c>to</c> and the result trimmed to <c>[from, to]</c>, so the last day is in whether
 /// the API treats the bound as inclusive or not. Errors may arrive with HTTP 200 and
 /// <c>{"status":"error","code":...}</c> in the body: 429 is a rate limit, 404 or "no
-/// data" is an empty series, anything else an <see cref="HttpRequestException"/>
-/// with that code.
+/// data" is an empty series, a 401 or 403 with no key configured is
+/// <see cref="ProviderKeyMissingException"/> (019), anything else an
+/// <see cref="HttpRequestException"/> with that code.
 /// </remarks>
 public sealed class TwelveDataProvider(HttpClient http, IOptions<MarketDataOptions> options) : IPriceProvider
 {
@@ -48,6 +49,7 @@ public sealed class TwelveDataProvider(HttpClient http, IOptions<MarketDataOptio
 
         using var response = await http.SendAsync(request, ct);
         ProviderResponse.ThrowIfRateLimited(response, Name);
+        ProviderResponse.ThrowIfKeyMissing(response, Name, twelveData.Key, providerSymbol, TwelveDataOptions.KeySetting);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return [];
@@ -59,10 +61,11 @@ public sealed class TwelveDataProvider(HttpClient http, IOptions<MarketDataOptio
             response.EnsureSuccessStatusCode();
         }
 
-        return await ProviderResponse.ReadAsync(response, Name, root => Closes(root, from, to), ct);
+        var keyless = string.IsNullOrEmpty(twelveData.Key);
+        return await ProviderResponse.ReadAsync(response, Name, root => Closes(root, from, to, keyless, providerSymbol), ct);
     }
 
-    private static IReadOnlyList<DailyClose> Closes(JsonElement root, DateOnly from, DateOnly to)
+    private static IReadOnlyList<DailyClose> Closes(JsonElement root, DateOnly from, DateOnly to, bool keyless, string symbol)
     {
         if (root.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String
             && status.GetString() == "error")
@@ -72,6 +75,8 @@ public sealed class TwelveDataProvider(HttpClient http, IOptions<MarketDataOptio
             return code switch
             {
                 429 => throw new ProviderRateLimitedException(Name, retryAfter: null),
+                _ when keyless && ProviderResponse.IsRefusal((HttpStatusCode)code) =>
+                    throw new ProviderKeyMissingException(Name, symbol, TwelveDataOptions.KeySetting),
                 404 => [],
                 400 when message.StartsWith("No data is available", StringComparison.OrdinalIgnoreCase) => [],
                 _ => throw new HttpRequestException($"{Name} answered error {code}: {message}", null, (HttpStatusCode)code),

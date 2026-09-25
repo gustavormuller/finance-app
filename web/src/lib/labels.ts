@@ -115,9 +115,18 @@ export const providerKindLabels: Record<ProviderKind, string> = {
   Brapi: 'brapi',
   CoinGecko: 'CoinGecko',
   TwelveData: 'Twelve Data',
+  Binance: 'Binance',
 };
 
-export const providerKinds: ProviderKind[] = ['Brapi', 'CoinGecko', 'TwelveData'];
+/** What each provider prices, beside its name where one is picked; the catalogue shows the plain name. */
+export const providerKindCoverage: Record<ProviderKind, string> = {
+  Brapi: 'B3: ações, FIIs, ETFs',
+  CoinGecko: 'cripto',
+  TwelveData: 'ações dos EUA',
+  Binance: 'cripto em reais',
+};
+
+export const providerKinds: ProviderKind[] = ['Brapi', 'CoinGecko', 'TwelveData', 'Binance'];
 
 const syncSectionLabels: Record<string, string> = {
   Bcb: 'Banco Central (SGS)',

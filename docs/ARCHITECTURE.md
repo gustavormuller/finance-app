@@ -531,13 +531,17 @@ Normalize everything to base 100 on the date of the first contribution:
 
 ## External data sources
 
-| Source | Covers | Free tier |
-|---|---|---|
-| BCB / SGS | CDI, SELIC, IPCA, PTAX | unlimited, no key |
-| brapi.dev | BR stocks, FIIs, ETFs, BDRs | 15,000 req/month |
-| CoinGecko (Demo) | crypto | 10,000 req/month, 100/min |
-| Binance public | BTCBRL and pairs | no key, no sign-up |
-| Twelve Data | US stocks | 800 req/day |
+| Source | Covers | Free tier | Adapter |
+|---|---|---|---|
+| BCB / SGS | CDI, SELIC, IPCA, PTAX | unlimited, no key | `BcbSgsProvider` (benchmarks) |
+| brapi.dev | BR stocks, FIIs, ETFs, BDRs; the IVVB11 benchmark | 4 tickers keyless; free token 15,000 req/month, 3 months of history | `BrapiProvider` |
+| CoinGecko | crypto in USD | keyless 365 days; Demo key 10,000 req/month, same history | `CoinGeckoProvider` |
+| Binance public | crypto pairs quoted in BRL | no key, no sign-up | `BinanceProvider` (019) |
+| Twelve Data | US stocks | key required; 800 req/day | `TwelveDataProvider` |
+
+Which key unlocks what, and how to set each one: `docs/market-data-keys.md`. A provider
+that refuses because its key is empty fails only that ticker, and the sync run says which
+setting to fill in (019).
 
 ### BCB / SGS — free, official, no key
 
@@ -546,40 +550,58 @@ https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados?formato=json
   &dataInicial=01/01/2020&dataFinal=31/12/2026
 ```
 
-Series: daily CDI, SELIC, monthly IPCA, PTAX dollar.
-**Confirm the codes on the SGS portal before hardcoding them.**
+Series: daily CDI, SELIC, monthly IPCA, PTAX dollar. The codes are configuration
+(`MarketData:Bcb:Series`): CDI 12 and SELIC 11 in percent per day, IPCA 433 in percent per
+month, USDBRL 1 as a level. All four were checked against the live API on 2026-09-25.
 
 ### brapi.dev
 
 B3 stocks, FIIs, ETFs, BDRs and indices, with history, dividends and FX.
-PETR4, VALE3, MGLU3 and ITUB4 work without a token; the rest require a free-plan token.
+PETR4, VALE3, MGLU3 and ITUB4 work without a token, with five years of history. Everything
+else, IVVB11 and unknown tickers included, answers HTTP 401 `MISSING_TOKEN` (checked
+2026-09-25). The free plan's token serves up to 3 months of history; the 5-year backfill
+needs a plan that covers it (`docs/market-data-keys.md`). The token travels as a bearer
+header, never in the URL.
 
 ```
-GET https://brapi.dev/api/quote/{tickers}?range=1mo&interval=1d&token={TOKEN}
+GET https://brapi.dev/api/quote/{ticker}?range=1mo&interval=1d
+Authorization: Bearer {TOKEN}
 ```
 
 ### Crypto
 
-**CoinGecko Demo** — free key from the dashboard, broad coverage:
+**CoinGecko** — broad coverage, keyless for the last 365 days; the optional Demo key gives
+a quota of its own, not more history. The adapter asks in `MarketData:CoinGecko:VsCurrency`
+(`usd`) and sends the key as a header:
 ```
 GET https://api.coingecko.com/api/v3/coins/bitcoin/market_chart
-    ?vs_currency=brl&days=365&x_cg_demo_api_key={KEY}
+    ?vs_currency=usd&days=365&interval=daily
+x-cg-demo-api-key: {KEY}
 ```
 
-**Binance** — no key, no sign-up, BTCBRL pair directly:
+**Binance** — no key, no sign-up, pairs quoted in BRL directly (`BTCBRL`, `ETHBRL`,
+`SOLBRL`, `USDTBRL`). Implemented in 019 as `ProviderKind.Binance`:
 ```
-GET https://api.binance.com/api/v3/klines?symbol=BTCBRL&interval=1d&limit=365
+GET https://api.binance.com/api/v3/klines?symbol=BTCBRL&interval=1d
+    &startTime={ms}&endTime={ms}&limit=1000
 ```
+At most 1000 daily candles a request, so the 5-year backfill is two. A candle is dated by
+the UTC day it opens and its close is that day's last price. A Binance asset must be
+quoted in BRL, with a symbol ending in BRL. Binance refuses some countries (the United
+States among them) with HTTP 451, so the server must run where it is served.
 
-Binance for the simple daily history; CoinGecko if more assets or metadata are needed.
+Binance for crypto in reais with full history; CoinGecko (in USD, 365 days without a paid
+plan) if a coin has no BRL pair.
 
 ### US stocks — Twelve Data
 
-800 requests/day against the ~10 needed. Returns in USD; convert using PTAX.
+800 requests/day against the ~10 needed. Returns in USD; convert using PTAX. No request
+works without a key (HTTP 401, checked 2026-09-25); the key travels as a header.
 
 ```
 GET https://api.twelvedata.com/time_series
-    ?symbol=AAPL&interval=1day&apikey={KEY}
+    ?symbol=AAPL&interval=1day&start_date=...&end_date=...&outputsize=5000
+Authorization: apikey {KEY}
 ```
 
 Finnhub (60 req/min) is an equivalent alternative.
@@ -739,10 +761,10 @@ MAIL_FROM=
 # Cloudflare
 CLOUDFLARE_TUNNEL_TOKEN=
 
-# Market data
-BRAPI_TOKEN=
-COINGECKO_DEMO_KEY=
-TWELVEDATA_KEY=
+# Market data (006, 019) — all optional; see docs/market-data-keys.md. Binance and BCB need none.
+MarketData__Brapi__Token=
+MarketData__CoinGecko__DemoKey=
+MarketData__TwelveData__Key=
 
 # AI (009) — the Ai: configuration section; "__" is ":" in an environment variable
 Ai__Provider=anthropic               # anthropic | openai
@@ -879,6 +901,7 @@ Reason: the financial computations become testable in milliseconds, without brin
 Concrete justification: four market sources already mapped (brapi, BCB, CoinGecko/Binance, Twelve Data) and an AI provider subject to change.
 *Criterion for new ports:* is there more than one real or foreseen implementation? If not, call directly.
 **Amendment (006).** The market-data port is two ports, not one: `IPriceProvider` (provider symbol → daily closes) and `IBenchmarkProvider` (series code → daily values), both in `Application/MarketData/`, replacing `IMarketDataProvider`. A close and a benchmark value are different shapes with different keys, and each adapter implements the port that fits. `IPriceProvider` has three implementations today (brapi, CoinGecko, Twelve Data), resolved by `IPriceProviderRegistry.For(ProviderKind)`. `IBenchmarkProvider` has one today, BCB SGS; it passes the criterion above on a *foreseen* second source — a benchmark such as USDBRL or IVVB11 served by brapi or Twelve Data instead of, or alongside, BCB.
+*Update (019):* Binance is a fourth `IPriceProvider`, for crypto quoted in BRL. It is one class and one registration, as the registry intends.
 
 ### ADR-016 — No Repository over EF Core
 `DbContext` is already a Unit of Work and `DbSet<T>` is already a repository. A repository layer would forward calls, lose `IQueryable` composition and add no testability that integration tests with Postgres in a container do not already deliver.

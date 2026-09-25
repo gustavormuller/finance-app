@@ -24,6 +24,22 @@ public sealed class SyncErrorTextTests
         { new BrokenCircuitException("open"), "Provedor suspenso temporariamente após falhas seguidas." },
         { new InvalidOperationException("No price provider is registered for Brapi."), "Provedor ou série sem configuração." },
         { new DivideByZeroException(), "Erro inesperado ao sincronizar." },
+        {
+            new ProviderKeyMissingException("Brapi", "BBAS3", "MarketData:Brapi:Token"),
+            "O brapi exige um token para BBAS3. Configure MarketData:Brapi:Token."
+        },
+        {
+            new ProviderKeyMissingException("TwelveData", "AAPL", "MarketData:TwelveData:Key"),
+            "O Twelve Data exige uma chave de API para AAPL. Configure MarketData:TwelveData:Key."
+        },
+        {
+            new ProviderKeyMissingException("CoinGecko", "bitcoin", "MarketData:CoinGecko:DemoKey"),
+            "O CoinGecko exige uma chave demo para bitcoin. Configure MarketData:CoinGecko:DemoKey."
+        },
+        {
+            new ProviderKeyMissingException("Acme", "XYZ", "MarketData:Acme:Key"),
+            "O provedor Acme exige uma chave de acesso para XYZ. Configure MarketData:Acme:Key."
+        },
     };
 
     [Theory]

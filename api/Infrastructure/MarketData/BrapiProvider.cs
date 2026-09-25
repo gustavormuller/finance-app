@@ -18,7 +18,9 @@ namespace Finance.Api.Infrastructure.MarketData;
 /// its day in Sao Paulo, fixed at UTC-3 (Brazil has kept no daylight saving time since
 /// 2019, and a fixed offset needs no time-zone database in the container). An unknown
 /// ticker is a <c>404</c> and reads as an empty series (006, test 4); so does a day
-/// with a null close.
+/// with a null close. Without a token brapi serves PETR4, VALE3, MGLU3 and ITUB4 only
+/// and answers <c>401</c> <c>MISSING_TOKEN</c> for any other ticker, unknown ones included
+/// (019).
 /// </remarks>
 public sealed class BrapiProvider(HttpClient http, IOptions<MarketDataOptions> options, TimeProvider clock) : IPriceProvider
 {
@@ -44,6 +46,7 @@ public sealed class BrapiProvider(HttpClient http, IOptions<MarketDataOptions> o
 
         using var response = await http.SendAsync(request, ct);
         ProviderResponse.ThrowIfRateLimited(response, Name);
+        ProviderResponse.ThrowIfKeyMissing(response, Name, brapi.Token, providerSymbol, BrapiOptions.TokenSetting);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return [];

@@ -39,6 +39,13 @@ public sealed class MarketDataOptionsTests
             options.Resilience.RetryAttempts, options.Resilience.RetryBaseDelay, options.Resilience.FailuresToBreak));
     }
 
+    /// <summary>019: Binance needs no key, only where it lives.</summary>
+    [Fact]
+    public void Appsettings_points_Binance_at_its_public_api()
+    {
+        Assert.Equal("https://api.binance.com/api/v3/", Bind().Binance.BaseUrl);
+    }
+
     [Fact]
     public void Series_codes_are_looked_up_ignoring_case()
     {

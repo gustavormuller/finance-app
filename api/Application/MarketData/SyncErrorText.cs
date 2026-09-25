@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using Finance.Api.Domain.MarketData;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
 
@@ -18,6 +19,7 @@ public static class SyncErrorText
     public static string For(Exception failure) => failure switch
     {
         ProviderRateLimitedException => "O provedor recusou por excesso de requisições; tente mais tarde.",
+        ProviderKeyMissingException missing => KeyMissing(missing),
         ProviderResponseInvalidException => "O provedor respondeu em um formato inesperado.",
         HttpRequestException { StatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden } =>
             "O provedor recusou a chave de acesso.",
@@ -27,4 +29,17 @@ public static class SyncErrorText
         InvalidOperationException => "Provedor ou série sem configuração.",
         _ => "Erro inesperado ao sincronizar.",
     };
+
+    /// <summary>Names the provider, what it wants, the symbol it refused and where to put the key (019).</summary>
+    private static string KeyMissing(ProviderKeyMissingException missing)
+    {
+        var (provider, key) = missing.Provider switch
+        {
+            nameof(ProviderKind.Brapi) => ("O brapi", "um token"),
+            nameof(ProviderKind.TwelveData) => ("O Twelve Data", "uma chave de API"),
+            nameof(ProviderKind.CoinGecko) => ("O CoinGecko", "uma chave demo"),
+            _ => ($"O provedor {missing.Provider}", "uma chave de acesso"),
+        };
+        return $"{provider} exige {key} para {missing.Symbol}. Configure {missing.Setting}.";
+    }
 }

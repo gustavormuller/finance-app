@@ -42,6 +42,8 @@ public sealed class MarketDataOptions
 
     public TwelveDataOptions TwelveData { get; set; } = new();
 
+    public BinanceOptions Binance { get; set; } = new();
+
     public MarketDataResilienceOptions Resilience { get; set; } = new();
 }
 
@@ -117,6 +119,9 @@ public sealed class BrapiOptions
 {
     public string BaseUrl { get; set; } = "";
 
+    /// <summary>Where <see cref="Token"/> is configured, as the sync names it when brapi refuses without one.</summary>
+    public const string TokenSetting = $"{MarketDataOptions.Section}:{nameof(MarketDataOptions.Brapi)}:{nameof(Token)}";
+
     /// <summary>Sent as a bearer token, never in the query string, so it stays out of logged URLs.</summary>
     public string Token { get; set; } = "";
 }
@@ -124,6 +129,9 @@ public sealed class BrapiOptions
 public sealed class CoinGeckoOptions
 {
     public string BaseUrl { get; set; } = "";
+
+    /// <summary>Where <see cref="DemoKey"/> is configured, as the sync names it when CoinGecko refuses without one.</summary>
+    public const string DemoKeySetting = $"{MarketDataOptions.Section}:{nameof(MarketDataOptions.CoinGecko)}:{nameof(DemoKey)}";
 
     /// <summary>Sent as the <c>x-cg-demo-api-key</c> header.</summary>
     public string DemoKey { get; set; } = "";
@@ -139,6 +147,15 @@ public sealed class TwelveDataOptions
 {
     public string BaseUrl { get; set; } = "";
 
+    /// <summary>Where <see cref="Key"/> is configured, as the sync names it when Twelve Data refuses without one.</summary>
+    public const string KeySetting = $"{MarketDataOptions.Section}:{nameof(MarketDataOptions.TwelveData)}:{nameof(Key)}";
+
     /// <summary>Sent as <c>Authorization: apikey ...</c>, never in the query string.</summary>
     public string Key { get; set; } = "";
+}
+
+/// <summary>Binance's public market data: no key, so only where it lives.</summary>
+public sealed class BinanceOptions
+{
+    public string BaseUrl { get; set; } = "";
 }
