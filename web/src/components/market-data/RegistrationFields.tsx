@@ -1,11 +1,17 @@
 import FormField, { selectClasses } from '@/components/FormField';
 import { Input } from '@/components/ui/input';
-import { marketAssetClasses, marketAssetClassLabels, providerKindLabels, providerKinds } from '@/lib/labels';
+import {
+  marketAssetClasses,
+  marketAssetClassLabels,
+  providerKindCoverage,
+  providerKindLabels,
+  providerKinds,
+} from '@/lib/labels';
 
 /**
- * A catalogue registration's fields (006): ticker, optional name, class, provider,
- * symbol at the provider and currency, each with the API's messages for it. Shared by
- * `/market-data` and 007's add asset, which posts the same body.
+ * A catalogue registration's fields: ticker, optional name, class, provider, symbol at
+ * the provider and currency, each with the API's messages for it. Shared by
+ * `/market-data` and the investments' add asset, which posts the same body.
  */
 export default function RegistrationFields({ idPrefix, errors }: { idPrefix: string; errors: Record<string, string[]> }) {
   const id = (field: string) => `${idPrefix}-${field}`;
@@ -31,13 +37,13 @@ export default function RegistrationFields({ idPrefix, errors }: { idPrefix: str
         <select id={id('provider')} name="provider" className={selectClasses} defaultValue="Brapi">
           {providerKinds.map((value) => (
             <option key={value} value={value}>
-              {providerKindLabels[value]}
+              {providerKindLabels[value]} ({providerKindCoverage[value]})
             </option>
           ))}
         </select>
       </FormField>
       <FormField id={id('symbol')} label="Símbolo no provedor" errors={errors.providerSymbol}>
-        <Input id={id('symbol')} name="providerSymbol" maxLength={50} placeholder="PETR4, bitcoin, AAPL" required />
+        <Input id={id('symbol')} name="providerSymbol" maxLength={50} placeholder="PETR4, bitcoin, AAPL, BTCBRL" required />
       </FormField>
       <FormField id={id('currency')} label="Moeda" errors={errors.currency}>
         <select id={id('currency')} name="currency" className={selectClasses} defaultValue="BRL">

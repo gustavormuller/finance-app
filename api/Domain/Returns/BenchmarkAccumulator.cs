@@ -2,7 +2,7 @@ namespace Finance.Api.Domain.Returns;
 
 /// <summary>A benchmark's stored values as an index, base 100 at the period start (008, decisions 6 and 7).</summary>
 /// <remarks>
-/// <paramref name="start"/> is the base day, at exactly 100. A rate row dated after it and
+/// <c>start</c> is the base day, at exactly 100. A rate row dated after it and
 /// on or before the end compounds on its own date; a day without a row holds the index.
 /// A level divides by the last value on or before the start and carries forward on gaps.
 /// The result has one point per calendar day, <c>start</c> to <c>end</c> inclusive, so it

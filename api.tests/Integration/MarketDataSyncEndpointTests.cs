@@ -9,8 +9,8 @@ using static Finance.Api.Tests.Integration.MarketDataApi;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 006 checkpoint 4: the manual sync and the run history, spec integration tests 20 to 22,
-/// with fake providers. The rate limit is global, so each test has a database of its own.
+/// The manual sync and the run history, spec 006 integration tests 20 to 22, with fake
+/// providers. The rate limit is global, so each test has a database of its own.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class MarketDataSyncEndpointTests(PostgresFixture postgres)

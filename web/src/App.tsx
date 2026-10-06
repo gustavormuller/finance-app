@@ -1,22 +1,20 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 
 import ThemeToggle from './components/ThemeToggle';
+import { createQueryClient } from './lib/queryClient';
 import { router } from './router';
 import HealthRoute from './routes/HealthRoute';
 
 // The client lives here rather than in main.tsx so <App /> stays renderable on its
 // own, which is what keeps App.test.tsx working without a wrapper.
-const queryClient = new QueryClient();
+const queryClient = createQueryClient();
 
 /*
- * The application shell: a top bar that does not change per route, the router's
- * output, and the readiness readout at the bottom.
- *
  * The heading and the readout sit outside the router on purpose. They render on the
  * first paint instead of after the router mounts, and an unauthenticated visit to /
- * ends up on /login — where 001's e2e specs still expect to find both after
- * navigating to /. The theme choice (012) is here too, for the same reason: it has to
+ * ends up on /login — where the smoke and health e2e specs still expect to find both
+ * after navigating to /. The theme choice is here too, for the same reason: it has to
  * be reachable on the sign-in page as well.
  *
  * The navigation is not here: it lives in ProtectedLayout, because it needs the

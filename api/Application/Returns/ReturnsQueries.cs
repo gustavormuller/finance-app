@@ -1,3 +1,4 @@
+using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.Returns;
 using Finance.Api.Infrastructure;
@@ -50,7 +51,7 @@ public sealed record AssetReturnsView(
 /// <c>[from - 1, to]</c>. That is <c>from - 1</c> whenever something was held then, and the
 /// first contribution's day at inception, where the architecture puts base 100. XIRR opens
 /// on <c>from - 1</c> with each asset's value there (zero at inception), so the first
-/// day's cash counts (DEFERRED, 008 CP1 and CP4).
+/// day's cash counts.
 /// </remarks>
 public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions<ReturnsOptions> options)
 {
@@ -136,8 +137,16 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
         var movements = (await db.Movements.AsNoTracking().Where(movement => ids.Contains(movement.AssetId))
                 .ToListAsync(cancellationToken))
             .ToLookup(movement => movement.AssetId);
-        var lastRow = await db.PortfolioDaily.Where(row => ids.Contains(row.AssetId))
-            .MaxAsync(row => (DateOnly?)row.Date, cancellationToken);
+        // Each asset's latest day is one backwards probe of the primary key; MAX over
+        // "AssetId" = ANY(ids) read every index entry of every asset instead.
+        var lastRow = await db.Assets
+            .Where(held => ids.Contains(held.Id))
+            .Select(held => db.PortfolioDaily
+                .Where(row => row.AssetId == held.Id)
+                .OrderByDescending(row => row.Date)
+                .Select(row => (DateOnly?)row.Date)
+                .FirstOrDefault())
+            .MaxAsync(cancellationToken);
         if (movements.Count == 0 || lastRow is null)
         {
             return null;
@@ -150,8 +159,19 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
         }
 
         var opening = range.From.AddDays(-1);
-        var rows = (await db.PortfolioDaily.AsNoTracking()
+        // Only the columns the returns read: the date and value for TWR and XIRR, quantity and
+        // price for the FX split. The rest stay at their defaults; at inception this is every
+        // row the user has, and decoding the other numeric columns was most of the request.
+        var rows = (await db.PortfolioDaily
                 .Where(row => ids.Contains(row.AssetId) && row.Date >= opening && row.Date <= range.To)
+                .Select(row => new PortfolioDaily
+                {
+                    AssetId = row.AssetId,
+                    Date = row.Date,
+                    Quantity = row.Quantity,
+                    Price = row.Price,
+                    ValueBrl = row.ValueBrl,
+                })
                 .ToListAsync(cancellationToken))
             .ToLookup(row => row.AssetId);
 
@@ -231,10 +251,8 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
     /// <summary>USDBRL from the latest rate on or before <paramref name="first"/> to <paramref name="last"/>: 007's FX rule.</summary>
     private async Task<IReadOnlyList<DailyPoint>> UsdBrlAsync(DateOnly first, DateOnly last, CancellationToken cancellationToken)
     {
-        var rates = db.Benchmarks.AsNoTracking().Where(rate => rate.Code == Investments.SnapshotRebuild.UsdBrl && rate.Date <= last);
-        var anchor = await rates.Where(rate => rate.Date <= first).MaxAsync(rate => (DateOnly?)rate.Date, cancellationToken);
-        return await (anchor is { } start ? rates.Where(rate => rate.Date >= start) : rates)
-            .OrderBy(rate => rate.Date).Select(rate => new DailyPoint(rate.Date, rate.Value)).ToListAsync(cancellationToken);
+        var rates = await db.UsdBrlRatesAsync(first, last, cancellationToken);
+        return [.. rates.Select(rate => new DailyPoint(rate.Date, rate.Value))];
     }
 
     private static decimal Round(decimal value, int places = RatePlaces) => Math.Round(value, places, MidpointRounding.ToEven);

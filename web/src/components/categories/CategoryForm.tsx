@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { categoryKindLabels, categoryKinds } from '@/lib/labels';
 
 /**
- * Nome, Tipo and "Fica dentro de" — the plain words for a category's place (spec 013).
+ * Nome, Tipo and "Fica dentro de" — the plain words for a category's place.
  * Choosing a main category fixes the kind to that category's, which is the rule the API
  * enforces.
  */

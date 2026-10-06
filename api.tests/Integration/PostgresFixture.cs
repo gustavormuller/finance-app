@@ -9,10 +9,14 @@ namespace Finance.Api.Tests.Integration;
 /// </summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
+    // Every test database keeps an Npgsql pool whose idle connections outlive the test by
+    // up to five minutes, so the run holds far more connections than any one test uses.
+    // PostgreSQL's default of 100 ran out ("53300: too many clients") once the suite grew.
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("financas")
         .WithUsername("dev")
         .WithPassword("dev")
+        .WithCommand("-c", "max_connections=300")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();
@@ -38,6 +42,18 @@ public sealed class PostgresFixture : IAsyncLifetime
         await command.ExecuteNonQueryAsync(cancellationToken);
 
         return new NpgsqlConnectionStringBuilder(ConnectionString) { Database = name }.ConnectionString;
+    }
+
+    /// <summary>
+    /// Closes the idle connections of a database from <see cref="CreateEmptyDatabaseAsync"/>
+    /// once its test is done. Each such database is a pool of its own, and Npgsql keeps idle
+    /// connections for five minutes, longer than the suite runs: left open, they reached the
+    /// container's 100 connections and refused the next test's.
+    /// </summary>
+    public static void ReleaseConnections(string connectionString)
+    {
+        using var connection = new NpgsqlConnection(connectionString);
+        NpgsqlConnection.ClearPool(connection);
     }
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();

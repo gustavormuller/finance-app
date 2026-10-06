@@ -2,7 +2,7 @@ import type { NetWorthPoint } from '@/api/finance';
 import { shiftMonth } from '@/lib/months';
 
 /**
- * 014: the hero's net-worth arithmetic. The API's figures carry two decimal places, so
+ * The hero's net-worth arithmetic. The API's figures carry two decimal places, so
  * they are added and subtracted in whole cents: in floating point 0.1 + 0.2 is a hair
  * off 0.3, and a hair below zero would print as "−0,00".
  */
@@ -13,7 +13,7 @@ export function addMoney(a: number, b: number): number {
   return (cents(a) + cents(b)) / 100;
 }
 
-export type NetWorthChangeKey = 'month' | 'year' | 'twelve';
+type NetWorthChangeKey = 'month' | 'year' | 'twelve';
 
 export interface NetWorthChange {
   key: NetWorthChangeKey;

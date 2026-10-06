@@ -5,7 +5,7 @@ import { money, tooltipProps } from '@/lib/chart';
 import { formatMonth, shortMonth } from '@/lib/months';
 
 /**
- * 014: the hero's sparkline, net worth at each month's end. One series in the accent,
+ * The hero's sparkline, net worth at each month's end. One series in the accent,
  * fading to the ground, with a dot on the latest point and only the first and last
  * months named; the hover tooltip gives any month's figure. The drawing is hidden from
  * screen readers, which get one sentence with the range and both ends instead.
@@ -47,8 +47,8 @@ export default function NetWorthChart({ series }: { series: NetWorthPoint[] }) {
               stroke="var(--primary)"
               strokeWidth={2}
               fill="url(#fade-net-worth)"
-              // Drawn at once: the first thing on the page should not move (012 kept
-              // motion to hover and focus).
+              // Drawn at once: the first thing on the page should not move, and motion is
+              // kept to hover and focus.
               isAnimationActive={false}
               activeDot={{ r: 4, fill: 'var(--primary)', stroke: 'var(--popover)', strokeWidth: 2 }}
             />

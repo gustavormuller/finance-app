@@ -1,4 +1,5 @@
-﻿using Finance.Api.Domain.Investments;
+﻿using Finance.Api.Application.MarketData;
+using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -30,9 +31,6 @@ namespace Finance.Api.Application.Investments;
 /// </remarks>
 public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
 {
-    /// <summary>The benchmark series that values a USD asset in BRL.</summary>
-    public const string UsdBrl = "USDBRL";
-
     public DateOnly Today => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
 
     /// <summary>
@@ -74,25 +72,12 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
         var prices = await ClosesAsync(asset.MarketAssetId, from, cancellationToken);
         var rates = asset.Currency == SnapshotBuilder.BaseCurrency || movements.Count == 0
             ? []
-            : await RatesAsync(movements.Min(movement => movement.Date), cancellationToken);
+            : await db.UsdBrlRatesAsync(movements.Min(movement => movement.Date), last: null, cancellationToken);
 
         await db.PortfolioDaily.Where(row => row.AssetId == assetId && row.Date >= from).ExecuteDeleteAsync(cancellationToken);
 
         var rows = SnapshotBuilder.Build(asset.UserId, assetId, asset.Currency, movements, prices, rates, from, Today);
-        db.PortfolioDaily.AddRange(rows);
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        finally
-        {
-            // Written or refused, the rows must not stay tracked for the next save in
-            // this context: the nightly run rebuilds many assets in one scope.
-            foreach (var row in rows)
-            {
-                db.Entry(row).State = EntityState.Detached;
-            }
-        }
+        await InsertAsync(asset.UserId, assetId, rows, cancellationToken);
 
         if (owned is not null)
         {
@@ -127,7 +112,7 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
             await db.Prices.Where(price => price.MarketAssetId == asset.MarketAssetId).MinAsync(price => (DateOnly?)price.Date, cancellationToken),
             asset.Currency == SnapshotBuilder.BaseCurrency
                 ? DateOnly.MinValue
-                : await db.Benchmarks.Where(rate => rate.Code == UsdBrl).MinAsync(rate => (DateOnly?)rate.Date, cancellationToken),
+                : await db.Benchmarks.Where(rate => rate.Code == Benchmark.UsdBrl).MinAsync(rate => (DateOnly?)rate.Date, cancellationToken),
         ];
 
         var from = lastRow is { } last && last < yesterday ? last.AddDays(1) : yesterday;
@@ -139,18 +124,39 @@ public sealed class SnapshotRebuild(AppDbContext db, TimeProvider clock)
         return from;
     }
 
+    /// <summary>
+    /// One statement for all of an asset's rows, in the transaction the rebuild runs in.
+    /// Through <c>SaveChanges</c>, five years of one asset (about 1 800 rows) were 1 800
+    /// tracked entities and 18 000 parameters, and nine tenths of the rebuild's time. The
+    /// values are the builder's, already rounded; the columns' scales are the same either way.
+    /// </summary>
+    private async Task InsertAsync(Guid userId, Guid assetId, IReadOnlyList<PortfolioDaily> rows, CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        DateOnly[] dates = [.. rows.Select(row => row.Date)], priceDates = [.. rows.Select(row => row.PriceDate)];
+        decimal[] quantities = [.. rows.Select(row => row.Quantity)], averageCosts = [.. rows.Select(row => row.AverageCost)],
+            prices = [.. rows.Select(row => row.Price)], fxRates = [.. rows.Select(row => row.FxRate)],
+            values = [.. rows.Select(row => row.ValueBrl)], costs = [.. rows.Select(row => row.CostBasisBrl)];
+
+        await db.Database.ExecuteSqlAsync(
+            $"""
+            INSERT INTO "PortfolioDaily"
+                ("UserId", "AssetId", "Date", "Quantity", "AverageCost", "Price", "PriceDate", "FxRate", "ValueBrl", "CostBasisBrl")
+            SELECT {userId}, {assetId}, day.*
+            FROM unnest({dates}, {quantities}, {averageCosts}, {prices}, {priceDates}, {fxRates}, {values}, {costs}) AS day
+            """,
+            cancellationToken);
+    }
+
     private async Task<List<Price>> ClosesAsync(Guid marketAssetId, DateOnly from, CancellationToken cancellationToken)
     {
         var closes = db.Prices.AsNoTracking().Where(price => price.MarketAssetId == marketAssetId);
         var anchor = await closes.Where(price => price.Date <= from).MaxAsync(price => (DateOnly?)price.Date, cancellationToken);
         return await closes.Where(price => price.Date >= (anchor ?? from)).ToListAsync(cancellationToken);
-    }
-
-    private async Task<List<Benchmark>> RatesAsync(DateOnly firstMovement, CancellationToken cancellationToken)
-    {
-        var rates = db.Benchmarks.AsNoTracking().Where(rate => rate.Code == UsdBrl);
-        var anchor = await rates.Where(rate => rate.Date <= firstMovement).MaxAsync(rate => (DateOnly?)rate.Date, cancellationToken);
-        return await (anchor is { } start ? rates.Where(rate => rate.Date >= start) : rates).ToListAsync(cancellationToken);
     }
 
     /// <summary>The asset's id folded to the <c>bigint</c> an advisory lock takes.</summary>

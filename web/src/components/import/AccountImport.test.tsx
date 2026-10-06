@@ -7,8 +7,8 @@ import { account, batch, renderAt, stubAccountsApi } from '@/routes/accounts-fix
 import type { SeenRequest } from '@/test-utils';
 
 /**
- * The import inside an account (015): the wizard of 004 and 011, scoped to the
- * account in the address, at `/accounts/$accountId?tab=import`.
+ * The import inside an account, scoped to the account in the address, at
+ * `/accounts/$accountId?tab=import`.
  */
 
 const nubank = account('acc-1', 'Nubank');
@@ -210,7 +210,7 @@ describe('AccountImport, "Sugerir com IA"', () => {
     return { user, suggest };
   }
 
-  /** Spec 015 test 14 (009's, moved from the import page). */
+  /** Spec 015 test 14. */
   it('posts the suggestion, refetches the rows in place and says what changed', async () => {
     const seen = stubApi({ status: 200, body: { suggested: 1, skipped: 0 } });
     const { user, suggest } = await openPreview();

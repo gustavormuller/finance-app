@@ -9,8 +9,8 @@ using Npgsql;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 006 checkpoint 1: the storage layer of the shared market-data catalogue. Spec
-/// integration tests 17 and 18, and the database half of 19.
+/// The storage layer of the shared market-data catalogue. Spec 006 integration tests 17
+/// and 18, and the database half of 19.
 /// </summary>
 /// <remarks>
 /// Every table here is shared by all users, and the test database is shared by every
@@ -186,7 +186,7 @@ public sealed class MarketDataPersistenceTests(PostgresFixture postgres)
         }
     }
 
-    /// <summary>Spec integration test 19, at the constraint; the 409 arrives with the endpoint.</summary>
+    /// <summary>Spec integration test 19, at the constraint.</summary>
     [Fact]
     public async Task A_provider_symbol_is_unique_per_provider()
     {

@@ -19,8 +19,25 @@
 	handle /health {
 		reverse_proxy api:8080
 	}
+	# 022: the build output is content-hashed, so a name never changes content and any
+	# cache may keep it for good. Only a 200 says so. A missing file is a 404, never the
+	# SPA's index.html: a stale chunk must fail as a chunk, and an edge must not store
+	# HTML under a script's name.
+	handle /assets/* {
+		root * /srv
+		header {
+			Cache-Control "public, max-age=31536000, immutable"
+			match status 200
+		}
+		file_server
+	}
+	# index.html (every app route), sw.js and manifest.webmanifest must be revalidated on
+	# every load, or a deploy waits for a cache to expire; the service worker is only
+	# replaced when the browser sees a new sw.js. try_files serves both as the files they
+	# are, with their own Content-Type.
 	handle {
 		root * /srv
+		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}

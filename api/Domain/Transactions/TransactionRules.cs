@@ -13,7 +13,8 @@ public readonly record struct RuleViolation(string Field, string Message);
 /// <remarks>
 /// The rules that are not here — currency matching the account, ids resolving under
 /// the current user's filter, a child category being given children — all need a
-/// query to decide, and live in <c>Application/</c> next to the context that runs it.
+/// query to decide, and live in <c>Application/Transactions</c> and
+/// <c>Application/Categories</c>, next to the context that runs it.
 /// </remarks>
 public static class TransactionRules
 {
@@ -23,7 +24,6 @@ public static class TransactionRules
     /// </summary>
     public const string AmountField = "amount";
 
-    /// <summary>The field name the API reports for a date rejection.</summary>
     public const string DateField = "date";
 
     /// <summary>
@@ -52,7 +52,7 @@ public static class TransactionRules
             new RuleViolation(AmountField, "Uma categoria de receita exige um valor positivo."),
         CategoryKind.Expense when amount > 0m =>
             new RuleViolation(AmountField, "Uma categoria de despesa exige um valor negativo."),
-        // 005: a transfer leaves one account and arrives in another, so either sign
+        // A transfer leaves one account and arrives in another, so either sign
         // is legitimate. Zero is still rule 1's to refuse.
         CategoryKind.Transfer => null,
         _ => null,

@@ -5,12 +5,13 @@ import { useState } from 'react';
 import { api, type Account } from '@/api/finance';
 import Alert from '@/components/Alert';
 import { Button } from '@/components/ui/button';
-import { accountRefusal, type Refusal } from '@/lib/accounts';
+import { accountRefusal } from '@/lib/accounts';
+import type { Refusal } from '@/lib/refusal';
 
 import AccountForm from './AccountForm';
 
 /**
- * "Detalhes da conta" (015): the edit form and the delete, with the messages the
+ * "Detalhes da conta": the edit form and the delete, with the messages the
  * accounts page always had. A refused delete shows the 409's sentence, which says how
  * many transactions are in the way — the reason the endpoint composes one.
  */

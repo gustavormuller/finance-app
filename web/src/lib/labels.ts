@@ -64,7 +64,7 @@ export const stagedRowStatusLabels: Record<StagedRowStatus, string> = {
   Invalid: 'Inválida',
 };
 
-/** Which rung chose a staged row's category (009). The preview only marks `Ai`. */
+/** Which rung chose a staged row's category. The preview only marks `Ai`. */
 export const categorySourceLabels: Record<CategorySource, string> = {
   None: 'Sem categoria',
   History: 'Pelo histórico',
@@ -115,9 +115,18 @@ export const providerKindLabels: Record<ProviderKind, string> = {
   Brapi: 'brapi',
   CoinGecko: 'CoinGecko',
   TwelveData: 'Twelve Data',
+  Binance: 'Binance',
 };
 
-export const providerKinds: ProviderKind[] = ['Brapi', 'CoinGecko', 'TwelveData'];
+/** What each provider prices, beside its name where one is picked; the catalogue shows the plain name. */
+export const providerKindCoverage: Record<ProviderKind, string> = {
+  Brapi: 'B3: ações, FIIs, ETFs',
+  CoinGecko: 'cripto',
+  TwelveData: 'ações dos EUA',
+  Binance: 'cripto em reais',
+};
+
+export const providerKinds: ProviderKind[] = ['Brapi', 'CoinGecko', 'TwelveData', 'Binance'];
 
 const syncSectionLabels: Record<string, string> = {
   Bcb: 'Banco Central (SGS)',
@@ -126,7 +135,7 @@ const syncSectionLabels: Record<string, string> = {
 
 /**
  * A key of a sync run's summary: a `ProviderKind` member, `Bcb` for the benchmark series,
- * or `Snapshots` for 007's rebuild after the sync. An unknown key is shown as sent rather
+ * or `Snapshots` for the snapshot rebuild after the sync. An unknown key is shown as sent rather
  * than hidden.
  */
 export function syncProviderLabel(key: string): string {
@@ -155,10 +164,7 @@ export const movementKindLabels: Record<MovementKind, string> = {
 
 export const movementKinds: MovementKind[] = ['Buy', 'Sell', 'Dividend', 'Jcp', 'Split'];
 
-/**
- * 008's benchmarks, keyed by the code the returns API sends (DEFERRED, 008 · CP3 and
- * CP4). The names are the spec's configuration labels.
- */
+/** Keyed by the code the returns API sends. The names are spec 008's configuration labels. */
 const benchmarkLabels: Record<string, string> = {
   CDI: 'CDI',
   SELIC: 'SELIC',
@@ -175,7 +181,7 @@ export function benchmarkLabel(code: string): string {
   return benchmarkLabels[code] ?? code;
 }
 
-/** Where the full name does not fit, as in 016's comparison tiles. */
+/** Where the full name does not fit, as in the comparison tiles. */
 const benchmarkShortLabels: Record<string, string> = {
   IVVB11: 'S&P 500',
 };

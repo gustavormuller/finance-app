@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Finance.Api.Domain.Import;
 
 namespace Finance.Api.Tests.Integration;
@@ -156,6 +157,35 @@ public sealed class CsvImportEndpointTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(["amountColumn", "dateColumn"], (await TransactionsFixtures.ProblemFieldsAsync(response, cancellationToken)).Order());
         Assert.Empty((await user.Client.GetFromJsonAsync<List<ImportFixtures.BatchItem>>("/api/imports", cancellationToken))!);
+    }
+
+    /// <summary>
+    /// An optional column reference is read the way a saved template stores it: trimmed.
+    /// The padding never mattered to resolving the column, so the refusal names the
+    /// column that was looked for, whether the mapping came inline or from a template.
+    /// </summary>
+    [Fact]
+    public async Task A_padded_optional_column_is_reported_trimmed_as_a_template_would_store_it()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("csv-padded-column", cancellationToken);
+        var accountId = await user.CreateAccountAsync("Nubank", cancellationToken);
+
+        using var response = await user.Client.SendAsync(
+            ImportFixtures.Upload(
+                "/api/imports",
+                Encoding.UTF8.GetBytes(Nubank),
+                "nubank.csv",
+                ImportFixtures.CsvFields(accountId, "en-US", "dd/MM/yyyy", "Signed", "Data", "  Amount  ", "Descrição", delimiter: ",")),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        Assert.Equal(
+            "Coluna \"Amount\" não encontrada no arquivo.",
+            problem.RootElement.GetProperty("errors").GetProperty("amountColumn")[0].GetString());
     }
 
     /// <summary>

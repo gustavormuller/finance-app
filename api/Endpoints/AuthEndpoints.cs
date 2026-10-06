@@ -5,7 +5,6 @@ using Finance.Api.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace Finance.Api.Endpoints;
 
@@ -49,7 +48,7 @@ public static class AuthEndpoints
             })
             .RequireAuthorization();
 
-        // 009: the user's own ai_enabled (ADR-010), the only way to turn AI on from the app.
+        // The user's own ai_enabled (ADR-010), the only way to turn AI on from the app.
         // Answers with the whole of GET /api/auth/me, aiEnabled included.
         routes.MapPatch("/api/auth/me", async (MePatch patch, ClaimsPrincipal principal, UserManager<AppUser> users) =>
             {
@@ -72,6 +71,21 @@ public static class AuthEndpoints
                 }
 
                 return Results.Ok(new MeResponse(user.Id, user.Email!, user.DisplayName, user.AiEnabled));
+            })
+            .RequireAuthorization();
+
+        // 023: the account and everything in it (ADR-013). A cookie whose user is already
+        // gone is not a session, as in GET.
+        routes.MapDelete("/api/auth/me", async (UserDeletion deletion, SignInManager<AppUser> signInManager, CancellationToken ct) =>
+            {
+                if (!await deletion.DeleteAsync(ct))
+                {
+                    return Results.Unauthorized();
+                }
+
+                await signInManager.SignOutAsync();
+
+                return Results.NoContent();
             })
             .RequireAuthorization();
 
