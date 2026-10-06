@@ -1,4 +1,4 @@
-using Finance.Api.Domain.MarketData;
+﻿using Finance.Api.Domain.MarketData;
 using Finance.Api.Domain.Transactions;
 
 namespace Finance.Api.Application.Compare;

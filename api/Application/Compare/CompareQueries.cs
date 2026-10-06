@@ -226,6 +226,7 @@ public sealed class CompareQueries(AppDbContext db, TimeProvider clock, IOptions
         ComparePlan plan,
         Comparison? comparison)
     {
+        // The comparison holds only the drawn series: where each requested one sits among them.
         var drawn = 0;
         var positions = plan.HasData.Select(hasData => comparison is not null && hasData ? drawn++ : (int?)null).ToList();
         var series = described.Select((one, position) =>

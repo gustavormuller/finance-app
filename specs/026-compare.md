@@ -118,15 +118,15 @@ Everything is `decimal` until it is serialised.
 ### Integration — `api.tests/Integration`
 
 7. Without a session, 401.
-8. Every refusal names its field with its pt-BR message: one series, seven, malformed, repeated, an unknown asset, an unknown benchmark; an unknown period; dates beside a preset; a malformed date; `from` not before `to`; an unknown currency.
+8. Every refusal names its field with its pt-BR message: one series, seven, malformed, repeated, an unknown asset, an unknown benchmark; an unknown period; dates beside a preset; a malformed date; `from` not before `to`; an unknown currency, and a series that cannot be converted to the one asked.
 9. Seeded closes and benchmarks, a custom period: an asset in BRL, one in USD, CDI, IPCA and USDBRL come back with hand-computed changes, annualised rates and points, in the order requested; converting to R$ and to US$ multiplies and divides by the PTAX of each day.
 10. States: a series without data in the window is `hasData: false` with null values; series that do not overlap give `period: null`.
 11. With a fixed clock, a preset and Máx resolve their start, and the start moves to the latest-starting series.
 
 ### E2E — `web/e2e/compare.spec.ts`, on the fake providers
 
-12. With nothing chosen, and with CDI alone, the page asks for a second series and draws nothing.
-13. Two catalogue assets registered on `/market-data` (one BRL on brapi, one USD on CoinGecko) and synced, and CDI, picked by search: a custom period of the last ten days shows each asset's change (9,90 to 10,00: +1,01%), three rows and three lines; 1A presses its button, refetches and writes `period=1y` to the URL.
+12. Reached from the navigation: with nothing chosen, and with CDI alone, the page asks for a second series and draws nothing; removing CDI's chip empties the selection.
+13. Two catalogue assets registered on `/market-data` (one BRL on brapi, one USD on CoinGecko) and synced, and CDI, picked by search: a custom period of the last ten days shows each asset's change (9,90 to 10,00: +1,01%), three rows and three lines; 1A presses its button, refetches and writes `period=1y` to the URL; Log does the same with `scale=log`.
 14. "Converter para R$" marks the USD asset as converted, "Converter para US$" the BRL asset and CDI, and the changes hold (PTAX is constant in the fakes); the URL carries `currency`. The URL opened in a new page shows the same series, period and currency.
 
 No web unit test: the page's behaviour is the E2E's. Every existing test keeps passing.
