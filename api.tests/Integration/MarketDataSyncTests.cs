@@ -184,6 +184,9 @@ public sealed partial class MarketDataSyncTests(PostgresFixture postgres)
             Provider = provider,
             ProviderSymbol = symbol,
             IsActive = active,
+
+            // Loaded from this provider before (025): the sync goes on from what is stored.
+            HistoryLoadedAt = Now.AddDays(-30),
             CreatedAt = Now.AddDays(-30),
         };
         await using var db = Context();

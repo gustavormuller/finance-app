@@ -21,7 +21,7 @@ internal sealed class InvestmentsApi : IAsyncDisposable
         ConnectionString = connectionString;
         Factory = new IdentityApiFactory(connectionString, services: services =>
         {
-            services.AddSingleton<IPriceProviderRegistry>(new PriceProviderRegistry([Brapi]));
+            services.AddSingleton<IPriceProviderRegistry>(new PriceProviderRegistry([Brapi, Yahoo]));
             services.AddSingleton<IBenchmarkProvider>(Bcb);
             if (clock is not null)
             {
@@ -41,6 +41,9 @@ internal sealed class InvestmentsApi : IAsyncDisposable
     public IdentityApiFactory Factory { get; }
 
     public FakePriceProvider Brapi { get; } = new(ProviderKind.Brapi);
+
+    /// <summary>Serves the IVVB11 benchmark (025) as Yahoo does: whole histories, revised.</summary>
+    public FakePriceProvider Yahoo { get; } = new(ProviderKind.Yahoo) { HistoryStart = new(1900, 1, 1), RevisesHistory = true };
 
     public FakeBenchmarkProvider Bcb { get; } = new();
 

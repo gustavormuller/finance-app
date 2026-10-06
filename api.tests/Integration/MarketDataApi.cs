@@ -17,7 +17,7 @@ internal sealed class MarketDataApi : IAsyncDisposable
         ConnectionString = connectionString;
         Factory = new IdentityApiFactory(connectionString, services: services =>
         {
-            services.AddSingleton<IPriceProviderRegistry>(new PriceProviderRegistry([Brapi, CoinGecko, TwelveData]));
+            services.AddSingleton<IPriceProviderRegistry>(new PriceProviderRegistry([Brapi, CoinGecko, TwelveData, Yahoo]));
             services.AddSingleton<IBenchmarkProvider>(Bcb);
         });
     }
@@ -31,6 +31,9 @@ internal sealed class MarketDataApi : IAsyncDisposable
     public FakePriceProvider CoinGecko { get; } = new(ProviderKind.CoinGecko);
 
     public FakePriceProvider TwelveData { get; } = new(ProviderKind.TwelveData);
+
+    /// <summary>Serves the IVVB11 benchmark (025) as Yahoo does: whole histories, revised.</summary>
+    public FakePriceProvider Yahoo { get; } = new(ProviderKind.Yahoo) { HistoryStart = new(1900, 1, 1), RevisesHistory = true };
 
     public FakeBenchmarkProvider Bcb { get; } = new();
 

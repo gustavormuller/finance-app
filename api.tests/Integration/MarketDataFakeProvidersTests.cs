@@ -38,8 +38,9 @@ public sealed class MarketDataFakeProvidersTests(PostgresFixture postgres)
         var second = await SyncAsync(client, ct);
 
         Assert.All([first, second], run => Assert.Equal(("Manual", "Succeeded"), (run.Trigger, run.Status)));
-        Assert.Equal(2, first.Summary["Brapi"].ItemsSynced); // PETR4 and the IVVB11 benchmark
+        Assert.Equal(1, first.Summary["Brapi"].ItemsSynced); // PETR4
         Assert.True(first.Summary["Brapi"].RowsWritten > 0);
+        Assert.Equal(1, first.Summary["Yahoo"].ItemsSynced); // the IVVB11 benchmark (025)
         Assert.True(first.Summary["Bcb"].ItemsSynced > 0);
     }
 
@@ -73,9 +74,19 @@ public sealed class MarketDataFakeProvidersTests(PostgresFixture postgres)
 
     private static async Task<SyncRunItem> SyncAsync(HttpClient client, CancellationToken ct)
     {
-        using var response = await client.SendAsync(TransactionsFixtures.Post("/api/market-data/sync", new { }), ct);
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-        var id = (await response.Content.ReadFromJsonAsync<Accepted>(ct))!.SyncRunId;
+        // A run reads Succeeded before the snapshot rebuild after it lets go of the gate, so a
+        // second run at once can meet a 429 from the gate (not from the window) for a moment.
+        var response = await client.SendAsync(TransactionsFixtures.Post("/api/market-data/sync", new { }), ct);
+        for (var attempt = 0; attempt < 50 && response.StatusCode == HttpStatusCode.TooManyRequests; attempt++)
+        {
+            response.Dispose();
+            await Task.Delay(100, ct);
+            response = await client.SendAsync(TransactionsFixtures.Post("/api/market-data/sync", new { }), ct);
+        }
+
+        using var accepted = response;
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        var id = (await accepted.Content.ReadFromJsonAsync<Accepted>(ct))!.SyncRunId;
 
         for (var attempt = 0; attempt < 100; attempt++)
         {

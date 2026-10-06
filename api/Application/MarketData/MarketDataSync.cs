@@ -6,9 +6,8 @@ using Microsoft.Extensions.Options;
 namespace Finance.Api.Application.MarketData;
 
 /// <summary>
-/// The market-data sync: every active asset's closes, then every benchmark series,
-/// each fetched from the day after its latest stored row (or <c>BackfillYears</c> back)
-/// through yesterday and upserted. One <see cref="SyncRun"/> row records the run.
+/// The market-data sync: every active asset's closes, then every benchmark series, each
+/// brought up to yesterday and upserted. One <see cref="SyncRun"/> row records the run.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,6 +15,18 @@ namespace Finance.Api.Application.MarketData;
 /// have closed, and CoinGecko dates its points by UTC day, so every stored close is final.
 /// Asking for today would store an intraday price as a close that the next run, starting
 /// the day after it, would never correct.
+/// </para>
+/// <para>
+/// How far back (025): an asset whose whole history has not been loaded from its current
+/// provider (<see cref="MarketAsset.HistoryLoadedAt"/> null) gets it, from the provider's
+/// <see cref="IPriceProvider.HistoryStart"/> or <c>BackfillYears</c> back, in place of what
+/// is stored. A price benchmark with no row gets the same. A BCB series reaches back to
+/// <c>MarketData:Bcb:HistoryStart</c>, once. After that, each item is asked for the days
+/// after its latest stored one; a provider that revises history (Yahoo) is asked from
+/// <see cref="RevisionOverlapDays"/> before it, and a stored day that now reads differently
+/// reloads the whole history (<see cref="PriceRevision"/>). A stored close that changes
+/// marks <see cref="MarketAsset.PricesRevisedFrom"/>, which the snapshot rebuild after the
+/// sync starts from.
 /// </para>
 /// <para>
 /// Failures are caught per item (an asset or a series), so one bad ticker never stops its
@@ -35,6 +46,15 @@ public sealed class MarketDataSync(
 {
     /// <summary>The summary key of the <see cref="IBenchmarkProvider"/>'s series.</summary>
     public const string BenchmarkProviderName = "Bcb";
+
+    /// <summary>How many days before its latest stored one a revising provider's series is read again (025, decision 12).</summary>
+    public const int RevisionOverlapDays = 7;
+
+    /// <summary>
+    /// A BCB series stored from this close to <c>HistoryStart</c> has reached it: the first
+    /// days can be a weekend or a holiday.
+    /// </summary>
+    private const int HistoryStartSlackDays = 7;
 
     /// <summary>Records a run and performs it: <see cref="StartAsync"/>, then <see cref="ExecuteAsync(Guid, CancellationToken)"/>.</summary>
     public async Task<SyncRun> RunAsync(SyncTrigger trigger, CancellationToken cancellationToken) =>
@@ -67,9 +87,11 @@ public sealed class MarketDataSync(
         var summary = new SortedDictionary<string, ProviderSyncSummary>(StringComparer.Ordinal);
         try
         {
+            var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+            var window = new Window(today.AddDays(-1), today.AddYears(-options.Value.BackfillYears));
             foreach (var provider in (await ItemsAsync(cancellationToken)).GroupBy(item => item.Provider))
             {
-                summary[provider.Key] = await SyncProviderAsync(provider.Key, provider, cancellationToken);
+                summary[provider.Key] = await SyncProviderAsync(provider.Key, provider, window, cancellationToken);
             }
         }
         catch (Exception error)
@@ -95,12 +117,8 @@ public sealed class MarketDataSync(
     }
 
     private async Task<ProviderSyncSummary> SyncProviderAsync(
-        string provider, IEnumerable<Item> items, CancellationToken cancellationToken)
+        string provider, IEnumerable<Item> items, Window window, CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-        var to = today.AddDays(-1);
-        var backfillFrom = today.AddYears(-options.Value.BackfillYears);
-
         var part = new ProviderSyncSummary();
         string? rateLimited = null;
         foreach (var item in items)
@@ -113,13 +131,7 @@ public sealed class MarketDataSync(
 
             try
             {
-                var from = (await item.LatestAsync(cancellationToken))?.AddDays(1) ?? backfillFrom;
-                if (from <= to)
-                {
-                    part.RowsWritten += await item.SyncAsync(from, to, cancellationToken);
-                }
-
-                await item.SyncedAsync(cancellationToken);
+                part.RowsWritten += await item.SyncAsync(window, cancellationToken);
                 part.ItemsSynced++;
             }
             catch (Exception error) when (!cancellationToken.IsCancellationRequested)
@@ -144,38 +156,172 @@ public sealed class MarketDataSync(
             .OrderBy(asset => asset.Provider).ThenBy(asset => asset.Ticker)
             .ToListAsync(cancellationToken);
 
-        var items = assets.Select(asset => new Item(
-            asset.Provider.ToString(),
-            asset.Ticker,
-            ct => db.Set<Price>().Where(price => price.MarketAssetId == asset.Id).MaxAsync(price => (DateOnly?)price.Date, ct),
-            async (from, to, ct) => await store.UpsertPricesAsync(
-                asset.Id, await prices.For(asset.Provider).GetDailyClosesAsync(asset.ProviderSymbol, from, to, ct), ct),
-            async ct =>
-            {
-                var now = clock.GetUtcNow();
-                await db.Set<MarketAsset>().Where(entity => entity.Id == asset.Id)
-                    .ExecuteUpdateAsync(set => set.SetProperty(entity => entity.LastSyncedAt, now), ct);
-            })).ToList();
+        var items = assets
+            .Select(asset => new Item(asset.Provider.ToString(), asset.Ticker, (window, ct) => SyncAssetAsync(asset, window, ct)))
+            .ToList();
 
         items.AddRange(options.Value.PriceBenchmarks.Select(benchmark => new Item(
             benchmark.Value.Provider.ToString(),
             benchmark.Key,
-            ct => LatestBenchmarkAsync(benchmark.Key, ct),
-            async (from, to, ct) =>
-            {
-                var closes = await prices.For(benchmark.Value.Provider).GetDailyClosesAsync(benchmark.Value.Symbol, from, to, ct);
-                return await store.UpsertBenchmarkAsync(
-                    benchmark.Key, [.. closes.Select(close => new DailyValue(close.Date, close.Close))], ct);
-            })));
+            (window, ct) => SyncPriceBenchmarkAsync(benchmark.Key, benchmark.Value, window, ct))));
 
         items.AddRange(options.Value.Bcb.Series.Keys.Order(StringComparer.Ordinal).Select(code => new Item(
-            BenchmarkProviderName,
-            code,
-            ct => LatestBenchmarkAsync(code, ct),
-            async (from, to, ct) => await store.UpsertBenchmarkAsync(
-                code, await benchmarks.GetSeriesAsync(code, from, to, ct), ct))));
+            BenchmarkProviderName, code, (window, ct) => SyncSeriesAsync(code, window, ct))));
 
         return items;
+    }
+
+    private async Task<int> SyncAssetAsync(MarketAsset asset, Window window, CancellationToken cancellationToken)
+    {
+        var provider = prices.For(asset.Provider);
+        var latest = await db.Set<Price>().Where(price => price.MarketAssetId == asset.Id)
+            .MaxAsync(price => (DateOnly?)price.Date, cancellationToken);
+
+        var rows = asset.HistoryLoadedAt is null ? await LoadHistoryAsync(asset, provider, window, replace: true, cancellationToken)
+            : latest is null ? await LoadHistoryAsync(asset, provider, window, replace: false, cancellationToken)
+            : provider.RevisesHistory ? await RefreshAsync(asset, provider, latest.Value, window, cancellationToken)
+            : latest.Value < window.To
+                ? await store.UpsertPricesAsync(
+                    asset.Id, await provider.GetDailyClosesAsync(asset.ProviderSymbol, latest.Value.AddDays(1), window.To, cancellationToken), cancellationToken)
+                : 0;
+
+        var now = clock.GetUtcNow();
+        await db.Set<MarketAsset>().Where(entity => entity.Id == asset.Id)
+            .ExecuteUpdateAsync(set => set.SetProperty(entity => entity.LastSyncedAt, now), cancellationToken);
+        return rows;
+    }
+
+    /// <summary>
+    /// The asset's whole history from its provider, in one transaction with its marks. When
+    /// <paramref name="replace"/>, it takes the place of what is stored: a series from another
+    /// source is never merged with this one. A provider that returns nothing leaves both the
+    /// stored prices and the pending load as they are.
+    /// </summary>
+    private async Task<int> LoadHistoryAsync(
+        MarketAsset asset, IPriceProvider provider, Window window, bool replace, CancellationToken cancellationToken)
+    {
+        var closes = await provider.GetDailyClosesAsync(
+            asset.ProviderSymbol, provider.HistoryStart ?? window.BackfillFrom, window.To, cancellationToken);
+        if (closes.Count == 0)
+        {
+            return 0;
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var stored = await db.Set<Price>().AsNoTracking().Where(price => price.MarketAssetId == asset.Id)
+            .ToDictionaryAsync(price => price.Date, price => price.Close, cancellationToken);
+        var rows = replace
+            ? await store.ReplacePricesAsync(asset.Id, closes, cancellationToken)
+            : await store.UpsertPricesAsync(asset.Id, closes, cancellationToken);
+        await MarkRevisedAsync(asset.Id, PriceRevision.EarliestChange(stored, closes, replace), cancellationToken);
+
+        // Only if the source is still the one read: an edit during the run keeps its pending load.
+        var now = clock.GetUtcNow();
+        await db.Set<MarketAsset>()
+            .Where(entity => entity.Id == asset.Id && entity.Provider == asset.Provider && entity.ProviderSymbol == asset.ProviderSymbol)
+            .ExecuteUpdateAsync(set => set.SetProperty(entity => entity.HistoryLoadedAt, now), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return rows;
+    }
+
+    /// <summary>
+    /// A revising provider's days since <see cref="RevisionOverlapDays"/> before the latest
+    /// stored one. A stored day that reads differently reloads the whole history; otherwise
+    /// only the days not stored yet are written.
+    /// </summary>
+    private async Task<int> RefreshAsync(
+        MarketAsset asset, IPriceProvider provider, DateOnly latest, Window window, CancellationToken cancellationToken)
+    {
+        var from = latest.AddDays(-RevisionOverlapDays);
+        var closes = await provider.GetDailyClosesAsync(asset.ProviderSymbol, from, window.To, cancellationToken);
+        var stored = await db.Set<Price>().AsNoTracking().Where(price => price.MarketAssetId == asset.Id && price.Date >= from)
+            .ToDictionaryAsync(price => price.Date, price => new StoredPrice(price.Close, price.AdjustedClose), cancellationToken);
+
+        if (PriceRevision.Revised(stored, closes))
+        {
+            logger.LogInformation("Market-data sync: {Provider} revised {Ticker}; reloading its whole history.", asset.Provider, asset.Ticker);
+            return await LoadHistoryAsync(asset, provider, window, replace: false, cancellationToken);
+        }
+
+        List<DailyClose> fresh = [.. closes.Where(close => !stored.ContainsKey(close.Date))];
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var rows = await store.UpsertPricesAsync(asset.Id, fresh, cancellationToken);
+
+        // A day filled in before the latest stored one replaces the close the snapshots carried over it.
+        await MarkRevisedAsync(
+            asset.Id, PriceRevision.EarliestChange(stored.ToDictionary(price => price.Key, price => price.Value.Close), fresh, replacing: false),
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return rows;
+    }
+
+    /// <summary>Moves <see cref="MarketAsset.PricesRevisedFrom"/> back to <paramref name="day"/>, never forward.</summary>
+    private async Task MarkRevisedAsync(Guid marketAssetId, DateOnly? day, CancellationToken cancellationToken)
+    {
+        if (day is not { } revised)
+        {
+            return;
+        }
+
+        await db.Set<MarketAsset>()
+            .Where(entity => entity.Id == marketAssetId && (entity.PricesRevisedFrom == null || entity.PricesRevisedFrom > revised))
+            .ExecuteUpdateAsync(set => set.SetProperty(entity => entity.PricesRevisedFrom, revised), cancellationToken);
+    }
+
+    /// <summary>
+    /// A benchmark read as an asset's closes (IVVB11): its total-return level,
+    /// <see cref="DailyClose.AdjustedClose"/> where the provider sends one (025, decision 14).
+    /// Loaded whole when it has no row; refreshed like an asset after that.
+    /// </summary>
+    private async Task<int> SyncPriceBenchmarkAsync(string code, PriceBenchmark benchmark, Window window, CancellationToken cancellationToken)
+    {
+        var provider = prices.For(benchmark.Provider);
+        var latest = await LatestBenchmarkAsync(code, cancellationToken);
+
+        Task<IReadOnlyList<DailyClose>> Read(DateOnly from) => provider.GetDailyClosesAsync(benchmark.Symbol, from, window.To, cancellationToken);
+        Task<int> Write(IEnumerable<DailyClose> closes) =>
+            store.UpsertBenchmarkAsync(code, [.. closes.Select(close => new DailyValue(close.Date, close.AdjustedClose ?? close.Close))], cancellationToken);
+
+        if (latest is null)
+        {
+            return await Write(await Read(provider.HistoryStart ?? window.BackfillFrom));
+        }
+
+        if (!provider.RevisesHistory)
+        {
+            return latest.Value < window.To ? await Write(await Read(latest.Value.AddDays(1))) : 0;
+        }
+
+        var from = latest.Value.AddDays(-RevisionOverlapDays);
+        var closes = await Read(from);
+        var stored = await db.Set<Benchmark>().AsNoTracking().Where(value => value.Code == code && value.Date >= from)
+            .ToDictionaryAsync(value => value.Date, value => value.Value, cancellationToken);
+
+        return closes.Any(close => stored.TryGetValue(close.Date, out var value) && PriceRevision.Differs(value, close.AdjustedClose ?? close.Close))
+            ? await Write(await Read(provider.HistoryStart ?? window.BackfillFrom))
+            : await Write(closes.Where(close => !stored.ContainsKey(close.Date)));
+    }
+
+    /// <summary>A BCB series: the days after its latest stored one, and once, the years back to <c>HistoryStart</c>.</summary>
+    private async Task<int> SyncSeriesAsync(string code, Window window, CancellationToken cancellationToken)
+    {
+        var historyStart = options.Value.Bcb.HistoryStart;
+        var values = db.Set<Benchmark>().Where(value => value.Code == code);
+        var earliest = await values.MinAsync(value => (DateOnly?)value.Date, cancellationToken);
+        var latest = await values.MaxAsync(value => (DateOnly?)value.Date, cancellationToken);
+
+        async Task<int> SyncAsync(DateOnly from, DateOnly to) =>
+            from > to ? 0 : await store.UpsertBenchmarkAsync(code, await benchmarks.GetSeriesAsync(code, from, to, cancellationToken), cancellationToken);
+
+        if (earliest is null || latest is null)
+        {
+            return await SyncAsync(historyStart ?? window.BackfillFrom, window.To);
+        }
+
+        var older = historyStart is { } start && earliest.Value > start.AddDays(HistoryStartSlackDays)
+            ? await SyncAsync(start, earliest.Value.AddDays(-1))
+            : 0;
+        return older + await SyncAsync(latest.Value.AddDays(1), window.To);
     }
 
     private Task<DateOnly?> LatestBenchmarkAsync(string code, CancellationToken cancellationToken) =>
@@ -206,15 +352,9 @@ public sealed class MarketDataSync(
         part.Failures.Add(new SyncFailure(item, error));
     }
 
-    /// <summary>One asset or series: its latest stored day, how to fetch and store a range, what to do once current.</summary>
-    private sealed record Item(
-        string Provider,
-        string Label,
-        Func<CancellationToken, Task<DateOnly?>> LatestAsync,
-        Func<DateOnly, DateOnly, CancellationToken, Task<int>> SyncAsync,
-        Func<CancellationToken, Task>? Synced = null)
-    {
-        public Task SyncedAsync(CancellationToken cancellationToken) =>
-            Synced?.Invoke(cancellationToken) ?? Task.CompletedTask;
-    }
+    /// <summary>The run's bounds: yesterday, and where a first load reaches back to without a history start.</summary>
+    private readonly record struct Window(DateOnly To, DateOnly BackfillFrom);
+
+    /// <summary>One asset or series, and how to bring it up to date; returns the rows written.</summary>
+    private sealed record Item(string Provider, string Label, Func<Window, CancellationToken, Task<int>> SyncAsync);
 }
