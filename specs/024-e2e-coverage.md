@@ -48,13 +48,13 @@ The site's routes (`web/src/routeTree.tsx`): `/login`, and behind the sign-in `/
 health footer.
 
 **Before:** 33 tests in 13 files of `web/e2e`, plus 5 in the separate PWA suite.
-**After:** 86 tests in 16 files of `web/e2e` (80 run, 6 `test.fixme` for the bugs below), plus the
+**After:** 87 tests in 16 files of `web/e2e` (80 run, 7 `test.fixme` for the bugs below), plus the
 same 5 in the PWA suite.
 
 **Flows:** 108 listed below. Before this spec 33 were covered, 15 partly and 60 were gaps. After
 it, 104 map to a passing test and 4 (AUTH-5, NAV-4, TX-10, CAT-5) only to `test.fixme` tests naming
-5 of the 6 bugs below; the sixth sits beside IMP-16's passing test. 16 more flows are listed as not
-E2E-reachable (the last table).
+5 of the 7 bugs below; the other two sit beside the passing tests of ACC-2 and IMP-16. 16 more
+flows are listed as not E2E-reachable (the last table).
 
 "Before" names the test that covered the flow when this spec was written; **GAP** means none
 did, *partial* means a test touched the flow without asserting its outcome. "After" names the
@@ -125,7 +125,7 @@ test that covers it now, by file and title.
 | # | Flow | Before | After |
 |---|---|---|---|
 | ACC-1 | No accounts: the empty state creates the first, Cancelar writes nothing | GAP | `accounts` "a new user creates the first account from the empty state" |
-| ACC-2 | Creating an account, with or without an opening balance | `support.createAccount` | unchanged; `accounts` "the tab is in the address…" (empty balance is zero) |
+| ACC-2 | Creating an account, with or without an opening balance | `support.createAccount` | unchanged; `accounts` "the tab is in the address…" (empty balance is zero); **bug 7**: `accounts` "an account created before the list has loaded is the one selected" (`fixme`) |
 | ACC-3 | Creating refused: a name in use, a blank name, a currency that is not ISO, a balance that is not a number | GAP | `accounts` "an account the form or the API refuses says why, under the field" |
 | ACC-4 | The cards: balance, type, last import (none, in review, its day), total | partial | `accounts` "a new user creates…", "Detalhes da conta…"; `import` "the account shows the import in its card…" |
 | ACC-5 | The Lançamentos tab: latest rows, empty message, link to all of the account's | GAP | `accounts` "the Lançamentos tab…", "a new user creates…" |
@@ -220,6 +220,7 @@ Each is kept as a `test.fixme` with its reason, and none is fixed here.
 | 4 | The 2 MB refusal reads "O arquivo tem 2.1 MB": the API formats the size under `InvariantGlobalization`, so the pt-BR sentence carries a decimal point. | API, `ImportEndpoints.cs` | `import` "a file over 2 MB is refused with its size written in Portuguese" |
 | 5 | After the session ends in another tab, a write shows "Request failed (401)": a 401 has no problem body and every page but `DeleteAccount` falls back to the client's English message. | web, `api/finance.ts` and the pages' error paths | `auth` "a write after the session ended in another tab is explained in Portuguese" |
 | 6 | Sair from a tab whose session already ended shows "Não foi possível sair." and stays: the logout answers 401 and the sidebar treats any non-2xx as a failure. **(review)** | web, `ProtectedLayout.tsx` | `auth` "Sair from a tab whose session already ended lands on the login page" |
+| 7 | An account created while `/accounts` is still opening its first account (Nova conta clicked before the list arrives, as on a slow network) is not the one selected: the form closes, the index route's redirect to the first account runs, and it wins over the navigation to the new one. Found as a flaky E2E run; `createAccount` now waits for the page to settle, as a person does, and the `fixme` holds the list back to reproduce it every time. | web, `AccountsPage.tsx` | `accounts` "an account created before the list has loaded is the one selected" |
 
 ### Not E2E-reachable
 
@@ -255,7 +256,7 @@ catalogue (decision 6).
 | `dashboard.spec.ts` | 5 → 8 | DASH-1, 4, 6, 8, 9, 11, 12 |
 | `transactions.spec.ts` | 3 → 9 | TX-2 to TX-10, IMP-15 |
 | `export.spec.ts` | 1 → 1 | EXP-1 on fixed dates, EXP-2, EXP-3 |
-| `accounts.spec.ts` (new) | 0 → 6 | ACC-1 to ACC-8, TX-12 |
+| `accounts.spec.ts` (new) | 0 → 7 | ACC-1 to ACC-8, TX-12 |
 | `import.spec.ts` | 6 → 18 | IMP-1, 3, 5 to 18, TX-11 |
 | `categories.spec.ts` (new) | 0 → 5 | CAT-1 to CAT-5, TX-13 |
 | `ai.spec.ts` | 2 → 6 | AI-3 to AI-6, SET-1 to SET-3 |
@@ -326,7 +327,7 @@ and 82 cases out of 16 more).
 | `components/import/PreviewStep.test.tsx` (8) | a | whole file | `import` 64, "the review lets a duplicate in…" (counts, invalid rows, duplicate ticked, categories per sign), "next month's statement…" (history row unmarked); `ai` 28 and "with AI off…" | — |
 | `components/TransactionForm.test.tsx` (9) | a | whole file | `transactions` 1, "editing a transaction…" (Entrada opens on its own), "the form checks…" (zero, groups by kind, Saída default, no direction for an expense, a typed minus ignored); `dashboard` 26 (both directions) | — |
 | `routes/AssetPage.test.tsx` (7) | a | whole file | `investments` 31, 32 (movements in Portuguese, note), US$ (asset page in dollars), "a sell, a JCP…", "a movement the rules refuse…", "an asset found in the catalogue…"; `navigation` "an account or an asset that does not exist…" | — |
-| `routes/AccountsPage.test.tsx` (14) | b | 11: "says so when the account in the address does not exist", the 8 of "creating and editing", the 2 of "the Lançamentos tab" | `navigation`; `accounts` (all six) | 3: the cards' figures with the credit card's destructive colour (colour), the year of a last import from another year (dates), `aria-current` on the opened card |
+| `routes/AccountsPage.test.tsx` (14) | b | 11: "says so when the account in the address does not exist", the 8 of "creating and editing", the 2 of "the Lançamentos tab" | `navigation`; `accounts` (the six passing tests) | 3: the cards' figures with the credit card's destructive colour (colour), the year of a last import from another year (dates), `aria-current` on the opened card |
 | `routes/TransactionsPage.test.tsx` (4) | b | 3: export by the filter bar, export of an import, disabled while empty | `export`; `import` "an OFX is uploaded…" | 1: an export the API refuses (the UI never sends a filter the API refuses) |
 | `routes/DashboardPage.test.tsx` (10) | b | 7: month query parameter, kind toggle, empty state, accounts with zero months, analysis card's month, investments-only series, Em contas and investido | `dashboard` "signing in…", "the month selector…"; `ai` 29; `investments` 31 | 3: the credit card's colour, the chips' tones on a long series, the chips and chart a short or single-point series cannot give (unit inputs) |
 | `routes/SettingsPage.test.tsx` (13) | b | 8: in the navigation, the disclosure, AI on, the switch holding from the click, the danger zone's place and copy, the exact e-mail, the delete landing on `/login`, the 401 row of "shows %s and stays on the page" | `navigation`; `ai` "the AI switch is saved both ways…" (its `setChecked` fails on a switch that lags the click); `delete-account` (both) | 5: a non-zero spend's rounding and plural, a refused PATCH, the switch while the PATCH is in flight, the 409 and 500 rows |

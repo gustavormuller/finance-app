@@ -48,6 +48,11 @@ export async function createAccount(
   { type = 'Checking', currency }: { type?: string; currency?: string } = {},
 ) {
   await page.goto('/accounts');
+  // Settled first, as a person sees it: with accounts, /accounts opens the first one, and an
+  // account created before that is not the one selected (spec 024, bug 7).
+  await expect(
+    page.getByRole('button', { name: 'Criar a primeira conta' }).or(page.getByRole('navigation', { name: 'Seções da conta' })),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Nova conta' }).click();
   await page.getByLabel('Nome').fill(name);
   // By value, not label: the option reads "Conta corrente" but the wire contract is

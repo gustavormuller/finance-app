@@ -47,6 +47,34 @@ test('a new user creates the first account from the empty state', async ({ page 
   await expect(page.getByText('Nenhum lançamento nesta conta ainda.')).toBeVisible();
 });
 
+/**
+ * 024: on a slow network the button is there before the list is. The list's answer is held
+ * back, so Nova conta is clicked while /accounts is still about to open its first account.
+ */
+test('an account created before the list has loaded is the one selected', async ({ page }) => {
+  test.fixme(true, 'Bug: created while /accounts is still opening its first account, the new account is not selected; that redirect wins.');
+
+  await devLogin(page, uniqueEmail('e2e-accounts-race'), 'Grace Hopper');
+  await createAccount(page, 'Banco A');
+
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/accounts', async (route) => {
+    if (route.request().method() === 'GET') {
+      await held;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/accounts');
+  await page.getByRole('button', { name: 'Nova conta' }).click();
+  release();
+  await page.getByLabel('Nome').fill('Zeta');
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Zeta', exact: true })).toBeVisible();
+});
+
 test('an account the form or the API refuses says why, under the field', async ({ page }) => {
   await devLogin(page, uniqueEmail('e2e-accounts-refused'), 'Grace Hopper');
   await createAccount(page, 'Nubank');
