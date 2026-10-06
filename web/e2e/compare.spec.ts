@@ -163,3 +163,55 @@ test('converting to reais and to dollars, and the address opened again', async (
   await expect(row(bookmarked, 'CDI')).toContainText('convertido para US$');
   await expect(bookmarked.getByRole('button', { name: `Remover ${tickers.brl}` })).toBeVisible();
 });
+
+/**
+ * Spec 024: the search's other answers, the six-series ceiling, and what the page says when
+ * the period holds nothing or is refused. Runs after test 13's sync, so the ticker it
+ * registers stays without closes for the rest of the run.
+ */
+test('the search, six series at most, a period with no data, a refused period and a series left out', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-compare-limits'), 'Grace Hopper');
+  const unpriced = uniqueTicker('CMN');
+  await page.goto('/market-data');
+  await registerAsset(page, unpriced, 'Brapi', 'StockBr', 'BRL');
+
+  await page.goto('/compare');
+  const search = page.getByRole('searchbox', { name: 'Buscar ativo ou índice' });
+  await search.fill(`${unpriced}X`);
+  await expect(page.getByText('Nada encontrado com esse ticker ou nome.')).toBeVisible();
+
+  // Accents and case do not matter, and a series already chosen is not offered twice.
+  await pick(page, 'dolar', 'Dólar (PTAX)');
+  await search.fill('DÓLAR');
+  await expect(page.getByRole('button', { name: 'Dólar (PTAX), já escolhida' })).toBeDisabled();
+
+  // A series with no data in the period is left out of the chart, and says so.
+  await pick(page, unpriced, unpriced);
+  await expect(page.getByText(`Sem dados no período escolhido, fora do gráfico: ${unpriced}.`)).toBeVisible();
+  await expect(row(page, unpriced)).toContainText('Sem dados no período');
+
+  // Six at most.
+  for (const benchmark of ['CDI', 'SELIC', 'IPCA', 'S&P 500 (IVVB11)']) {
+    await pick(page, benchmark.split(' ')[0]!, benchmark);
+  }
+  await expect(search).toBeDisabled();
+  await expect(page.getByText('Até 6 séries por comparação. Remova uma para escolher outra.')).toBeVisible();
+  await page.getByRole('button', { name: 'Remover IPCA' }).click();
+  await expect(search).toBeEnabled();
+
+  // Long before any series begins, nothing has data.
+  const periods = page.getByRole('group', { name: 'Período' });
+  await periods.getByRole('button', { name: 'Personalizado' }).click();
+  await page.getByLabel('De', { exact: true }).fill('2000-01-01');
+  await page.getByLabel('Até', { exact: true }).fill('2000-01-31');
+  await page.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.getByText('Nenhuma das séries tem dados no período escolhido.')).toBeVisible();
+  await expect(page.getByText('Escolha um período mais longo, ou Máx.')).toBeVisible();
+
+  // Dates the wrong way round are the API's refusal, in Portuguese.
+  await periods.getByRole('button', { name: 'Personalizado' }).click();
+  await page.getByLabel('De', { exact: true }).fill('2000-02-01');
+  await page.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.getByRole('alert')).toHaveText('A data inicial deve ser anterior à data final.');
+  await expect(page.getByText('One or more validation errors occurred.')).toHaveCount(0);
+});

@@ -12,12 +12,21 @@ test('the sidebar opens every page and marks the one shown', async ({ page }) =>
   await page.goto('/');
 
   const nav = page.getByRole('navigation', { name: 'Principal' });
-  // Six pages and no "Importar": a statement is imported from its account (015).
-  await expect(nav.getByRole('link')).toHaveText(['Início', 'Lançamentos', 'Contas', 'Investimentos', 'Categorias', 'Configurações']);
+  // Seven pages and no "Importar": a statement is imported from its account (015).
+  await expect(nav.getByRole('link')).toHaveText([
+    'Início',
+    'Lançamentos',
+    'Contas',
+    'Investimentos',
+    'Comparar',
+    'Categorias',
+    'Configurações',
+  ]);
   const pages: [string, string, RegExp][] = [
     ['Lançamentos', 'Lançamentos', /\/transactions$/],
     ['Contas', 'Contas', /\/accounts$/],
     ['Investimentos', 'Investimentos', /\/investments$/],
+    ['Comparar', 'Comparar', /\/compare$/],
     ['Categorias', 'Categorias', /\/categories$/],
     ['Configurações', 'Configurações', /\/settings$/],
     ['Início', 'Início', /\/$/],

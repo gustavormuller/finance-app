@@ -3,7 +3,18 @@ import { expect, test, type Page } from '@playwright/test';
 import { createAccount, devLogin, uniqueEmail } from './support';
 
 /** Every page behind the sign-in, the ones outside the navigation included. */
-const PROTECTED = ['/', '/transactions', '/accounts', '/import', '/categories', '/investments', '/investments/returns', '/market-data', '/settings'];
+const PROTECTED = [
+  '/',
+  '/transactions',
+  '/accounts',
+  '/import',
+  '/categories',
+  '/investments',
+  '/investments/returns',
+  '/compare',
+  '/market-data',
+  '/settings',
+];
 
 test('an unauthenticated visit to any page lands on the login page', async ({ page }) => {
   for (const path of PROTECTED) {
