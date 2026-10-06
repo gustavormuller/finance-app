@@ -3,7 +3,13 @@ import { defineConfig, devices } from '@playwright/test';
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5173';
 
 /** The specs that trigger a manual market-data sync; see `projects`. */
-const SYNCING_SPECS = [/market-data\.spec\.ts/, /investments\.spec\.ts/, /returns\.spec\.ts/, /yahoo\.spec\.ts/];
+const SYNCING_SPECS = [
+  /market-data\.spec\.ts/,
+  /investments\.spec\.ts/,
+  /returns\.spec\.ts/,
+  /compare\.spec\.ts/,
+  /yahoo\.spec\.ts/,
+];
 
 export default defineConfig({
   testDir: './e2e',
@@ -16,7 +22,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   // A manual sync is refused (429) while another is running, and the market-data,
-  // investments, returns and yahoo specs all trigger one. Test 26 asserts the 202, so the
+  // investments, returns, compare and yahoo specs all trigger one. Test 26 asserts the 202, so the
   // syncing specs run one project after another, in that order. Every other spec runs alongside.
   projects: [
     {
@@ -42,9 +48,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      name: 'compare',
+      testMatch: /compare\.spec\.ts/,
+      dependencies: ['returns'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'yahoo',
       testMatch: /yahoo\.spec\.ts/,
-      dependencies: ['returns'],
+      dependencies: ['compare'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],

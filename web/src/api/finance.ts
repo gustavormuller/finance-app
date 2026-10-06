@@ -536,6 +536,65 @@ export interface AssetReturns extends Returns {
   fx: FxSplit | null;
 }
 
+// ---- compare --------------------------------------------------------------------
+
+/** The `period` query value (026); `custom` takes `from`/`to` (`YYYY-MM-DD`). */
+export type ComparePeriodKind = '1m' | '6m' | 'ytd' | '1y' | '5y' | '10y' | 'max' | 'custom';
+
+/** Each series in its own currency, or every one converted at the day's PTAX. */
+export type CompareCurrency = 'original' | 'BRL' | 'USD';
+
+export interface CompareQuery {
+  /** `asset:{marketAssetId}` or `benchmark:{code}`, in the order chosen. */
+  series: string[];
+  period: ComparePeriodKind;
+  from?: string | undefined;
+  to?: string | undefined;
+  currency: CompareCurrency;
+}
+
+/**
+ * One series of a comparison. `currency` is its own; it is drawn in the response's currency
+ * unless that is `original`. `firstDate` is where its data begins in the currency drawn,
+ * `lastDate` its last observation. Rates are fractions, null when it is not drawn.
+ */
+export interface CompareSeries {
+  key: string;
+  kind: 'asset' | 'benchmark';
+  ticker: string | null;
+  name: string | null;
+  class: MarketAssetClass | null;
+  code: string | null;
+  currency: string;
+  firstDate: string | null;
+  lastDate: string | null;
+  hasData: boolean;
+  change: number | null;
+  annualised: number | null;
+}
+
+/** Each series' index on `date`, base 100 on the period's `from`, in the series' order; null when not drawn. */
+export interface ComparePoint {
+  date: string;
+  values: (number | null)[];
+}
+
+/**
+ * `from` is the start, every series at 100. `startMoved`: the start is a series' first day,
+ * later than the period's own start (always under Máx, which has none).
+ */
+export interface ComparePeriod extends ReturnsPeriod {
+  startMoved: boolean;
+}
+
+/** `GET /api/compare`. `period` is null, and `points` empty, when nothing is drawn. */
+export interface Comparison {
+  currency: CompareCurrency;
+  period: ComparePeriod | null;
+  series: CompareSeries[];
+  points: ComparePoint[];
+}
+
 // ---- AI ------------------------------------------------------------------------
 
 export type AnalysisStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
@@ -806,6 +865,11 @@ export const api = {
 
   assetReturns: (assetId: string, query: ReturnsQuery) =>
     request<AssetReturns>(`/api/returns/assets/${assetId}?${searchParams(query)}`),
+
+  compare: ({ series, currency, ...period }: CompareQuery) =>
+    request<Comparison>(
+      `/api/compare?${searchParams({ series: series.join(','), ...period, currency: currency === 'original' ? undefined : currency })}`,
+    ),
 
   listCsvTemplates: () => request<CsvTemplate[]>('/api/csv-templates'),
 

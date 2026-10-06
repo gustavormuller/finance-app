@@ -9,7 +9,7 @@ import { devLogin, syncMarketData, uniqueEmail } from './support';
  * history ending at a close of 12,50 on the sync's `to`; brapi's fake ends at 10,00. The
  * catalogue is shared and kept between runs, so every ticker here is new.
  *
- * Every test here syncs, so this file runs in its own Playwright project, after `returns`
+ * Every test here syncs, so this file runs in its own Playwright project, after `compare`
  * (playwright.config.ts), and its tests run one after another.
  */
 test.describe.configure({ mode: 'default' });
