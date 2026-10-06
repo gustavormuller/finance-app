@@ -36,7 +36,16 @@ function registration(page: Page) {
 /** Spec E2E test 23. */
 test('Yahoo is the default, its symbols and currencies are suggested, and a sync needs no key', async ({ page }) => {
   await devLogin(page, uniqueEmail('e2e-yahoo'), 'Ada Lovelace');
-  await page.goto('/market-data');
+
+  // Decision 22: the catalogue is in the menu, and the comparison's empty search links to it.
+  await page.goto('/compare');
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Dados de mercado' })).toBeVisible();
+  await page.getByLabel('Buscar ativo ou índice').fill('ZZZZ9');
+  await page
+    .getByText('Nada encontrado com esse ticker ou nome.')
+    .getByRole('link', { name: 'Dados de mercado' })
+    .click();
+  await expect(page).toHaveURL(/\/market-data$/);
   const fields = registration(page);
 
   await expect(fields.provider).toHaveValue('Yahoo');

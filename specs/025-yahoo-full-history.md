@@ -91,6 +91,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 19 | Benchmarks audit | Configured: CDI (SGS 12), SELIC (11), IPCA (433), USDBRL (1, PTAX) from BCB, keyless; IVVB11 from brapi, which needs a token. IVVB11 moves to Yahoo `IVVB11.SA` (decision 14). 008's `Returns:Benchmarks` does not change. No key-bound default remains. |
 | 20 | Keys | None is needed. The brapi token, the Twelve Data key and the CoinGecko demo key become optional: they serve only assets someone keeps on those providers. `docs/market-data-keys.md` and `deploy/.env.example` say so. |
 | 21 | E2E fakes | `FakeMarketDataProviders` answers Yahoo with a fake of its own (decision 9's members included): every calendar day from `to − 1000` days, a close of 12,50 on `to` and one cent lower for each day before it (7,50 from 500 days back), doubled before a 2:1 split on `to − 100`; dividends on `to − 30`, `to − 60` and `to − 90`, each taking 1 % off `AdjustedClose` for the days before it. The other kinds keep their closes. |
+| 22 | Reaching the catalogue | `/market-data` joins the menu as "Dados de mercado", after "Comparar", and the comparison's empty search links to it. Since 025 it is where a series to compare is registered and where an entry moves to Yahoo; before, it was reachable only by typing its address. **(review)** |
 
 ## Out of scope
 
