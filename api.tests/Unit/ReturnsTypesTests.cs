@@ -10,10 +10,16 @@ namespace Finance.Api.Tests.Unit;
 /// </summary>
 public sealed partial class ReturnsTypesTests
 {
-    private static readonly string[] Namespaces = ["Finance.Api.Domain.Returns", "Finance.Api.Application.Returns", "Finance.Api.Domain.Compare"];
+    private static readonly string[] Namespaces =
+    [
+        "Finance.Api.Domain.Returns", "Finance.Api.Application.Returns", "Finance.Api.Domain.Compare", "Finance.Api.Application.Compare",
+    ];
 
     private static readonly string[] Folders =
-        [Path.Combine("Domain", "Returns"), Path.Combine("Application", "Returns"), Path.Combine("Domain", "Compare")];
+    [
+        Path.Combine("Domain", "Returns"), Path.Combine("Application", "Returns"),
+        Path.Combine("Domain", "Compare"), Path.Combine("Application", "Compare"),
+    ];
 
     [Fact]
     public void No_returns_type_declares_a_double_or_a_float()
