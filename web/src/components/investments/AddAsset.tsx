@@ -10,7 +10,7 @@ import RegistrationFields from '@/components/market-data/RegistrationFields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { marketAssetClassLabels } from '@/lib/labels';
+import { holdableAssetClasses, marketAssetClassLabels } from '@/lib/labels';
 import { refusal } from '@/lib/refusal';
 
 import { INVESTMENTS } from './queries';
@@ -18,7 +18,8 @@ import { INVESTMENTS } from './queries';
 /**
  * Search the shared catalogue and add a result, or register a ticker missing from it
  * in the same call. Either way the new asset opens, since it holds nothing until a
- * first movement is recorded there.
+ * first movement is recorded there. Indices and exchange rates are compared, never held
+ * (025): the search leaves them out and the registration does not offer them.
  *
  * A 400 is shown under the registration field it names; a 409 ("already held", or a
  * duplicate symbol) and any other refusal as the API's sentence.
@@ -35,6 +36,7 @@ export default function AddAsset() {
     queryKey: ['market-assets', q],
     queryFn: () => api.searchMarketAssets(q),
     enabled: q !== '',
+    select: (assets) => assets.filter((asset) => holdableAssetClasses.includes(asset.class)),
   });
 
   const add = useMutation({
@@ -113,7 +115,7 @@ export default function AddAsset() {
             add.mutate(readRegistration(event.currentTarget));
           }}
         >
-          <RegistrationFields idPrefix="new-asset" errors={fieldErrors} />
+          <RegistrationFields idPrefix="new-asset" errors={fieldErrors} classes={holdableAssetClasses} />
           <div className="flex gap-2 sm:col-span-3">
             <Button type="submit" disabled={add.isPending}>
               Cadastrar e adicionar

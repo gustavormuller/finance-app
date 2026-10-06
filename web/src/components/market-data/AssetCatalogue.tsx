@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
-import { api, type MarketAssetInput } from '@/api/finance';
+import { api, type MarketAsset, type MarketAssetInput } from '@/api/finance';
 import Alert from '@/components/Alert';
 import SectionHeading from '@/components/dashboard/SectionHeading';
 import { Button } from '@/components/ui/button';
@@ -11,19 +11,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { marketAssetClassLabels, providerKindLabels } from '@/lib/labels';
 import { refusal } from '@/lib/refusal';
 
+import EditSource from './EditSource';
 import { REGISTRATION_FIELDS, readRegistration } from './registration';
 import RegistrationFields from './RegistrationFields';
 
 /**
- * The shared catalogue: search it, and register a ticker into it. A 400 is shown under
- * the fields it names and a 409 as the API's sentence.
+ * The shared catalogue: search it, register a ticker into it, and move an entry to another
+ * provider or symbol (025). A 400 is shown under the fields it names and a 409 as the
+ * API's sentence.
  */
 export default function AssetCatalogue() {
   const queryClient = useQueryClient();
-  const form = useRef<HTMLFormElement>(null);
   const [q, setQ] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  // A new key remounts the registration fields blank, suggestions and all.
+  const [registration, setRegistration] = useState(0);
+  const [editing, setEditing] = useState<MarketAsset | null>(null);
 
   const assets = useQuery({ queryKey: ['market-assets', q], queryFn: () => api.searchMarketAssets(q) });
 
@@ -32,7 +36,7 @@ export default function AssetCatalogue() {
     onSuccess: async () => {
       setFailure(null);
       setFieldErrors({});
-      form.current?.reset();
+      setRegistration((key) => key + 1);
       await queryClient.invalidateQueries({ queryKey: ['market-assets'] });
     },
     onError: (error: Error) => {
@@ -48,7 +52,6 @@ export default function AssetCatalogue() {
       <SectionHeading id="catalogue-heading">Ativos</SectionHeading>
 
       <form
-        ref={form}
         aria-label="Cadastrar ativo"
         className="glass grid gap-4 rounded-2xl p-5 sm:grid-cols-3 sm:p-6"
         onSubmit={(event) => {
@@ -56,7 +59,7 @@ export default function AssetCatalogue() {
           register.mutate(readRegistration(event.currentTarget));
         }}
       >
-        <RegistrationFields idPrefix="asset" errors={fieldErrors} />
+        <RegistrationFields key={registration} idPrefix="asset" errors={fieldErrors} />
         <div className="sm:col-span-3">
           <Button type="submit" disabled={register.isPending}>
             Cadastrar ativo
@@ -83,6 +86,8 @@ export default function AssetCatalogue() {
         </Button>
       </form>
 
+      {editing && <EditSource key={editing.id} asset={editing} onDone={() => setEditing(null)} />}
+
       {assets.isError && <Alert>Não foi possível carregar os ativos.</Alert>}
 
       {assets.data?.length === 0 ? (
@@ -98,18 +103,31 @@ export default function AssetCatalogue() {
               <TableHead className="hidden sm:table-cell">Classe</TableHead>
               <TableHead className="hidden sm:table-cell">Provedor</TableHead>
               <TableHead className="hidden sm:table-cell">Moeda</TableHead>
+              <TableHead>
+                <span className="sr-only">Ações</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(assets.data ?? []).map((asset) => (
               <TableRow key={asset.id} data-testid={`market-asset-${asset.id}`}>
                 <TableCell className="font-medium">{asset.ticker}</TableCell>
-                <TableCell className="whitespace-normal">{asset.name}</TableCell>
+                <TableCell className="whitespace-normal">
+                  {asset.name}
+                  {asset.historyLoadedAt === null && (
+                    <span className="text-muted-foreground block text-xs">Histórico completo na próxima sincronização.</span>
+                  )}
+                </TableCell>
                 <TableCell className="hidden sm:table-cell">{marketAssetClassLabels[asset.class]}</TableCell>
                 <TableCell className="hidden sm:table-cell">
                   {providerKindLabels[asset.provider]} <span className="text-muted-foreground">({asset.providerSymbol})</span>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">{asset.currency}</TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="outline" aria-label={`Editar ${asset.ticker}`} onClick={() => setEditing(asset)}>
+                    Editar
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -118,4 +136,3 @@ export default function AssetCatalogue() {
     </section>
   );
 }
-

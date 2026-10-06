@@ -106,12 +106,20 @@ export const marketAssetClassLabels: Record<MarketAssetClass, string> = {
   Bdr: 'BDR',
   StockUs: 'Ação (EUA)',
   Crypto: 'Criptomoeda',
+  Index: 'Índice',
+  Currency: 'Câmbio',
 };
 
-export const marketAssetClasses: MarketAssetClass[] = ['StockBr', 'Fii', 'EtfBr', 'Bdr', 'StockUs', 'Crypto'];
+export const marketAssetClasses: MarketAssetClass[] = ['StockBr', 'Fii', 'EtfBr', 'Bdr', 'StockUs', 'Crypto', 'Index', 'Currency'];
+
+/** What a portfolio can hold: indices and exchange rates are only compared against (025). */
+export const holdableAssetClasses: MarketAssetClass[] = marketAssetClasses.filter(
+  (value) => value !== 'Index' && value !== 'Currency',
+);
 
 /** Provider names are brands, written as each writes itself. */
 export const providerKindLabels: Record<ProviderKind, string> = {
+  Yahoo: 'Yahoo Finance',
   Brapi: 'brapi',
   CoinGecko: 'CoinGecko',
   TwelveData: 'Twelve Data',
@@ -120,13 +128,15 @@ export const providerKindLabels: Record<ProviderKind, string> = {
 
 /** What each provider prices, beside its name where one is picked; the catalogue shows the plain name. */
 export const providerKindCoverage: Record<ProviderKind, string> = {
+  Yahoo: 'B3, EUA, índices, cripto em US$, câmbio — sem chave',
   Brapi: 'B3: ações, FIIs, ETFs',
   CoinGecko: 'cripto',
   TwelveData: 'ações dos EUA',
   Binance: 'cripto em reais',
 };
 
-export const providerKinds: ProviderKind[] = ['Brapi', 'CoinGecko', 'TwelveData', 'Binance'];
+/** In the order a select offers them: Yahoo first, the keyless source of nearly everything (025). */
+export const providerKinds: ProviderKind[] = ['Yahoo', 'Brapi', 'CoinGecko', 'TwelveData', 'Binance'];
 
 const syncSectionLabels: Record<string, string> = {
   Bcb: 'Banco Central (SGS)',
