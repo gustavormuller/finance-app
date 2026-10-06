@@ -54,9 +54,11 @@ test('registers a ticker, finds it by search, and refuses it twice', async ({ pa
   await registerAsset(page, ticker, 'De novo');
   await expect(page.getByRole('alert')).toHaveText(`O símbolo '${ticker}' já está cadastrado no provedor Brapi.`);
 
-  // 019: each provider says what it prices, and a Binance pair is stored in capitals.
+  // 019: each provider says what it prices, Yahoo first since 025, and a Binance pair is
+  // stored in capitals.
   const form = page.getByRole('form', { name: 'Cadastrar ativo' });
   await expect(form.getByLabel('Provedor', { exact: true }).locator('option')).toHaveText([
+    'Yahoo Finance (B3, EUA, índices, cripto em US$, câmbio — sem chave)',
     'brapi (B3: ações, FIIs, ETFs)',
     'CoinGecko (cripto)',
     'Twelve Data (ações dos EUA)',
@@ -91,7 +93,108 @@ test('a registration a provider cannot price is refused under the field that is 
 
   await registerAsset(page, uniqueTicker(), 'CoinGecko em reais', { provider: 'CoinGecko', assetClass: 'Crypto', symbol: 'bitcoin' });
   await expect(under('Moeda')).toHaveText('Ativos do CoinGecko são cotados em USD.');
+
+  // 025: a Yahoo symbol is letters, digits and . - ^ = only.
+  await registerAsset(page, uniqueTicker(), 'Yahoo com espaço', { provider: 'Yahoo', symbol: 'PETR4 SA' });
+  await expect(under('Símbolo no provedor')).toHaveText('Use um símbolo do Yahoo Finance, como PETR4.SA, AAPL, ^BVSP, BTC-USD ou BRL=X.');
   await expect(page.getByText('One or more validation errors occurred.')).toHaveCount(0);
+});
+
+/**
+ * 025, decision 18: the symbol and the currency follow the ticker, class and provider, each
+ * provider spelling the ticker its own way, until the person sets that field. Nothing is
+ * registered: the catalogue is shared.
+ */
+test('the symbol and the currency are suggested for each provider until the person sets them', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-market-suggest'), 'Katherine Johnson');
+  await page.goto('/market-data');
+  const form = page.getByRole('form', { name: 'Cadastrar ativo' });
+  const provider = form.getByLabel('Provedor', { exact: true });
+  const symbol = form.getByLabel('Símbolo no provedor');
+  const currency = form.getByLabel('Moeda');
+
+  await form.getByLabel('Ticker').fill('aapl');
+  await form.getByLabel('Classe').selectOption('StockUs');
+  await expect(provider).toHaveValue('Yahoo');
+  const suggested: [string, string, string][] = [
+    ['Yahoo', 'AAPL', 'USD'],
+    ['Binance', 'AAPLBRL', 'BRL'],
+    ['CoinGecko', '', 'USD'],
+    ['TwelveData', 'AAPL', 'USD'],
+    ['Brapi', 'AAPL', 'BRL'],
+  ];
+  for (const [kind, expectedSymbol, expectedCurrency] of suggested) {
+    await provider.selectOption(kind);
+    await expect(symbol, kind).toHaveValue(expectedSymbol);
+    await expect(currency, kind).toHaveValue(expectedCurrency);
+  }
+
+  // Typed, the symbol is the person's: a new ticker or provider leaves it, and the currency
+  // follows what it says.
+  await provider.selectOption('Yahoo');
+  await symbol.fill('msft');
+  await form.getByLabel('Ticker').fill('goog');
+  await provider.selectOption('TwelveData');
+  await provider.selectOption('Yahoo');
+  await expect(symbol).toHaveValue('msft');
+  await symbol.fill('ITUB4.SA');
+  await expect(currency).toHaveValue('BRL');
+
+  // Chosen, the currency is the person's too.
+  await currency.selectOption('USD');
+  await form.getByLabel('Classe').selectOption('Fii');
+  await symbol.fill('HGLG11.SA');
+  await expect(currency).toHaveValue('USD');
+});
+
+/**
+ * 025, decision 16: Editar moves an entry to another provider or symbol, checked as a
+ * registration is, against the entry's own currency; a series already in the catalogue is
+ * the sentence; Cancelar leaves the entry as it was. Nothing is saved, so no sync is needed.
+ */
+test('a source edit is refused under its field or as a duplicate, and Cancelar keeps the entry', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-market-edit'), 'Grace Hopper');
+  await page.goto('/market-data');
+  const ticker = uniqueTicker();
+  const taken = uniqueTicker();
+  await registerAsset(page, ticker, 'Fonte a editar');
+  await expect(page.getByLabel('Ticker')).toHaveValue('');
+  await registerAsset(page, taken, 'Já no Yahoo', { provider: 'Yahoo', symbol: `${taken}.SA` });
+  await expect(page.getByLabel('Ticker')).toHaveValue('');
+
+  await page.getByLabel('Buscar ativo').fill(ticker);
+  await page.getByRole('button', { name: 'Buscar' }).click();
+  const row = page.locator('[data-testid^="market-asset-"]');
+  await expect(row).toHaveCount(1);
+  await row.getByRole('button', { name: `Editar ${ticker}` }).click();
+
+  const edit = page.getByRole('form', { name: 'Editar fonte do ativo' });
+  await expect(edit).toContainText(
+    `A próxima sincronização troca as cotações de ${ticker} pelo histórico completo da nova fonte. A moeda (BRL) não muda.`,
+  );
+  const symbol = edit.getByLabel('Símbolo no provedor');
+  // Page-rooted: `has` is matched inside each of the form's divs.
+  const under = edit.locator('div').filter({ has: page.getByLabel('Símbolo no provedor', { exact: true }) }).getByRole('alert');
+  await expect(symbol).toHaveValue(ticker);
+  await edit.getByLabel('Provedor', { exact: true }).selectOption('Yahoo');
+  await expect(symbol).toHaveValue(`${ticker}.SA`);
+
+  await symbol.fill(`${ticker}-USD`);
+  await edit.getByRole('button', { name: 'Salvar' }).click();
+  await expect(under).toHaveText(`O símbolo ${ticker}-USD é cotado em USD no Yahoo Finance. Este ativo é cotado em BRL.`);
+
+  await symbol.fill(`${ticker} SA`);
+  await edit.getByRole('button', { name: 'Salvar' }).click();
+  await expect(under).toHaveText('Use um símbolo do Yahoo Finance, como PETR4.SA, AAPL, ^BVSP, BTC-USD ou BRL=X.');
+
+  await symbol.fill(`${taken.toLowerCase()}.sa`);
+  await edit.getByRole('button', { name: 'Salvar' }).click();
+  await expect(edit.getByRole('alert')).toHaveText(`O símbolo '${taken}.SA' já está cadastrado no provedor Yahoo.`);
+  await expect(page.getByText('One or more validation errors occurred.')).toHaveCount(0);
+
+  await edit.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(edit).toBeHidden();
+  await expect(row).toContainText(`brapi (${ticker})`);
 });
 
 test('a search with no match says so', async ({ page }) => {
