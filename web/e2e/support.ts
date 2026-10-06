@@ -96,6 +96,41 @@ export async function uploadStatement(
   await page.getByLabel('Escolher arquivo').setInputFiles(typeof file === 'string' ? fixture(file) : file);
 }
 
+/**
+ * An OFX statement in reais, made by the test for the files a fixture would hold only
+ * once: one with a marked row, one too long, one with no transactions. `date` is
+ * `YYYY-MM-DD` and `amount` is written as the bank writes it, `-55.90`.
+ */
+export function ofxStatement(name: string, rows: { date: string; amount: string; id: string; memo: string }[]) {
+  const transactions = rows.map((row) =>
+    [
+      '<STMTTRN>',
+      '<TRNTYPE>OTHER',
+      `<DTPOSTED>${row.date.replaceAll('-', '')}000000[-3:BRT]`,
+      `<TRNAMT>${row.amount}`,
+      `<FITID>${row.id}`,
+      `<MEMO>${row.memo}`,
+      '</STMTTRN>',
+    ].join('\n'),
+  );
+  const text = [
+    'OFXHEADER:100',
+    'DATA:OFXSGML',
+    'VERSION:102',
+    '',
+    '<OFX>',
+    '<BANKMSGSRSV1><STMTTRNRS><STMTRS>',
+    '<CURDEF>BRL',
+    '<BANKTRANLIST>',
+    ...transactions,
+    '</BANKTRANLIST>',
+    '</STMTRS></STMTTRNRS></BANKMSGSRSV1>',
+    '</OFX>',
+  ].join('\n');
+
+  return { name, mimeType: 'application/x-ofx', buffer: Buffer.from(text, 'utf8') };
+}
+
 /** The import's current step; the history underneath offers the same verbs for other batches. */
 export function importStep(page: Page): Locator {
   return page.getByTestId('import-step');
