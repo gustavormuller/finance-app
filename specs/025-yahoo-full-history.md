@@ -44,8 +44,8 @@ GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}
 What the responses look like, and what the adapter must do about it:
 
 - `meta` carries `currency`, `exchangeTimezoneName` (`America/Sao_Paulo`, `America/New_York`,
-  `UTC` for crypto, `Europe/London` for FX), `gmtoffset` (the offset **now**), `priceHint`
-  (2 for stocks and indices, 4 for FX) and `firstTradeDate`.
+  `UTC` for crypto, `Europe/London` for FX), `gmtoffset` (the offset **now**, in seconds),
+  `priceHint` (2 for stocks and indices, 4 for FX) and `firstTradeDate`.
 - A bar is stamped at its session's start: 13:00 UTC for B3, 13:30 or 14:30 UTC for New
   York, 00:00 UTC for crypto, and **London midnight** for FX: 23:00 UTC the day before in
   summer, 00:00 UTC in winter. A fixed offset dates winter or summer FX bars a day off.
@@ -74,7 +74,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 2 | Request | `GET {BaseUrl}{symbol}?period1=…&period2={now}&interval=1d&events=div%2Csplit&includeAdjustedClose=true`, `User-Agent` from `MarketData:Yahoo:UserAgent` (a desktop browser's), `Accept: application/json`, gzip. `period2` is always now, never `to`: a split Yahoo already applied to the closes must be among the events, or the raw close comes out wrong. `period1` is the day before `from` (London-midnight FX bars), or 1900-01-01 for a whole history. No cookie, no crumb: add them only when Yahoo demands them. |
 | 3 | Pacing | Yahoo's requests start at least `MarketData:Yahoo:RequestInterval` (1 s) apart, across the process. **(review)** |
 | 4 | Resilience | The existing per-provider pipeline (006 decision 4), and for Yahoo only, a 429 is retried with the same exponential backoff (2, 4, 8 s, jitter, `Retry-After` honoured). Still 429 after three retries: `ProviderRateLimitedException`, and the sync stops asking Yahoo for the rest of the run, as for any 429. The circuit breaker still ignores 429. The other providers keep 006's rule: a 429 is not retried. **(review)** |
-| 5 | A bar's day | The date of its timestamp in `meta.exchangeTimezoneName`, daylight saving included, or at `meta.gmtoffset` where the host does not know the zone. Crypto's zone is UTC, so crypto days are UTC days. Kept only when on or before `to` **and** before the exchange's today: an unfinished session is never stored. A null close is skipped. Two points on one day (FX's "now" point): the first with a close wins. |
+| 5 | A bar's day | The date of its timestamp at `meta.gmtoffset`, read one hour later. Yahoo gives only today's offset, and a bar from the other half of the year was stamped at an offset one hour away: a London-midnight FX bar would land on the day before. Every session starts between local midnight and mid-morning, so an hour later never crosses into the next day, whichever half of the year the offset comes from. The exchange's time zone database is not used: the API runs with invariant globalization, which on Windows finds no IANA zone, and the same code must date bars alike in development and in the Linux container. Crypto's offset is 0, so crypto days are UTC days. A bar is kept only when on or before `to` **and** before the exchange's today (now at `gmtoffset`): an unfinished session is never stored. A null close is skipped. Two points on one day (FX's "now" point): the first with a close wins. |
 | 6 | What `Close` means | **The raw traded price.** 007 records a split or a bonus as a `Split` movement (quantity added at price 0) and `SnapshotBuilder` values `Quantity × Close`, so a split-adjusted close would value the pre-split quantity at a fraction of its price. Yahoo's close is split-adjusted, so the adapter rebuilds it: raw = close × the product of numerator ÷ denominator over every split whose day is after the bar's day, rounded to `meta.priceHint` decimals. AAPL 2020-08-28: 124.8075 × 4 = 499.23. |
 | 7 | Total return | `Price.AdjustedClose`, nullable, `numeric(18,8)`: Yahoo's `adjclose` as sent (split- and dividend-adjusted). Every other provider leaves it null. 026 reads `AdjustedClose ?? Close`. |
 | 8 | Refusals | 404 → `ProviderSymbolUnknownException` → "O Yahoo Finance não encontrou o símbolo {símbolo}. Confira o símbolo do ativo no catálogo." 401 or 403 → `ProviderBlockedException` → "O Yahoo Finance recusou o acesso. Tente de novo mais tarde; se persistir, ele passou a exigir cookie e o adaptador precisa mudar." 400 "Data doesn't exist", or 200 without `timestamp` → an empty series. A body that is not the chart JSON (an HTML consent page) → "O provedor respondeu em um formato inesperado." (006). Both texts reach `/market-data` through `SyncErrorText`, as 019's do. |
@@ -116,12 +116,30 @@ Migration `AddYahooHistory`:
 `ProviderKind.Yahoo = 4`, `MarketAssetClass.Index = 6` and `Currency = 7` live in the existing
 `int` columns, which have no check constraint: no column change for them.
 
-Generated SQL (`dotnet ef migrations script AddAi AddYahooHistory`), to review before it is
-applied anywhere:
+Generated SQL (`dotnet ef migrations script 20260924082437_AddAi AddYahooHistory`), to review
+before it is applied anywhere:
 
 ```sql
-(filled in by CP3)
+START TRANSACTION;
+ALTER TABLE "Prices" ADD "AdjustedClose" numeric(18,8);
+
+ALTER TABLE "MarketAssets" ADD "HistoryLoadedAt" timestamp with time zone;
+
+ALTER TABLE "MarketAssets" ADD "PricesRevisedFrom" date;
+
+UPDATE "MarketAssets" SET "HistoryLoadedAt" = "LastSyncedAt";
+
+DELETE FROM "Benchmarks" WHERE "Code" = 'IVVB11';
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261006065309_AddYahooHistory', '10.0.12');
+
+COMMIT;
 ```
+
+The three columns are nullable with no default, so adding them rewrites no table. The
+`UPDATE` touches every catalogue row once; the `DELETE` only IVVB11's benchmark rows, which
+the next sync reloads from Yahoo.
 
 ## API surface
 
@@ -184,7 +202,7 @@ cover only what E2E cannot reach.
 1. AAPL around the 2020 split: bars dated in New York, `Close` raw (2020-08-28: 499.23), `AdjustedClose` Yahoo's, nothing through `double`
 2. ITUB4 with both bonus issues: raw closes before 2025-03-18 are Yahoo's × 1.1 × 1.03, between the two × 1.03, after both as sent
 3. The request: path, `period1` the day before `from` (1900-01-01 for a whole history), `period2` now, both event kinds, `includeAdjustedClose`, the `User-Agent`
-4. BRL=X: summer bars stamped 23:00 UTC are the next London day; an unknown zone falls back to `gmtoffset`
+4. BRL=X, read with a summer offset and with a winter one: bars stamped 23:00 UTC (London summer midnight) and 00:00 UTC (winter) both get their London day
 5. Today's bar and anything after `to` are left out; null closes are skipped; FX's "now" point does not replace a day's bar
 6. A close is rounded to `priceHint` decimals; a missing `priceHint` leaves it as sent
 7. 404 → `ProviderSymbolUnknownException`; 401 and 403 → `ProviderBlockedException`; 429 → `ProviderRateLimitedException`; 400 "Data doesn't exist" and a 200 without `timestamp` → empty; malformed bodies and an HTML page → `ProviderResponseInvalidException`

@@ -32,6 +32,7 @@ internal static class MarketDataModel
         {
             price.HasKey(entity => new { entity.MarketAssetId, entity.Date });
             price.Property(entity => entity.Close).HasColumnType(ValueColumnType);
+            price.Property(entity => entity.AdjustedClose).HasColumnType(ValueColumnType);
 
             // RESTRICT: five years of closes are not dropped by an accidental
             // catalogue delete. Nothing deletes an asset yet; one that must go has its
