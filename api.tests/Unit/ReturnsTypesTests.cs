@@ -37,6 +37,7 @@ public sealed partial class ReturnsTypesTests
         var files = Folders.SelectMany(folder =>
                 Directory.EnumerateFiles(Path.Combine(TestPaths.RepositoryRoot(), "api", folder), "*.cs", SearchOption.AllDirectories))
             .Append(Path.Combine(TestPaths.RepositoryRoot(), "api", "Endpoints", "ReturnsEndpoints.cs"))
+            .Append(Path.Combine(TestPaths.RepositoryRoot(), "api", "Endpoints", "CompareEndpoints.cs"))
             .ToList();
 
         Assert.Contains(files, file => file.EndsWith("DecimalMath.cs", StringComparison.Ordinal));

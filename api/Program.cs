@@ -2,6 +2,7 @@
 using Finance.Api.Application;
 using Finance.Api.Application.Ai;
 using Finance.Api.Application.Categories;
+using Finance.Api.Application.Compare;
 using Finance.Api.Application.Dashboard;
 using Finance.Api.Application.Investments;
 using Finance.Api.Application.Returns;
@@ -59,6 +60,9 @@ builder.Services.AddScoped<MovementCommands>();
 // 008's returns: the benchmarks they compare with, and the reads behind /api/returns.
 builder.Services.AddOptions<ReturnsOptions>().BindConfiguration(ReturnsOptions.Section);
 builder.Services.AddScoped<ReturnsQueries>();
+
+// 026's comparison: catalogue assets and benchmark series side by side.
+builder.Services.AddScoped<CompareQueries>();
 
 builder.Services.AddAi();
 
@@ -166,6 +170,7 @@ app.MapDashboardEndpoints();
 app.MapMarketDataEndpoints();
 app.MapInvestmentEndpoints();
 app.MapReturnsEndpoints();
+app.MapCompareEndpoints();
 app.MapAiEndpoints();
 
 app.Run();
