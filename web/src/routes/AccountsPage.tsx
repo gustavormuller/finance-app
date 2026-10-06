@@ -11,7 +11,8 @@ import Alert from '@/components/Alert';
 import Card from '@/components/Card';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
-import { accountRefusal, type Refusal } from '@/lib/accounts';
+import { accountRefusal } from '@/lib/accounts';
+import type { Refusal } from '@/lib/refusal';
 
 /**
  * `/accounts`: the accounts on the left, the selected one on the right (the

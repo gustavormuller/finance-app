@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 
-import { api, ApiError, type MarketAssetInput } from '@/api/finance';
+import { api, type MarketAssetInput } from '@/api/finance';
 import Alert from '@/components/Alert';
 import SectionHeading from '@/components/dashboard/SectionHeading';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { marketAssetClassLabels, providerKindLabels } from '@/lib/labels';
+import { refusal } from '@/lib/refusal';
 
 import { REGISTRATION_FIELDS, readRegistration } from './registration';
 import RegistrationFields from './RegistrationFields';
@@ -35,13 +36,10 @@ export default function AssetCatalogue() {
       await queryClient.invalidateQueries({ queryKey: ['market-assets'] });
     },
     onError: (error: Error) => {
-      const fields = error instanceof ApiError ? error.fields : {};
-      const elsewhere = Object.entries(fields)
-        .filter(([field]) => !(REGISTRATION_FIELDS as readonly string[]).includes(field))
-        .flatMap(([, messages]) => messages);
+      const refused = refusal(error, REGISTRATION_FIELDS);
 
-      setFieldErrors(fields);
-      setFailure(Object.keys(fields).length === 0 ? error.message : elsewhere.length > 0 ? elsewhere.join(' ') : null);
+      setFieldErrors(refused.fields);
+      setFailure(refused.message);
     },
   });
 

@@ -1,6 +1,8 @@
+import { formatDate } from '@/lib/labels';
+
 /**
  * What every Recharts chart shares: the tooltip drawn as a solid popover in the
- * theme's colours, and money formatting for axes and tooltips. Colours are CSS
+ * theme's colours, and money and date formatting for axes and tooltips. Colours are CSS
  * variables, so a chart follows the theme without re-rendering.
  */
 export const tooltipProps = {
@@ -20,6 +22,9 @@ export const axisTick = { fill: 'var(--muted-foreground)', fontSize: 11 } as con
 
 export const money = (value: number) =>
   value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** `2026-09-24` as `24/09`, for a date axis. */
+export const shortDay = (isoDay: string) => formatDate(isoDay).slice(0, 5);
 
 /** Axis ticks only: whole reais with pt-BR grouping, so the axis stays narrow. */
 export const wholeMoney = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });

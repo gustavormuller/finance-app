@@ -1,4 +1,3 @@
-using System.Reflection;
 using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.MarketData;
 
@@ -31,33 +30,12 @@ public sealed class MarketDataTypesTests
     [Fact]
     public void No_market_data_type_declares_a_double_or_a_float()
     {
-        const BindingFlags Declared =
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-
         var types = typeof(Price).Assembly.GetTypes()
             .Where(type => Namespaces.Contains(type.Namespace))
             .ToList();
 
         Assert.Contains(typeof(Price), types);
 
-        var offenders = types
-            .SelectMany(type => type.GetProperties(Declared).Select(member => (type, member.Name, member.PropertyType))
-                .Concat(type.GetFields(Declared).Select(member => (type, member.Name, member.FieldType))))
-            .Where(member => IsBinaryFloatingPoint(member.Item3))
-            .Select(member => $"{member.type.FullName}.{member.Name}")
-            .ToList();
-
-        Assert.Empty(offenders);
-    }
-
-    private static bool IsBinaryFloatingPoint(Type type)
-    {
-        var underlying = Nullable.GetUnderlyingType(type) ?? type;
-        if (underlying.IsArray)
-        {
-            underlying = underlying.GetElementType()!;
-        }
-
-        return underlying == typeof(double) || underlying == typeof(float) || underlying == typeof(Half);
+        Assert.Empty(FloatingPointMembers.In(types));
     }
 }

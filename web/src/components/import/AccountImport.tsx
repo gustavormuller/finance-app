@@ -18,7 +18,9 @@ import {
 } from '@/api/finance';
 import { useMe } from '@/auth/useMe';
 import { useImports } from '@/components/accounts/queries';
+import { useCategories } from '@/components/categories/queries';
 import { Button } from '@/components/ui/button';
+import { refusalMessage } from '@/lib/refusal';
 
 import DoneStep from './DoneStep';
 import FileStep from './FileStep';
@@ -63,17 +65,6 @@ function suggestionNotice({ suggested, skipped }: SuggestResult): string {
   return moved + left;
 }
 
-/** The sentence a refusal becomes, with the fields a 400 named appended. */
-function describe(error: unknown): string {
-  if (error instanceof ApiError) {
-    const fields = Object.values(error.fields).flat();
-
-    return fields.length > 0 ? fields.join(' ') : error.message;
-  }
-
-  return error instanceof Error ? error.message : 'Algo deu errado.';
-}
-
 /**
  * "Importar extrato": the four steps on top, this
  * account's history underneath. The account is the page's, so no step asks for one.
@@ -90,7 +81,7 @@ export default function AccountImport({ account }: { account: Account }): React.
 
   const me = useMe();
 
-  const categories = useQuery({ queryKey: ['categories'], queryFn: api.listCategories });
+  const categories = useCategories();
   const templates = useQuery({ queryKey: ['csv-templates'], queryFn: api.listCsvTemplates });
   const history = useImports();
   const batches = (history.data ?? []).filter((batch) => batch.accountId === account.id);
@@ -110,7 +101,7 @@ export default function AccountImport({ account }: { account: Account }): React.
   const fail = (error: unknown) => {
     const openBatchId = error instanceof ApiError ? error.openBatchId : null;
 
-    setFailure({ message: describe(error), openBatchId });
+    setFailure({ message: refusalMessage(error), openBatchId });
 
     // A batch opened elsewhere (another tab) is news to the history, and to the notice
     // that replaces the drop zone while it is open.

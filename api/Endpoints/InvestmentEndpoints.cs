@@ -3,7 +3,6 @@ using Finance.Api.Application.Investments;
 using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
-using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -73,7 +72,7 @@ public static class InvestmentEndpoints
             TimeProvider clock,
             CancellationToken cancellationToken) =>
         {
-            var nickname = string.IsNullOrWhiteSpace(request.Nickname) ? null : request.Nickname.Trim();
+            var nickname = RequestText.Optional(request.Nickname);
             if (nickname is { Length: > NicknameLength })
             {
                 return Problems.Validation("nickname", $"O apelido deve ter até {NicknameLength} caracteres.");
@@ -122,11 +121,7 @@ public static class InvestmentEndpoints
             };
             database.Add(held);
 
-            try
-            {
-                await database.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException exception) when (exception.IsDuplicate())
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 // A new catalogue row cannot already be held, so its duplicate is the
                 // catalogue's: another request registered the same symbol first.
@@ -225,7 +220,7 @@ public static class InvestmentEndpoints
     private static IResult Answer(MovementWrite write, Func<Movement, IResult> done) => write switch
     {
         { Outcome: MovementOutcome.NotFound } => Results.NotFound(),
-        { Outcome: MovementOutcome.Invalid } => Problems.Validation([.. write.Violations!.Select(violation => (RuleViolation?)violation)])!,
+        { Outcome: MovementOutcome.Invalid } => Problems.Validation(write.Violations!)!,
         _ => done(write.Movement!),
     };
 

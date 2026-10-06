@@ -11,6 +11,12 @@ namespace Finance.Api.Domain.MarketData;
 /// </remarks>
 public sealed class Benchmark
 {
+    /// <summary>
+    /// The series that converts a USD amount to BRL: valuing a USD asset, and pricing an
+    /// AI call billed in dollars. 006 stores it from BCB SGS series 1.
+    /// </summary>
+    public const string UsdBrl = "USDBRL";
+
     public string Code { get; set; } = "";
 
     public DateOnly Date { get; set; }

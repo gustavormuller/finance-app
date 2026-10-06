@@ -37,6 +37,7 @@ Each spec contains:
 | 015 | accounts-import | accounts as the home of import and its history |
 | 016 | investments-returns | returns first on the investments page, R$ and US$ |
 | 017 | cleanup | comments that earn their place, no dead code |
+| 020 | architecture | a review against the ADRs, one home for duplicated logic |
 
 One number per session set. If a feature needs more than three sessions, it was scoped
 too large — split it.
