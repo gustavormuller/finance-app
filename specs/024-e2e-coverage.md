@@ -21,8 +21,8 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 3 | Extend or add | An existing test is extended when the new assertions follow its own story (the `.xlsx` test also runs on the `.xls`); otherwise a new test. No near-duplicates. |
 | 4 | Dates | Fixed dates and explicit filters, never "this month" by default: the transactions list is narrowed to the fixture's dates, and the dashboard is paged back to the fixture's month (`showDashboardMonth`). A feature defined relative to today (the dashboard's current month and its net-worth chips, the categories' last 12 months, the returns' 30-day fixture and No ano) gets dates computed from today at a safe distance from any boundary: the 15th of a month, 14 months back, 20 days back. Nothing assumes which month it is. **(review)** |
 | 5 | Each test's user | A fresh user per test (`devLogin` + `uniqueEmail`), so every test starts from the default categories and nothing else, and tests run in parallel. |
-| 6 | Shared market data | The catalogue, prices, benchmarks and sync runs are shared by every user. A test that syncs, or that asserts a price is missing, runs in the serial syncing projects (`market-data` → `investments` → `returns` → `compare`, `playwright.config.ts`); every other test runs in parallel in `chromium`. New tickers are unique per run (`uniqueTicker`). Figures that depend on how many days of fake series the database has kept (the benchmarks' returns) are not asserted, only their rows. |
-| 7 | Fakes | The API runs with `MarketData__FakeProviders=true` and `Ai__FakeProvider=true`: no request leaves the machine, and the figures are fixed (a close of 10 on the last day a sync asks for, yesterday in UTC, one cent less for each day before it; 0,05 on every benchmark day since 026, USDBRL included; the AI's answers derived from its input, prose for a row marked `GARBAGE`). |
+| 6 | Shared market data | The catalogue, prices, benchmarks and sync runs are shared by every user. A test that syncs, or that asserts a price is missing, runs in the serial syncing projects (`market-data` → `investments` → `returns` → `compare` → `yahoo`, `playwright.config.ts`); every other test runs in parallel in `chromium`. New tickers are unique per run (`uniqueTicker`). Figures that depend on what the database has kept of a benchmark (its returns, where its history begins) are not asserted, only its rows; a period or a figure is asserted on the run's own assets. |
+| 7 | Fakes | The API runs with `MarketData__FakeProviders=true` and `Ai__FakeProvider=true`: no request leaves the machine, and the figures are fixed (a close of 10 on the last day a sync asks for, yesterday in UTC, one cent less for each day before it; 0,05 on every benchmark day since 026, USDBRL included, back to 1994 for the BCB's since 025; Yahoo's own fake since 025, 1000 days ending at 12,50 with dividends 30, 60 and 90 days back and a 2:1 split 100 days back; the AI's answers derived from its input, prose for a row marked `GARBAGE`). |
 | 8 | Fixtures | The documented sample statements of `samples/statements/` (README there lists each file's expected outcome) are copied byte for byte into `web/e2e/fixtures/` under their own names, as `bb-extrato.xlsx` already was. Files a test needs only once (120 or 5 001 rows, over 2 MB, header-less, not an OFX, empty) are built in the test (`ofxStatement`). |
 | 9 | A real bug found by a test | Not fixed here. The test stays, marked `test.fixme` with a one-line reason, and the bug is listed below. |
 | 10 | Two tabs | A refusal a person reaches only with a second tab open (an import started in another tab, a session ended in another tab, AI switched off in another tab) is driven with a second page in the same browser context: it is the person's own browser, and the refusal's sentence is what they would read. **(review)** |
@@ -45,18 +45,19 @@ The site's routes (`web/src/routeTree.tsx`): `/login`, and behind the sign-in `/
 `details`), `/categories`, `/market-data`, `/investments`, `/investments/returns`,
 `/investments/$assetId`, `/investments/$assetId/returns`, `/compare` (026, merged while this spec
 was under way), `/settings`. The shell around them (`App.tsx`, `ProtectedLayout.tsx`) has the theme
-toggle, the sidebar with the sign-out, and the health footer.
+toggle, the sidebar with the sign-out, and the health footer. 025 (Yahoo, merged after 026) added
+no route: it put `/market-data` in the sidebar and changed what its catalogue does.
 
 **Before:** 33 tests in 13 files of `web/e2e`, plus 5 in the separate PWA suite; 026 then brought
-`compare.spec.ts` with 3.
-**After:** 91 tests in 17 files of `web/e2e` (84 run, 7 `test.fixme` for the bugs below), plus the
+`compare.spec.ts` with 3, and 025 `yahoo.spec.ts` with 4.
+**After:** 98 tests in 18 files of `web/e2e` (91 run, 7 `test.fixme` for the bugs below), plus the
 same 5 in the PWA suite.
 
-**Flows:** 119 listed below. Before this spec 33 were covered, 15 partly and 60 were gaps; `/compare`
-arrived with 11 more, 6 covered by 026's own tests and 5 gaps. After it, 115 map to a passing test
-and 4 (AUTH-5, NAV-4, TX-10, CAT-5) only to `test.fixme` tests naming 5 of the 7 bugs below; the
-other two sit beside the passing tests of ACC-2 and IMP-16. 17 more flows are listed as not
-E2E-reachable (the last table).
+**Flows:** 131 listed below. Before this spec 33 were covered, 15 partly and 60 were gaps; `/compare`
+arrived with 11 more, 6 covered by 026's own tests and 5 gaps; 025 with 12, 7 covered by its own
+tests, 1 partly and 4 gaps. After it, 127 map to a passing test and 4 (AUTH-5, NAV-4, TX-10,
+CAT-5) only to `test.fixme` tests naming 5 of the 7 bugs below; the other two sit beside the
+passing tests of ACC-2 and IMP-16. 19 more flows are listed as not E2E-reachable (the last table).
 
 "Before" names the test that covered the flow when this spec was written; **GAP** means none
 did, *partial* means a test touched the flow without asserting its outcome. "After" names the
@@ -71,8 +72,8 @@ test that covers it now, by file and title.
 | AUTH-3 | Sair returns to `/login`, and the cookie is gone | `auth` | `auth` "logging out returns to the login page and leaves / protected" |
 | AUTH-4 | `/login?error=unverified\|cancelled\|auth_failed` explains itself; `/login`, an unknown code or notice show nothing | GAP | `auth` "the login page explains each way a sign-in can come back, and nothing else" |
 | AUTH-5 | A write, and Sair, from a tab whose session ended in another tab | GAP | **bugs 5 and 6**: `auth` "a write after the session ended in another tab is explained in Portuguese", "Sair from a tab whose session already ended lands on the login page" (`fixme`) |
-| NAV-1 | The sidebar's seven pages (Comparar since 026), no Importar, the current one marked | GAP | `navigation` "the sidebar opens every page and marks the one shown" |
-| NAV-2 | `/market-data` and `/investments/returns` open by address | partial | `navigation` "the pages outside the sidebar open by their address" |
+| NAV-1 | The sidebar's eight pages (Comparar since 026, Dados de mercado since 025), no Importar, the current one marked | GAP | `navigation` "the sidebar opens every page and marks the one shown" |
+| NAV-2 | `/investments/returns` opens by address (`/market-data` did too, until 025 put it in the sidebar) | partial | `navigation` "the returns page, outside the sidebar, opens by its address" |
 | NAV-3 | An account or asset id that does not exist says so (`/accounts/$id`, `/investments/$id`, `/investments/$id/returns`) | GAP | `navigation` "an account or an asset that does not exist says so" |
 | NAV-4 | An address that matches no page | GAP | **bug 1**: `navigation` "an address that matches no page answers in Portuguese" (`fixme`) |
 | THEME-1 | Claro and Escuro survive a reload, the toolbar colour follows | `theme` | `theme` "the theme chosen is kept across a reload" |
@@ -210,10 +211,31 @@ test that covers it now, by file and title.
 | RET-4 | Nothing held, or nothing valued: nothing to measure | GAP | `returns` "with nothing held, the returns page has nothing to measure"; `investments` "a new ticker shows "Sem cotação"…" |
 | RET-5 | The benchmark rows and a chart reference toggled | partial | `returns` 36 |
 
+### Market data from Yahoo (025)
+
+025 arrived with master `1229fcc`, with `yahoo.spec.ts` and its 4 tests in a syncing project after
+`compare`. "Before" here is what 025 brought; `yahoo` 23 to 26 are its spec's E2E tests.
+
+| # | Flow | Before | After |
+|---|---|---|---|
+| YAH-1 | Yahoo first in the provider select, and the default, saying what it prices | `yahoo` 23 | `yahoo` 23; `market-data` "registers a ticker…" (the five providers in order) |
+| YAH-2 | Yahoo's symbol and currency suggested from ticker and class: a B3 stock `….SA` in BRL, crypto `…-USD` in USD, an index `^…` (IBOV → `^BVSP`), a currency `BRL=X` | `yahoo` 23 | unchanged |
+| YAH-3 | The other providers' suggestions (brapi and Twelve Data the ticker, Binance `…BRL`, CoinGecko none), and a symbol typed or a currency chosen kept from then on | GAP | `market-data` "the symbol and the currency are suggested for each provider until the person sets them" |
+| YAH-4 | A Yahoo symbol refused: a character Yahoo's symbols never have, a currency its suffix contradicts | partial (`yahoo` 24, the currency) | `market-data` "a registration a provider cannot price…"; `yahoo` 24 |
+| YAH-5 | The one-time note "Histórico completo na próxima sincronização.", gone once a sync loads the history; the catalogue read again when a run ends | `yahoo` 23, 25 | unchanged |
+| YAH-6 | A sync's "Yahoo Finance" line, with no key | `yahoo` 23 | unchanged |
+| YAH-7 | Editar moves an entry to Yahoo: the symbol suggested, Salvar, the row and its note, the next sync, the position revalued | `yahoo` 25 | unchanged |
+| YAH-8 | Editar refused: a symbol quoted in another currency than the entry's, an invalid symbol, a series already in the catalogue; Cancelar | GAP | `market-data` "a source edit is refused under its field or as a duplicate, and Cancelar keeps the entry" |
+| YAH-9 | Índice and Câmbio offered on `/market-data`, never on `/investments`, whose search leaves them out | `yahoo` 23, 26 | unchanged |
+| YAH-10 | "Dados de mercado" in the menu, and the comparison's empty search linking to it | `yahoo` 23 | `yahoo` 23; `navigation` "the sidebar opens every page…" |
+
 ### Compare (`/compare`, 026)
 
 The page arrived with 026's merge (master `3bf0a31`), with `compare.spec.ts` and its 3 tests in a
-syncing project after `returns`. "Before" here is what 026 brought.
+syncing project after `returns`. "Before" here is what 026 brought. Its tests 13 and 14 now assert
+the period and the figures while only the run's own assets are compared, and CDI joins afterwards:
+where a benchmark's stored history begins is the database's, and on a database CDI first reached
+before 026 it moved the start ("1 dia" for "10 dias").
 
 | # | Flow | Before | After |
 |---|---|---|---|
@@ -228,6 +250,8 @@ syncing project after `returns`. "Before" here is what 026 brought.
 | CMP-9 | Six series at most | GAP | same |
 | CMP-10 | A period no series has data in | GAP | same |
 | CMP-11 | A period the API refuses (dates the wrong way round) | GAP | same |
+| CMP-12 | A Yahoo asset compared by its total return, its dividend reinvested (025) | GAP | `compare` "a Yahoo asset is compared by its total return, and a start moved to its first day says so" |
+| CMP-13 | A start moved to a series' first day ("Começa em…") | not reachable until 025's Yahoo fake, the first series to begin later than the others | same |
 
 ### Bugs the new tests found
 
@@ -251,11 +275,13 @@ Each is kept as a `test.fixme` with its reason, and none is fixed here.
 | The nightly market-data sync and snapshot rebuild on their schedule | A cron in the API process; E2E runs with `MarketData__ScheduledSync=false` and triggers the same job manually (MKT-2). |
 | The monthly AI analysis job's schedule | Same: the on-demand path (AI-2) runs the same job. |
 | A sync refused by the ten-minute window, and "Nenhuma sincronização ainda" / "Nenhum ativo cadastrado ainda" | The fakes have no window, a run lasts milliseconds while the button is disabled, and the sync history and the catalogue are shared by every test. |
-| A provider failure listed under a sync run | The fake providers never fail. |
+| A provider failure listed under a sync run, Yahoo's refusals among them (an unknown symbol, access refused, a 429 retried and given up) | The fake providers never fail. |
+| A Yahoo revision (a rebased adjusted close reloading an asset's whole history), and the snapshot rebuild from a revised close's day | The Yahoo fake's values move only with the sync's day, and a test cannot move the day between two syncs. |
 | A stale price ("Cotação desatualizada") | The fakes always close on the sync's day. |
 | No dollar rate synced ("Sem cotação do dólar sincronizada") | Every fake sync stores USDBRL, and benchmarks are shared by every test. |
-| Returns in US$, an asset's FX split, and the benchmarks' figures | Since 026 the fake stores a benchmark value for every day it is asked for, but a database kept between runs also holds what earlier syncs wrote (one point per sync day before 026), and a sync only fetches the days after the latest stored one. Whether a period's first day has a rate is the database's history, not the test's. |
-| Two series with no period in common ("As séries escolhidas não têm um período em comum"), a series whose data stops a week early ("dados até…"), and a start moved to a series' first day ("Começa em…") | Every fake series spans the same days, except as a kept database's history makes them differ. |
+| Returns in US$, an asset's FX split, and the benchmarks' figures | Since 026 the fake stores a benchmark value for every day it is asked for, and since 025 a BCB series reaches back to 1994 once; but a database kept between runs also holds what earlier builds wrote (one point per sync day before 026), and no sync fills a gap between stored days. A benchmark's values over a period are the database's history, not the test's. |
+| Two series with no period in common ("As séries escolhidas não têm um período em comum"), and a series whose data stops a week early ("dados até…") | Every fake series ends on the sync's day: none stops early, and any two overlap. |
+| The portfolio refusing an index or an exchange rate ("Índices e câmbio servem para comparação e não entram na carteira.") | `/investments` neither offers those classes nor lists them in its search (YAH-9), so no screen sends one. No API test pins this refusal either (`POST /api/investments/assets`, 400 on `class` or `marketAssetId`): it belongs in the investments endpoint's integration tests, outside this spec. |
 | The AI budget spent (402), the provider timing out (504) or failing (502), an analysis that fails, a 409 from another tab's generation | The fake provider always answers at once, and a call costs cents against R$ 15. |
 | An analysis for a month that has not begun | The month selector stops at the current month. |
 | A page failing to load ("Não foi possível carregar…", the comparison's included) and the in-flight states ("Carregando…", "Verificando…", "Gerando…") | Needs the API to fail or hang mid-suite; it is shared by every test, and an in-flight state lasts milliseconds. |
@@ -273,7 +299,7 @@ catalogue (decision 6).
 | File | Tests before → after | New or extended |
 |---|---|---|
 | `auth.spec.ts` | 3 → 6 | AUTH-1 to AUTH-5 |
-| `navigation.spec.ts` (new) | 0 → 4 | NAV-1 to NAV-4 |
+| `navigation.spec.ts` (new) | 0 → 4 | NAV-1 to NAV-4, YAH-10 |
 | `theme.spec.ts` | 2 → 3 | THEME-2 |
 | `dashboard.spec.ts` | 5 → 8 | DASH-1, 4, 6, 8, 9, 11, 12 |
 | `transactions.spec.ts` | 3 → 9 | TX-2 to TX-10, IMP-15 |
@@ -283,17 +309,18 @@ catalogue (decision 6).
 | `categories.spec.ts` (new) | 0 → 5 | CAT-1 to CAT-5, TX-13 |
 | `ai.spec.ts` | 2 → 6 | AI-3 to AI-6, SET-1 to SET-3 |
 | `delete-account.spec.ts` | 1 → 2 | SET-5, SET-6 |
-| `market-data.spec.ts` | 2 → 4 | MKT-1, MKT-3, MKT-4 |
+| `market-data.spec.ts` | 2 → 6 | MKT-1, MKT-3, MKT-4, YAH-1, YAH-3, YAH-4, YAH-8 |
 | `investments.spec.ts` | 4 → 9 | INV-2 to INV-11, DASH-5, MKT-3 |
 | `returns.spec.ts` | 1 → 2 | RET-3 to RET-5 |
-| `compare.spec.ts` (026) | 3 → 4 | CMP-7 to CMP-11 |
+| `compare.spec.ts` (026) | 3 → 5 | CMP-7 to CMP-13; tests 13 and 14 made independent of the database's benchmark history |
+| `yahoo.spec.ts` (025) | 4 → 4 | unchanged |
 | `smoke.spec.ts`, `health.spec.ts` | 3 → 3 | unchanged |
 
 `support.ts` gains `fixture`, `uploadStatement`, `ofxStatement`, `importStep`, `commitImport`,
 `uniqueTicker`, `utcDaysAgo`, `localToday`, `localMonthDay` and `showDashboardMonth`, and
 `createAccount` takes a type and a currency and waits for `/accounts` to settle, so the specs stop
-keeping their own copies. `compare.spec.ts` keeps 026's own `uniqueTicker` and `utcDaysAgo`, left as
-merged.
+keeping their own copies. `compare.spec.ts` and `yahoo.spec.ts` keep their own `uniqueTicker` (and
+026's `utcDaysAgo`), left as merged.
 
 ## Phase 2 — the tests E2E makes redundant
 
@@ -347,7 +374,7 @@ and 82 cases out of 16 more).
 | `components/EmptyState.test.tsx` (3) | a | whole file | `transactions` "the list opens on the current month, and an empty ledger says so", "narrowing the date range…" | — |
 | `routes/ImportPage.test.tsx` (2) | a | whole file | `import` "the account shows the import in its card…" (in review); `accounts` "the tab is in the address…" (nothing in review) | — |
 | `routes/CategoriesPage.test.tsx` (9) | a | whole file | `categories`, all four passing tests (kind labels, Transfer category created, tree, rollup and share, edit in place, Só as sem uso, search keeping a parent) | — |
-| `components/market-data/AssetCatalogue.test.tsx` (4) | a | whole file | `market-data` "registers a ticker…", "a registration a provider cannot price…" | — |
+| `components/market-data/AssetCatalogue.test.tsx` (4) | a | whole file | `market-data` "registers a ticker…" (the providers in order, Yahoo first since 025), "a registration a provider cannot price…"; `yahoo` 23 | — |
 | `components/import/MappingStep.test.tsx` (3) | a | whole file | `import` "the date format changes the live preview…", "the review lets a duplicate in…" (description order), "a CSV is mapped…" (Continuar waits), "a statement with debit and credit columns…", "a mapping saved as a template…" | — |
 | `components/import/PreviewStep.test.tsx` (8) | a | whole file | `import` 64, "the review lets a duplicate in…" (counts, invalid rows, duplicate ticked, categories per sign), "next month's statement…" (history row unmarked); `ai` 28 and "with AI off…" | — |
 | `components/TransactionForm.test.tsx` (9) | a | whole file | `transactions` 1, "editing a transaction…" (Entrada opens on its own), "the form checks…" (zero, groups by kind, Saída default, no direction for an expense, a typed minus ignored); `dashboard` 26 (both directions) | — |
@@ -387,8 +414,8 @@ and 82 cases out of 16 more).
 
 ### API — `api.tests/Unit`
 
-57 test files (4 of them 026's) and 2 harnesses (`AiProviderHarness`, `MarketDataProviderHarness`),
-all kept.
+61 test files (4 of them 026's, 4 025's) and 2 harnesses (`AiProviderHarness`,
+`MarketDataProviderHarness`), all kept.
 
 | Files | Class | Why kept |
 |---|---|---|
@@ -403,10 +430,11 @@ all kept.
 | `AiOptions`, `MarketDataOptions`, `ReturnsOptions`, `MarketDataSetup`, `PriceProviderRegistry`, `MonthlyAnalysisPrompt`, `AiCategorisationRequest`, `GoogleUserInfo`, `MarketDataSyncJob`, `SyncErrorText` | c | configuration, wiring, prompts, the Google claim, the schedule, and failure texts the fakes never produce |
 | `AiTypes`, `InvestmentsTypes`, `MarketDataTypes`, `ReturnsTypes`, `FakeAiProvider`, `FakeMarketDataProviders`, `HarnessSanity` | c | no-float guards and the test infrastructure's self-checks |
 | `ComparePeriods`, `ComparisonSampling`, `PtaxConversion`, `SeriesComparison` (026) | c | the comparison's calculation core; `compare.spec.ts` drives the page on fake series |
+| `YahooProvider`, `YahooResilience`, `BcbSgsWindowing`, `PriceRevision` (025) | c | the Yahoo adapter against captured responses (bar days, raw and adjusted closes, refusals, pacing, the 429 retry), the BCB's five-year windows, and the rebasing check: adapters and history the fakes never produce |
 
 ### API — `api.tests/Integration`
 
-63 test files (2 of them 026's) and 9 fixtures (`DashboardFixtures`, `IdentityApiFactory`,
+67 test files (2 of them 026's, 4 025's) and 9 fixtures (`DashboardFixtures`, `IdentityApiFactory`,
 `ImportFixtures`, `InvestmentsApi`, `MarketDataApi`, `MarketDataSyncFakes`, `PostgresFixture`,
 `ReturnsFixtures`, `TransactionsFixtures`).
 
@@ -438,14 +466,16 @@ all kept.
 | `AiBootTests`, `ReturnsBootTests`, `AiFakeProviderTests`, `MarketDataFakeProvidersTests`, `MarketDataSyncWiringTests`, `PostgresContainerTests` | c | — | — | boot checks, wiring and the infrastructure's self-checks |
 | `AiGatewayTests`, `AiGatewayGateTests`, `AiGatewayTimeoutTests`, `AnalysisJobTests`, `AnalysisInputQueriesTests`, `MarketDataSyncTests`, `MarketDataSyncFailureTests` | c | — | — | the budget, timeouts and job lifecycle, what the AI is sent, and sync windows and failures: none reachable on the fakes |
 | `CompareEndpointTests`, `CompareFiguresTests` (026) | c | — | — | the comparison's validation and figures (026), kept as calculation core and endpoint validation |
+| `CompareTotalReturnTests` (025) | c | — | `compare` "a Yahoo asset is compared by its total return…" (one ordinary case) | the adjusted close per row, never mixed with another source's closes: the comparison's calculation core |
+| `MarketDataSyncHistoryTests`, `SnapshotRebuildRevisedPricesTests`, `AddYahooHistoryMigrationTests` (025) | c | — | `yahoo` 23 and 25 (a first load, a moved entry) | whole-history loads and replacements, revisions, the BCB's reach back to 1994, the rebuild from a revised close, and the migration (sync windows, snapshots and migrations: policy) |
 
 ### Summary
 
 | Suite | Test files | (a) | (b) | (c) | Tests before | Tests after the plan |
 |---|---|---|---|---|---|---|
 | web (Vitest) | 41 | 9 | 32 | 0 | 298 | 170, in 32 files |
-| API unit | 57 | 0 | 17 | 40 | 1 140 together (`dotnet test`) | 1 138 together, in the same 120 files |
-| API integration | 63 | 0 | 24 | 39 | | |
+| API unit | 61 | 0 | 17 | 44 | 1 199 together (`dotnet test`) | 1 197 together, in the same 128 files |
+| API integration | 67 | 0 | 24 | 43 | | |
 
 ### Proposed "Testing" note for `docs/ARCHITECTURE.md`
 
