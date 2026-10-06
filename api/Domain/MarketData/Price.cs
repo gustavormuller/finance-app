@@ -18,7 +18,7 @@ public sealed class Price
     /// <summary>
     /// The raw traded price: what the shares traded at that day, before any later split.
     /// A split is a movement that adds quantity (007), so the snapshots value
-    /// <c>Quantity × Close</c> and need the price the quantity held then traded at.
+    /// <c>Quantity * Close</c> and need the price the quantity held then traded at.
     /// </summary>
     public decimal Close { get; set; }
 

@@ -256,6 +256,40 @@ ITUB4.SA, WEGE3.SA, BTC-USD, BRL=X, ^BVSP, ^GSPC and AAPL, sync, and record each
 count; compare AAPL 2020-08-28 and the ITUB4 days around 2025-03-18 raw against adjusted; check
 that PTAX and CDI reach back to 1994-07-01.
 
+### Done on 2026-10-06, about 07:40 UTC
+
+The first manual sync took 121 s and succeeded: Yahoo 8 items (the seven assets and IVVB11),
+70 822 rows; BCB 4 series, 24 677 rows. A second sync right after it wrote nothing, reloaded
+nothing (no stored day read differently) and took 9 s.
+
+| Asset | Symbol | First day | Last day | Days stored |
+|---|---|---|---|---|
+| ITUB4 | ITUB4.SA | 2000-12-21 | 2026-10-05 | 6 464 |
+| WEGE3 | WEGE3.SA | 2000-01-03 | 2026-10-05 | 6 717 |
+| BTC | BTC-USD | 2014-09-17 | 2026-10-05 | 4 402 |
+| USD | BRL=X | 2003-12-01 | 2026-10-05 | 5 509 (the 453 null days skipped) |
+| IBOV | ^BVSP | 1993-04-27 | 2026-10-05 | 8 284 |
+| SP500 | ^GSPC | 1927-12-30 | 2026-10-05 | 24 807 |
+| AAPL | AAPL | 1980-12-12 | 2026-10-05 | 11 545 |
+
+Raw close against Yahoo's adjusted close:
+
+| Day | Close (raw) | AdjustedClose | Event |
+|---|---|---|---|
+| AAPL 1980-12-12 | 28.75 | 0.09812242 | the IPO day's close |
+| AAPL 2020-08-28 | 499.23 | 120.95568085 | last day before 4:1 |
+| AAPL 2020-08-31 | 129.04 | 125.05754089 | |
+| ITUB4 2025-03-17 | 35.34 | 28.21543503 | last day before 110:100 |
+| ITUB4 2025-03-18 | 32.30 | 28.36713028 | |
+| ITUB4 2025-12-23 | 40.26 | 38.25687408 | last day before 103:100 |
+| ITUB4 2025-12-26 | 39.10 | 38.26922607 | |
+| WEGE3 2021-04-27 | 74.02 | 32.89364624 | last day before 2:1 |
+| WEGE3 2021-04-28 | 36.50 | 32.44038391 | |
+
+BCB: CDI from 1994-07-04 (8 096 days; the 1st has no value), SELIC from 1994-07-04, IPCA from
+1994-07-01 (386 months), USDBRL (PTAX) from 1994-07-01 at 1.0000 (8 098 days). IVVB11 from
+2014-04-29 (3 094 days; its 2026-10-05 close was still null at Yahoo).
+
 ## Definition of done
 
 - `verify.sh` green; E2E green on the isolated stack
