@@ -3,10 +3,13 @@ import { Link, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { api, type Transaction } from '@/api/finance';
+import { useAccounts } from '@/components/accounts/queries';
 import Amount from '@/components/Amount';
 import Alert from '@/components/Alert';
+import { useCategories } from '@/components/categories/queries';
 import EmptyState from '@/components/EmptyState';
 import { formatDate } from '@/lib/labels';
+import { currentMonth, monthDays } from '@/lib/months';
 import TransactionForm from '@/components/TransactionForm';
 import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -23,43 +26,25 @@ import {
 
 const PAGE_SIZE = 50;
 
-/** The current month, which is what the spec asks the filter to open on. */
-function currentMonth() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  return { from: isoDay(first), to: isoDay(last) };
-}
-
-/** Local calendar day, not UTC: toISOString() would shift the date west of UTC. */
-function isoDay(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  // Arriving from an import's done step, or from an account (015): show that batch or
+  // Arriving from an import's done step, or from an account: show that batch or
   // that account, whatever the dates, rather than the current month with most of it
   // filtered out.
   const { importBatchId, accountId } = useSearch({ strict: false }) as { importBatchId?: string; accountId?: string };
   const [filter, setFilter] = useState(
     importBatchId || accountId
       ? { from: '', to: '', accountId: accountId ?? '', categoryId: '', importBatchId: importBatchId ?? '' }
-      : { ...currentMonth(), accountId: '', categoryId: '', importBatchId: '' },
+      : { ...monthDays(currentMonth()), accountId: '', categoryId: '', importBatchId: '' },
   );
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [creating, setCreating] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.listAccounts });
-  const categories = useQuery({ queryKey: ['categories'], queryFn: api.listCategories });
+  const accounts = useAccounts();
+  const categories = useCategories();
 
   const query = { ...filter, page, pageSize: PAGE_SIZE };
   const transactions = useQuery({

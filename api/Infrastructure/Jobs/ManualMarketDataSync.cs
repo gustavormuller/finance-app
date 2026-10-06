@@ -87,7 +87,7 @@ public sealed class ManualMarketDataSync(
             await scope.ServiceProvider.GetRequiredService<MarketDataSync>()
                 .ExecuteAsync(syncRunId, lifetime.ApplicationStopping);
 
-            // Still under the gate, so it never overlaps the nightly run's rebuild (007).
+            // Still under the gate, so it never overlaps the nightly run's rebuild.
             await scope.ServiceProvider.GetRequiredService<SnapshotRebuildAfterSync>()
                 .RunAsync(syncRunId, lifetime.ApplicationStopping);
         }

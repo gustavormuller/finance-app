@@ -4,7 +4,7 @@ namespace Finance.Api.Domain.Returns;
 /// <param name="Total">The whole period, not annualised.</param>
 /// <param name="Annualised">
 /// <c>(1 + Total)^(365 / Days) - 1</c>, computed for any period, a year or less included
-/// (spec silent; DEFERRED, 008 CP2). <c>null</c> when there is no day to annualise over,
+/// (spec-silent). <c>null</c> when there is no day to annualise over,
 /// or when the result is past the <see cref="decimal"/> range.
 /// </param>
 /// <param name="Days">Calendar days from the base day to the last day.</param>

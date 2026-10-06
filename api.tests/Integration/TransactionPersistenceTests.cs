@@ -9,9 +9,9 @@ namespace Finance.Api.Tests.Integration;
 /// stores and hands back.
 /// </summary>
 /// <remarks>
-/// The HTTP halves — that the same values survive JSON serialisation in both
-/// directions — arrive with the endpoints in the next checkpoint. If a float were
-/// anywhere in this half, no amount of care in the endpoint could repair it.
+/// The HTTP half — that the same values survive JSON serialisation in both
+/// directions — is in TransactionEndpointTests. If a float were anywhere in this
+/// half, no amount of care in the endpoint could repair it.
 /// </remarks>
 [Collection(nameof(PostgresCollection))]
 public sealed class TransactionPersistenceTests(PostgresFixture postgres)

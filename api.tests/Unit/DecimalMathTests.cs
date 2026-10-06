@@ -3,9 +3,9 @@ using Finance.Api.Domain.Returns;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 008 checkpoint 1: the <c>decimal</c> exponential, logarithm and power under every
-/// returns formula. Each expected value was computed outside this code base, with
-/// Python's <c>decimal</c> module at 40 significant digits, and written in by hand.
+/// The <c>decimal</c> exponential, logarithm and power under every returns formula. Each
+/// expected value was computed outside this code base, with Python's <c>decimal</c> module
+/// at 40 significant digits, and written in by hand.
 /// </summary>
 public sealed class DecimalMathTests
 {

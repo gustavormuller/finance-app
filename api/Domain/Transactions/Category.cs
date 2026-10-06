@@ -19,8 +19,8 @@ public sealed class Category : IUserOwned
     public string Name { get; set; } = "";
 
     /// <summary>
-    /// Income or expense. A child's kind must equal its parent's, and the sign of
-    /// every transaction filed under it must agree with it.
+    /// A child's kind must equal its parent's, and the sign of every transaction filed
+    /// under it must agree with it. A transfer takes either sign.
     /// </summary>
     public CategoryKind Kind { get; set; }
 

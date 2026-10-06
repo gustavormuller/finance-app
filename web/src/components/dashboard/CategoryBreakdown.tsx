@@ -17,7 +17,7 @@ const percent = (share: number) =>
 /**
  * Section 4: the selected month by top-level category.
  *
- * 012: a ring of the shares above a ranked list. The ring is decoration for the eye;
+ * A ring of the shares above a ranked list. The ring is decoration for the eye;
  * the list carries every figure — label, share and amount as markup — so it reads the
  * same to a screen reader, and each row's swatch matches its arc. The API has already
  * sorted the rows.

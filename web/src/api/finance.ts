@@ -1,18 +1,13 @@
 /**
- * The 003 API surface, hand-written.
- *
- * ARCHITECTURE.md's stack table calls for these types to be generated from OpenAPI
- * with openapi-typescript. Nothing exposes an OpenAPI document yet and standing that
- * up is its own piece of work, not 003's — so these are written by hand and the
- * integration tests are what keep them honest, since they declare the same shapes
- * independently and assert against the real endpoints.
+ * Hand-written: nothing exposes an OpenAPI document. The integration tests keep these
+ * shapes honest, since they declare them independently and assert against the real endpoints.
  */
 
 import type { AuthenticatedUser } from '@/auth/useMe';
 
 export type AccountType = 'Checking' | 'Savings' | 'CreditCard' | 'Cash' | 'Investment';
 
-/** `Transfer` (005) moves money between the user's own accounts: any sign, never income or expense. */
+/** `Transfer` moves money between the user's own accounts: any sign, never income or expense. */
 export type CategoryKind = 'Income' | 'Expense' | 'Transfer';
 
 export interface Account {
@@ -21,7 +16,7 @@ export interface Account {
   type: AccountType;
   currency: string;
   createdAt: string;
-  /** The balance before every recorded transaction (005). A number for the reason `Transaction.amount` is. */
+  /** The balance before every recorded transaction. A number for the reason `Transaction.amount` is. */
   openingBalance: number;
 }
 
@@ -42,7 +37,7 @@ export interface Category {
  * `numeric(18,2)` there, and nothing client-side does arithmetic on money beyond
  * applying a sign. Any future totalling belongs on the API, not here.
  *
- * One exception, by design (016): a BRL figure shown in dollars is divided by the
+ * One exception, by design: a BRL figure shown in dollars is divided by the
  * latest USDBRL at display time, the architecture's "convert on read". That division
  * is exact, in `bigint`, and rounded once to the cent (`lib/currency.ts`).
  */
@@ -83,7 +78,7 @@ export interface AccountInput {
   openingBalance?: number;
 }
 
-/** One category's use in a range (013): signed, as its transactions are. */
+/** One category's use in a range: signed, as its transactions are. */
 export interface CategoryUsage {
   categoryId: string;
   count: number;
@@ -106,7 +101,7 @@ export interface TransactionQuery {
   pageSize?: number;
 }
 
-// ---- 004: import ------------------------------------------------------------
+// ---- import -----------------------------------------------------------------
 
 export type ImportSource = 'Ofx' | 'Csv' | 'Spreadsheet';
 
@@ -117,7 +112,7 @@ export type StagedRowStatus = 'Ready' | 'Duplicate' | 'Invalid';
 export type SignMode = 'Signed' | 'SignedInverted' | 'DebitCredit';
 
 /**
- * Which rung of the cascade chose a staged row's category (009): `Default` is the sign
+ * Which rung of the cascade chose a staged row's category: `Default` is the sign
  * default, the only rows "Sugerir com IA" sends; `Ai` came from that; `User` was picked
  * by hand in the preview.
  */
@@ -130,7 +125,7 @@ export interface CsvPreview {
   /** The first row of the table, header or not; the mapping step decides. */
   headers: string[];
   sampleRows: string[][];
-  /** Null for a spreadsheet (011), which has none. */
+  /** Null for a spreadsheet, which has none. */
   delimiter: string | null;
   skippedRows: number;
   rowCount: number;
@@ -209,14 +204,14 @@ export interface StagedRow {
   issues: string[];
 }
 
-export interface StagedRowCounts {
+interface StagedRowCounts {
   ready: number;
   duplicates: number;
   invalid: number;
   included: number;
 }
 
-export interface StagedRowPage {
+interface StagedRowPage {
   items: StagedRow[];
   page: number;
   pageSize: number;
@@ -255,7 +250,7 @@ export interface SuggestResult {
   skipped: number;
 }
 
-// ---- 005: dashboard -----------------------------------------------------------
+// ---- dashboard ----------------------------------------------------------------
 
 /**
  * The dashboard's money is signed as stored — `expense` and every Expense category
@@ -300,7 +295,7 @@ export interface CategoryTotal {
 }
 
 /**
- * 014: what was owned at the end of a month — the summary's accounts as they stood that
+ * What was owned at the end of a month — the summary's accounts as they stood that
  * day, plus the portfolio's value. The current month is month-to-date.
  */
 export interface NetWorthPoint {
@@ -315,7 +310,7 @@ export interface NetWorthPoint {
 /** The kinds the breakdown accepts; a Transfer is neither and the API refuses it. */
 export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
 
-// ---- 006: market data -----------------------------------------------------------
+// ---- market data ----------------------------------------------------------------
 
 export type MarketAssetClass = 'StockBr' | 'Fii' | 'EtfBr' | 'Bdr' | 'StockUs' | 'Crypto';
 
@@ -350,7 +345,7 @@ export interface MarketAssetInput {
 }
 
 /** An item that failed, and why; `error` is already pt-BR. */
-export interface SyncFailure {
+interface SyncFailure {
   item: string;
   error: string;
 }
@@ -373,7 +368,7 @@ export interface SyncRun {
   summary: Record<string, ProviderSyncSummary>;
 }
 
-// ---- 007: investments -----------------------------------------------------------
+// ---- investments ----------------------------------------------------------------
 
 export type MovementKind = 'Buy' | 'Sell' | 'Dividend' | 'Jcp' | 'Split';
 
@@ -402,14 +397,14 @@ export interface Position {
   dividendsBrl: number | null;
 }
 
-/** One asset class's part of the total (016); `share` is a fraction, and the shares sum to 1. */
-export interface AllocationItem {
+/** One asset class's part of the total; `share` is a fraction, and the shares sum to 1. */
+interface AllocationItem {
   class: MarketAssetClass;
   valueBrl: number;
   share: number;
 }
 
-/** BRL per US dollar, the latest USDBRL the market data holds, and its day (016). */
+/** BRL per US dollar, the latest USDBRL the market data holds, and its day. */
 export interface UsdBrl {
   rate: number;
   date: string;
@@ -425,7 +420,7 @@ export interface PortfolioSummary {
   usdBrl: UsdBrl | null;
 }
 
-/** Either a catalogue entry already there, or 006's registration body. */
+/** Either a catalogue entry already there, or a new one to register. */
 export type AddAssetInput = { marketAssetId: string } | MarketAssetInput;
 
 export interface Movement {
@@ -464,7 +459,7 @@ export interface DailyRow {
   costBasisBrl: number;
 }
 
-// ---- 008: returns ---------------------------------------------------------------
+// ---- returns --------------------------------------------------------------------
 
 /** The `period` query value; `custom` takes `from`/`to` (`YYYY-MM-DD`). */
 export type ReturnsPeriodKind = 'inception' | 'ytd' | '12m' | 'custom';
@@ -522,7 +517,7 @@ export interface AssetReturns extends Returns {
   fx: FxSplit | null;
 }
 
-// ---- 009: AI -------------------------------------------------------------------
+// ---- AI ------------------------------------------------------------------------
 
 export type AnalysisStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
 
@@ -603,7 +598,6 @@ function searchParams(query: object): string {
   return search.toString();
 }
 
-/** The multipart body of an upload: the file, then every mapping field that is set. */
 function uploadBody(upload: ImportUpload): FormData {
   const body = new FormData();
 
@@ -662,7 +656,7 @@ export const api = {
 
   /**
    * A CSV's or a spreadsheet's first rows. `culture` and `dateFormat` only matter to a
-   * spreadsheet, whose typed cells the API writes in them (011).
+   * spreadsheet, whose typed cells the API writes in them.
    */
   previewCsv: (
     file: File,
@@ -767,7 +761,4 @@ export const api = {
 
   createCsvTemplate: (input: CsvTemplateInput) =>
     request<CsvTemplate>('/api/csv-templates', { method: 'POST', body: JSON.stringify(input) }),
-
-  deleteCsvTemplate: (id: string) =>
-    request<void>(`/api/csv-templates/${id}`, { method: 'DELETE' }),
 };

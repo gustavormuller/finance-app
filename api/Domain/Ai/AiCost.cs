@@ -8,7 +8,7 @@ public static class AiCost
 {
     /// <summary>
     /// <c>(input / 1e6) * inputPrice + (output / 1e6) * outputPrice</c>, the prices in USD
-    /// per million tokens, converted at <paramref name="usdBrl"/> (009).
+    /// per million tokens, converted at <paramref name="usdBrl"/>.
     /// </summary>
     /// <remarks>
     /// Computed in full and rounded once, to the column's four places, half away from zero as
@@ -28,7 +28,7 @@ public static class AiCost
     /// <summary>The month, <c>YYYY-MM</c>, an instant falls in on a fixed UTC-3 clock.</summary>
     /// <remarks>
     /// Brazil has kept no daylight saving time since 2019, the same fixed offset the brapi
-    /// adapter uses (006). A call at 23:30 on the 31st counts against that month.
+    /// adapter uses. A call at 23:30 on the 31st counts against that month.
     /// </remarks>
     public static string MonthOf(DateTimeOffset instant) =>
         instant.ToOffset(SaoPaulo).ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);

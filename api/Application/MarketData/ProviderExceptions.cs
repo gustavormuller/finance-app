@@ -2,7 +2,7 @@ namespace Finance.Api.Application.MarketData;
 
 /// <summary>
 /// A market-data provider could not deliver a series. The sync catches it per asset and
-/// per provider, so one bad ticker or one provider down never stops the rest (006).
+/// per provider, so one bad ticker or one provider down never stops the rest.
 /// </summary>
 /// <remarks>
 /// Messages are English diagnostics for logs, not text for the screen: whatever the sync

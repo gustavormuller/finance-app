@@ -42,7 +42,7 @@ public sealed class TransactionSecurityTests(PostgresFixture postgres)
         Assert.Empty(transactions!.Items);
         Assert.Equal(0, transactions.Total);
 
-        // Categories are the one list that is not empty, because B has their own eight
+        // Categories are the one list that is not empty, because B has their own
         // seeded ones. Asserting "empty" here would also pass if the filter were
         // hiding every row from everybody.
         Assert.DoesNotContain(categories!, category => category.Id == world.CategoryId);

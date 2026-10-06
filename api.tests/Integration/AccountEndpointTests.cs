@@ -115,6 +115,99 @@ public sealed class AccountEndpointTests(PostgresFixture postgres)
         Assert.Empty(accounts!);
     }
 
+    /// <summary>
+    /// 003 amendment 1, test 16a. An import batch holds its account by a RESTRICT key,
+    /// so a batch left with no transactions used to pass the check and end in a 500.
+    /// </summary>
+    [Fact]
+    public async Task An_account_with_an_import_in_its_history_cannot_be_deleted_until_it_is_undone()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("account-import", cancellationToken);
+        var accountId = await user.CreateAccountAsync("Nubank", cancellationToken);
+
+        var batch = await user.UploadOfxAsync(accountId, ImportFixtures.Ofx(ImportFixtures.OfxRows(2)), cancellationToken);
+        await user.CommitAsync(batch.BatchId, cancellationToken);
+
+        // Both in the way: one sentence names both, undo first.
+        using var both = await user.Client.SendAsync(
+            TransactionsFixtures.Delete($"/api/accounts/{accountId}"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Conflict, both.StatusCode);
+        Assert.Equal(
+            "'Nubank' ainda tem 2 lançamento(s) e 1 importação(ões) no histórico. "
+            + "Desfaça ou descarte as importações e mova ou exclua os lançamentos restantes antes de excluir a conta.",
+            await InvestmentAssetEndpointTests.DetailAsync(both, cancellationToken));
+
+        foreach (var imported in (await user.ListTransactionsAsync(cancellationToken)).Items)
+        {
+            using var byHand = await user.Client.SendAsync(
+                TransactionsFixtures.Delete($"/api/transactions/{imported.Id}"), cancellationToken);
+
+            Assert.Equal(HttpStatusCode.NoContent, byHand.StatusCode);
+        }
+
+        // No transactions left, only the batch: this was the 500.
+        using var batchOnly = await user.Client.SendAsync(
+            TransactionsFixtures.Delete($"/api/accounts/{accountId}"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Conflict, batchOnly.StatusCode);
+        Assert.Equal(
+            "'Nubank' ainda tem 1 importação(ões) no histórico. "
+            + "Desfaça ou descarte as importações antes de excluir a conta.",
+            await InvestmentAssetEndpointTests.DetailAsync(batchOnly, cancellationToken));
+
+        Assert.Single((await user.Client.GetFromJsonAsync<List<TransactionsFixtures.AccountItem>>(
+            "/api/accounts", cancellationToken))!);
+        Assert.Single((await user.Client.GetFromJsonAsync<List<ImportFixtures.BatchItem>>(
+            "/api/imports", cancellationToken))!);
+
+        // The way out the sentence points at.
+        using var undo = await user.Client.SendAsync(
+            ImportFixtures.Post($"/api/imports/{batch.BatchId}/undo"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+
+        using var deleted = await user.Client.SendAsync(
+            TransactionsFixtures.Delete($"/api/accounts/{accountId}"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
+    /// <summary>003 amendment 1, test 16b: a batch in review holds its account too.</summary>
+    [Fact]
+    public async Task An_account_with_an_import_in_review_cannot_be_deleted_until_it_is_discarded()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var factory = new IdentityApiFactory(postgres.ConnectionString);
+        var user = await factory.SignInNewUserAsync("account-staged", cancellationToken);
+        var accountId = await user.CreateAccountAsync("Inter", cancellationToken);
+
+        var batch = await user.UploadOfxAsync(accountId, ImportFixtures.Ofx(ImportFixtures.OfxRows(2)), cancellationToken);
+
+        using var refused = await user.Client.SendAsync(
+            TransactionsFixtures.Delete($"/api/accounts/{accountId}"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal(
+            "'Inter' ainda tem 1 importação(ões) no histórico. "
+            + "Desfaça ou descarte as importações antes de excluir a conta.",
+            await InvestmentAssetEndpointTests.DetailAsync(refused, cancellationToken));
+
+        using var discard = await user.Client.SendAsync(
+            TransactionsFixtures.Delete($"/api/imports/{batch.BatchId}"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, discard.StatusCode);
+
+        using var deleted = await user.Client.SendAsync(
+            TransactionsFixtures.Delete($"/api/accounts/{accountId}"), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
     [Fact]
     public async Task Two_accounts_cannot_share_a_name_under_one_user()
     {

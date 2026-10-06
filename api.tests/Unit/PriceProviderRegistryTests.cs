@@ -3,7 +3,7 @@ using Finance.Api.Domain.MarketData;
 
 namespace Finance.Api.Tests.Unit;
 
-/// <summary>006 provider registry: one implementation per <see cref="ProviderKind"/>.</summary>
+/// <summary>One implementation per <see cref="ProviderKind"/>.</summary>
 public sealed class PriceProviderRegistryTests
 {
     [Fact]

@@ -5,7 +5,7 @@ namespace Finance.Api.Tests.Unit;
 
 /// <summary>
 /// One asset's TWR days from its <see cref="PortfolioDaily"/> rows and movements (008,
-/// decision 3 and the CP1 defaults): buys in at cost plus fees, sells out at proceeds less
+/// decision 3, and spec-silent defaults): buys in at cost plus fees, sells out at proceeds less
 /// fees, dividends and JCP as income net of fees, USD flows at 007's FX rule, and a flow
 /// dated before the first row moved onto it.
 /// </summary>
@@ -50,7 +50,7 @@ public sealed class ReturnSeriesTests
         Assert.Equal(new ReturnDay(At(2), 100m, 0m, 0m), days[1]);
     }
 
-    /// <summary>A buy on day 1 before the first close on day 3 lands on day 3 (DEFERRED, 008 CP1).</summary>
+    /// <summary>A buy on day 1 before the first close on day 3 lands on day 3.</summary>
     [Fact]
     public void A_flow_before_the_first_row_moves_onto_it()
     {

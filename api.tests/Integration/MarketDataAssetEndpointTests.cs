@@ -7,8 +7,8 @@ using static Finance.Api.Tests.Integration.MarketDataApi;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 006 checkpoint 4: the catalogue, price and benchmark routes, and the endpoint half of
-/// spec integration test 19.
+/// The catalogue, price and benchmark routes, and the endpoint half of spec 006
+/// integration test 19.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class MarketDataAssetEndpointTests(PostgresFixture postgres)

@@ -63,7 +63,7 @@ public static class SnapshotBuilder
 
         // A buy dated before the first known rate takes the earliest one after it.
         // USDBRL at BCB goes back decades, so this only bites a fresh catalogue whose
-        // history is not backfilled yet (DEFERRED, 007 CP2).
+        // history is not backfilled yet.
         decimal RateForCost(DateOnly date) =>
             isBase ? 1m : (rates.LastOrDefault(r => r.Date <= date) ?? rates[0]).Value;
 

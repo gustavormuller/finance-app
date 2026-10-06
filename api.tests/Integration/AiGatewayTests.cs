@@ -9,9 +9,9 @@ using Microsoft.Extensions.Time.Testing;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 009 checkpoint 2: the database halves of spec tests 1, 2 and 4, and decision 3, on the
-/// path a job takes (a scope acting for the user, the query filters on). A scripted
-/// provider stands in; no test calls a real AI API.
+/// The database halves of spec 009 tests 1, 2 and 4, and decision 3, on the path a job takes
+/// (a scope acting for the user, the query filters on). A scripted provider stands in; no test
+/// calls a real AI API.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed partial class AiGatewayTests(PostgresFixture postgres)

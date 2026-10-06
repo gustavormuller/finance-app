@@ -34,7 +34,7 @@ async function enableAi(page: Page) {
 
 /** Step 1 through to the review, for `extrato.ofx`. */
 async function uploadOfx(page: Page, account: string) {
-  // 015: from the account's own tab, where choosing the file starts the upload.
+  // From the account's own tab, where choosing the file starts the upload.
   await openImportTab(page, account);
   await page.getByLabel('Escolher arquivo').setInputFiles(OFX);
 

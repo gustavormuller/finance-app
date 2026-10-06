@@ -13,7 +13,7 @@ import SectionHeading from './SectionHeading';
  * also drives the category breakdown. Forward stops at the local current month —
  * there is nothing recorded in the future worth paging to.
  *
- * 012: the net is the card's figure, with how much of the income it kept under it.
+ * The net is the card's figure, with how much of the income it kept under it.
  */
 export default function MonthTotals({
   month,

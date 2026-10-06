@@ -2,9 +2,9 @@ import type { PeriodReturn, ReturnsPeriod } from '@/api/finance';
 import { formatRate, perYear, showsAnnualised, signTone } from '@/lib/rates';
 
 /**
- * Spec 008 "Headline": TWR, XIRR and their difference, the timing effect. XIRR is always
- * a year's rate, so the timing effect is too. In dollars (016) only the TWR is converted;
- * XIRR and the timing effect say they are in reais (decision 14).
+ * TWR, XIRR and their difference, the timing effect. XIRR is always a year's rate, so
+ * the timing effect is too. In dollars only the TWR is converted; XIRR and the timing
+ * effect say they are in reais (016, decision 14).
  */
 export default function Headline({
   period,

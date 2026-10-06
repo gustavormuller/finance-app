@@ -23,7 +23,6 @@ public sealed class MovementRulesTests
         Assert.Equal("Quantidade vendida maior que a posição", violation?.Message);
     }
 
-    /// <summary>Selling exactly what is held closes the position and is fine.</summary>
     [Fact]
     public void Selling_everything_held_is_allowed() =>
         Assert.Null(MovementRules.ValidatePositions(
