@@ -446,6 +446,8 @@ test('a mapping saved as a template fills the next mapping', async ({ page }) =>
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.getByTestId('preview-counts')).toHaveText(/3 prontas/);
   await importStep(page).getByRole('button', { name: 'Descartar' }).click();
+  // The file step comes back once the discard is done; leaving before that cancels it.
+  await expect(page.getByTestId('drop-zone')).toBeVisible();
 
   await uploadTable(page, 'Nubank', 'nubank.csv');
   await page.getByLabel('Modelo salvo').selectOption({ label: 'Nubank conta' });
