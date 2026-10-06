@@ -37,6 +37,10 @@ public static class MarketDataEndpoints
         string? ProviderSymbol,
         string? Currency);
 
+    /// <summary>Where an existing entry's prices come from (025): the only part of it that can be edited.</summary>
+    private sealed record SourceRequest(ProviderKind Provider, string? ProviderSymbol);
+
+    /// <remarks><c>HistoryLoadedAt</c> null: the next sync loads the whole history from the current source (025).</remarks>
     private sealed record AssetResponse(
         Guid Id,
         string Ticker,
@@ -47,9 +51,11 @@ public static class MarketDataEndpoints
         string ProviderSymbol,
         bool IsActive,
         DateTimeOffset? LastSyncedAt,
+        DateTimeOffset? HistoryLoadedAt,
         DateTimeOffset CreatedAt);
 
-    private sealed record PriceResponse(DateOnly Date, decimal Close);
+    /// <remarks><c>Close</c> is the traded price; <c>AdjustedClose</c> the total-return series, Yahoo's only (025).</remarks>
+    private sealed record PriceResponse(DateOnly Date, decimal Close, decimal? AdjustedClose);
 
     private sealed record BenchmarkResponse(DateOnly Date, decimal Value);
 
@@ -108,6 +114,42 @@ public static class MarketDataEndpoints
             return Results.Created($"/api/market-data/assets/{asset.Id}", Describe(asset));
         });
 
+        // 025: an entry moves to another provider or symbol; the next sync replaces its prices
+        // with the new source's whole history. Ticker, class and currency stay: movements are
+        // in the asset's currency (007).
+        marketData.MapPatch("/assets/{id:guid}", async (
+            Guid id,
+            SourceRequest request,
+            AppDbContext database,
+            IOptions<MarketDataOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            var asset = await database.Set<MarketAsset>().SingleOrDefaultAsync(entity => entity.Id == id, cancellationToken);
+            if (asset is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (ValidateSource(request, asset.Currency, options.Value) is { } invalid)
+            {
+                return invalid;
+            }
+
+            var symbol = Symbol(request.Provider, request.ProviderSymbol!);
+            if (asset.Provider != request.Provider || asset.ProviderSymbol != symbol)
+            {
+                asset.Provider = request.Provider;
+                asset.ProviderSymbol = symbol;
+                asset.HistoryLoadedAt = null;
+                if (!await database.TrySaveAsync(cancellationToken))
+                {
+                    return DuplicateSymbol(asset);
+                }
+            }
+
+            return Results.Ok(Describe(asset));
+        });
+
         marketData.MapGet("/assets/{id:guid}/prices", async (
             Guid id,
             AppDbContext database,
@@ -125,7 +167,7 @@ public static class MarketDataEndpoints
             query = to is { } end ? query.Where(price => price.Date <= end) : query;
 
             return Results.Ok(await query.OrderBy(price => price.Date)
-                .Select(price => new PriceResponse(price.Date, price.Close)).ToListAsync(cancellationToken));
+                .Select(price => new PriceResponse(price.Date, price.Close, price.AdjustedClose)).ToListAsync(cancellationToken));
         });
 
         // An unknown code is an empty series, like a configured one not yet synced.
@@ -174,7 +216,6 @@ public static class MarketDataEndpoints
     internal static MarketAsset NewAsset(AssetRequest request, TimeProvider clock)
     {
         var ticker = request.Ticker!.Trim().ToUpperInvariant();
-        var symbol = request.ProviderSymbol!.Trim();
         return new MarketAsset
         {
             Id = Guid.NewGuid(),
@@ -183,12 +224,18 @@ public static class MarketDataEndpoints
             Class = request.Class,
             Currency = request.Currency!.Trim().ToUpperInvariant(),
             Provider = request.Provider,
-            // Binance spells its symbols in capitals only; one spelling keeps one row per pair.
-            ProviderSymbol = request.Provider == ProviderKind.Binance ? symbol.ToUpperInvariant() : symbol,
+            ProviderSymbol = Symbol(request.Provider, request.ProviderSymbol!),
             IsActive = true,
             CreatedAt = clock.GetUtcNow(),
         };
     }
+
+    /// <summary>
+    /// Binance and Yahoo spell their symbols in capitals only (Yahoo answers <c>itub4.sa</c>
+    /// too); one spelling keeps one row per series.
+    /// </summary>
+    private static string Symbol(ProviderKind provider, string symbol) =>
+        provider is ProviderKind.Binance or ProviderKind.Yahoo ? symbol.Trim().ToUpperInvariant() : symbol.Trim();
 
     internal static IResult DuplicateSymbol(MarketAsset asset) =>
         Problems.Conflict($"O símbolo '{asset.ProviderSymbol}' já está cadastrado no provedor {asset.Provider}.");
@@ -209,31 +256,70 @@ public static class MarketDataEndpoints
             !Enum.IsDefined(request.Provider)
                 ? new RuleViolation("provider", "O provedor não é válido.")
                 : null,
-            string.IsNullOrWhiteSpace(request.ProviderSymbol) || request.ProviderSymbol.Trim().Length > 50
-                ? new RuleViolation("providerSymbol", "O símbolo no provedor é obrigatório e deve ter até 50 caracteres.")
-                : request.Provider == ProviderKind.Binance && !IsBrlPair(request.ProviderSymbol.Trim())
-                    ? new RuleViolation("providerSymbol", "Use um par da Binance cotado em reais, terminado em BRL (ex.: BTCBRL).")
-                    : null,
+            SymbolViolation(request.Provider, request.ProviderSymbol),
             currency is null || !Currencies.Contains(currency)
                 ? new RuleViolation("currency", "A moeda deve ser BRL ou USD.")
-                : request.Provider == ProviderKind.CoinGecko
-                    && !string.Equals(currency, options.CoinGecko.VsCurrency, StringComparison.OrdinalIgnoreCase)
-                    ? new RuleViolation(
-                        "currency",
-                        $"Ativos do CoinGecko são cotados em {options.CoinGecko.VsCurrency.ToUpperInvariant()}.")
-                    : request.Provider == ProviderKind.Binance && currency != BinanceQuote
-                        ? new RuleViolation("currency", $"Ativos da Binance são cotados em {BinanceQuote}.")
-                        : null);
+                : CurrencyViolation(request.Provider, request.ProviderSymbol, currency, options));
     }
+
+    /// <summary>
+    /// An edit of an entry's source (025). The currency is the entry's own and cannot change
+    /// here, so a symbol quoted in another one is the symbol's fault.
+    /// </summary>
+    private static IResult? ValidateSource(SourceRequest request, string currency, MarketDataOptions options) =>
+        Problems.Validation(
+            !Enum.IsDefined(request.Provider)
+                ? new RuleViolation("provider", "O provedor não é válido.")
+                : null,
+            SymbolViolation(request.Provider, request.ProviderSymbol)
+                ?? (CurrencyViolation(request.Provider, request.ProviderSymbol, currency, options) is { } mismatch
+                    ? new RuleViolation("providerSymbol", $"{mismatch.Message} Este ativo é cotado em {currency}.")
+                    : null));
+
+    private static RuleViolation? SymbolViolation(ProviderKind provider, string? symbol) =>
+        string.IsNullOrWhiteSpace(symbol) || symbol.Trim().Length > 50
+            ? new RuleViolation("providerSymbol", "O símbolo no provedor é obrigatório e deve ter até 50 caracteres.")
+            : provider == ProviderKind.Binance && !IsBrlPair(symbol.Trim())
+                ? new RuleViolation("providerSymbol", "Use um par da Binance cotado em reais, terminado em BRL (ex.: BTCBRL).")
+                : provider == ProviderKind.Yahoo && !IsYahooSymbol(symbol.Trim())
+                    ? new RuleViolation("providerSymbol", "Use um símbolo do Yahoo Finance, como PETR4.SA, AAPL, ^BVSP, BTC-USD ou BRL=X.")
+                    : null;
+
+    /// <summary>A currency the provider does not quote this symbol in.</summary>
+    private static RuleViolation? CurrencyViolation(ProviderKind provider, string? symbol, string currency, MarketDataOptions options) =>
+        provider == ProviderKind.CoinGecko && !string.Equals(currency, options.CoinGecko.VsCurrency, StringComparison.OrdinalIgnoreCase)
+            ? new RuleViolation("currency", $"Ativos do CoinGecko são cotados em {options.CoinGecko.VsCurrency.ToUpperInvariant()}.")
+            : provider == ProviderKind.Binance && currency != BinanceQuote
+                ? new RuleViolation("currency", $"Ativos da Binance são cotados em {BinanceQuote}.")
+                : provider == ProviderKind.Yahoo && symbol is not null && YahooQuote(Symbol(provider, symbol)) is { } quote && quote != currency
+                    ? new RuleViolation("currency", $"O símbolo {Symbol(provider, symbol)} é cotado em {quote} no Yahoo Finance.")
+                    : null;
 
     /// <summary>A pair quoted in reais: a base asset, then <c>BRL</c>. A USDT pair stored as reais would be off fivefold.</summary>
     private static bool IsBrlPair(string symbol) =>
         symbol.Length > BinanceQuote.Length && symbol.EndsWith(BinanceQuote, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>What Yahoo's symbols are made of: <c>PETR4.SA</c>, <c>^BVSP</c>, <c>BTC-USD</c>, <c>BRL=X</c>.</summary>
+    private static bool IsYahooSymbol(string symbol) =>
+        symbol.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '^' or '=');
+
+    /// <summary>
+    /// The currency a Yahoo symbol is quoted in, where its suffix says so (025, decision 17):
+    /// B3's <c>.SA</c>, crypto's <c>-USD</c>, a rate into reais. Null where it does not
+    /// (<c>AAPL</c>, <c>^GSPC</c>).
+    /// </summary>
+    private static string? YahooQuote(string symbol) =>
+        symbol.EndsWith(".SA", StringComparison.Ordinal) || symbol.EndsWith("-BRL", StringComparison.Ordinal)
+            || symbol.EndsWith("BRL=X", StringComparison.Ordinal)
+            ? "BRL"
+            : symbol.EndsWith("-USD", StringComparison.Ordinal) || symbol.EndsWith("USD=X", StringComparison.Ordinal)
+                ? "USD"
+                : null;
 
     private static string EscapeLike(string text) =>
         text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
     private static AssetResponse Describe(MarketAsset asset) =>
         new(asset.Id, asset.Ticker, asset.Name, asset.Class, asset.Currency, asset.Provider,
-            asset.ProviderSymbol, asset.IsActive, asset.LastSyncedAt, asset.CreatedAt);
+            asset.ProviderSymbol, asset.IsActive, asset.LastSyncedAt, asset.HistoryLoadedAt, asset.CreatedAt);
 }

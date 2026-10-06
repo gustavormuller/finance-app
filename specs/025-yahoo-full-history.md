@@ -147,7 +147,9 @@ the next sync reloads from Yahoo.
 PATCH /api/market-data/assets/{id}            new (decision 16)
       { provider, providerSymbol }
       200 the entry, historyLoadedAt null when the source changed
-      400 provider | providerSymbol | currency  (registration's messages, decision 17's)
+      400 provider | providerSymbol  (registration's messages; a symbol quoted in another
+          currency than the entry's is the symbol's fault: "O símbolo BTC-USD é cotado em USD
+          no Yahoo Finance. Este ativo é cotado em BRL.")
       404 unknown id
       409 "O símbolo '…' já está cadastrado no provedor …."
 
