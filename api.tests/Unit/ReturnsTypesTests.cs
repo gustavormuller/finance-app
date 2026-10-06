@@ -5,14 +5,21 @@ namespace Finance.Api.Tests.Unit;
 
 /// <summary>
 /// 008's definition of done: no binary floating point anywhere in the returns module,
-/// locals included. Reflection covers declared members; the source scan covers locals,
-/// casts and <c>System.Math</c>'s floating-point functions.
+/// locals included; and 026's, for the comparison built on it. Reflection covers declared
+/// members; the source scan covers locals, casts and <c>System.Math</c>'s floating-point functions.
 /// </summary>
 public sealed partial class ReturnsTypesTests
 {
-    private static readonly string[] Namespaces = ["Finance.Api.Domain.Returns", "Finance.Api.Application.Returns"];
+    private static readonly string[] Namespaces =
+    [
+        "Finance.Api.Domain.Returns", "Finance.Api.Application.Returns", "Finance.Api.Domain.Compare", "Finance.Api.Application.Compare",
+    ];
 
-    private static readonly string[] Folders = [Path.Combine("Domain", "Returns"), Path.Combine("Application", "Returns")];
+    private static readonly string[] Folders =
+    [
+        Path.Combine("Domain", "Returns"), Path.Combine("Application", "Returns"),
+        Path.Combine("Domain", "Compare"), Path.Combine("Application", "Compare"),
+    ];
 
     [Fact]
     public void No_returns_type_declares_a_double_or_a_float()
@@ -20,6 +27,7 @@ public sealed partial class ReturnsTypesTests
         var types = typeof(Rate).Assembly.GetTypes().Where(type => Namespaces.Contains(type.Namespace)).ToList();
 
         Assert.Contains(typeof(BenchmarkAccumulator), types);
+        Assert.Contains(typeof(Domain.Compare.SeriesComparison), types);
         Assert.Empty(FloatingPointMembers.In(types));
     }
 
@@ -29,10 +37,12 @@ public sealed partial class ReturnsTypesTests
         var files = Folders.SelectMany(folder =>
                 Directory.EnumerateFiles(Path.Combine(TestPaths.RepositoryRoot(), "api", folder), "*.cs", SearchOption.AllDirectories))
             .Append(Path.Combine(TestPaths.RepositoryRoot(), "api", "Endpoints", "ReturnsEndpoints.cs"))
+            .Append(Path.Combine(TestPaths.RepositoryRoot(), "api", "Endpoints", "CompareEndpoints.cs"))
             .ToList();
 
         Assert.Contains(files, file => file.EndsWith("DecimalMath.cs", StringComparison.Ordinal));
         Assert.Contains(files, file => file.EndsWith("ReturnsQueries.cs", StringComparison.Ordinal));
+        Assert.Contains(files, file => file.EndsWith("SeriesComparison.cs", StringComparison.Ordinal));
         var offenders = files
             .SelectMany(file => File.ReadLines(file).Select((line, number) => (file, number, code: Comment().Replace(line, ""))))
             .Where(line => FloatingPoint().IsMatch(line.code))

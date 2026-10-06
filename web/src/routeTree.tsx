@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, lazyRouteComponent } from '@tanstack/react-router';
 
+import { validateCompareSearch } from './components/compare/search';
 import { accountTabs, type AccountTab } from './lib/accounts';
 import LoginPage from './routes/LoginPage';
 import ProtectedLayout from './routes/ProtectedLayout';
@@ -14,6 +15,7 @@ const FirstAccount = lazyRouteComponent(() => import('./routes/AccountsPage'), '
 const AssetPage = lazyRouteComponent(() => import('./routes/AssetPage'));
 const AssetReturnsPage = lazyRouteComponent(() => import('./routes/AssetReturnsPage'));
 const CategoriesPage = lazyRouteComponent(() => import('./routes/CategoriesPage'));
+const ComparePage = lazyRouteComponent(() => import('./routes/ComparePage'));
 const DashboardPage = lazyRouteComponent(() => import('./routes/DashboardPage'));
 const ImportPage = lazyRouteComponent(() => import('./routes/ImportPage'));
 const InvestmentsPage = lazyRouteComponent(() => import('./routes/InvestmentsPage'));
@@ -147,6 +149,15 @@ const assetReturnsRoute = createRoute({
   component: AssetReturnsPage,
 });
 
+// 026: what is compared, over what and in which currency are search parameters, so a
+// comparison can be bookmarked.
+const compareRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/compare',
+  validateSearch: validateCompareSearch,
+  component: ComparePage,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/settings',
@@ -155,5 +166,5 @@ const settingsRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute.addChildren([accountsIndexRoute, accountRoute]), categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute, assetReturnsRoute, settingsRoute]),
+  protectedRoute.addChildren([homeRoute, transactionsRoute, importRoute, accountsRoute.addChildren([accountsIndexRoute, accountRoute]), categoriesRoute, marketDataRoute, investmentsRoute, returnsRoute, assetRoute, assetReturnsRoute, compareRoute, settingsRoute]),
 ]);

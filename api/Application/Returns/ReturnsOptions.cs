@@ -72,6 +72,15 @@ public sealed class ReturnsOptions
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown benchmark type."),
     };
 
+    /// <summary>How a series recorded in a unit accumulates: the inverse of <see cref="UnitFor"/>.</summary>
+    public static BenchmarkType TypeFor(BenchmarkUnit unit) => unit switch
+    {
+        BenchmarkUnit.PercentPerDay => BenchmarkType.DailyRate,
+        BenchmarkUnit.PercentPerMonth => BenchmarkType.MonthlyRate,
+        BenchmarkUnit.Level => BenchmarkType.Level,
+        _ => throw new ArgumentOutOfRangeException(nameof(unit), unit, "Unknown benchmark unit."),
+    };
+
     private static BenchmarkUnit? UnitOf(string code, MarketDataOptions marketData) =>
         marketData.Bcb.Series.TryGetValue(code, out var series) ? series.Unit
         : marketData.PriceBenchmarks.TryGetValue(code, out var price) ? price.Unit
