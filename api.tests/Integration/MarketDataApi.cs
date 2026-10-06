@@ -45,7 +45,11 @@ internal sealed class MarketDataApi : IAsyncDisposable
 
     public AppDbContext Context() => TransactionsFixtures.ContextFor(ConnectionString, null);
 
-    public ValueTask DisposeAsync() => Factory.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await Factory.DisposeAsync();
+        PostgresFixture.ReleaseConnections(ConnectionString);
+    }
 
     public sealed record AssetItem(
         Guid Id,

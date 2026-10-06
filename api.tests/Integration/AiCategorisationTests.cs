@@ -9,9 +9,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 009 checkpoint 4a: which rung chose a staged row's category (<see cref="CategorySource"/>),
-/// and rung 3 on the application path (<see cref="CategorisationCascade"/>) with a scripted
-/// provider: the application halves of spec tests 18-20. CP4b covers them over HTTP.
+/// Which rung chose a staged row's category (<see cref="CategorySource"/>), and rung 3 on the
+/// application path (<see cref="CategorisationCascade"/>) with a scripted provider: the
+/// application halves of spec 009 tests 18-20. The endpoint tests cover them over HTTP.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class AiCategorisationTests(PostgresFixture postgres)

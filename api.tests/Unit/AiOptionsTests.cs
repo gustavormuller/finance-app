@@ -4,9 +4,9 @@ using Microsoft.Extensions.Configuration;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 009 checkpoint 2: the <c>Ai</c> settings bind from <c>appsettings.json</c>, commit no
-/// key, and are refused when a call could not be priced: a price of zero, or no price at
-/// all, would let every call past the budget (ADR-008).
+/// The <c>Ai</c> settings bind from <c>appsettings.json</c>, commit no key, and are refused
+/// when a call could not be priced: a price of zero, or no price at all, would let every
+/// call past the budget (ADR-008).
 /// </summary>
 public sealed class AiOptionsTests
 {
@@ -149,23 +149,10 @@ public sealed class AiOptionsTests
     private static AiOptions Bind()
     {
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(RepositoryRoot(), "api", "appsettings.json"), optional: false, reloadOnChange: false)
+            .AddJsonFile(Path.Combine(TestPaths.RepositoryRoot(), "api", "appsettings.json"), optional: false, reloadOnChange: false)
             .Build();
 
         return configuration.GetSection(AiOptions.Section).Get<AiOptions>()
             ?? throw new InvalidOperationException("No Ai section in appsettings.json.");
-    }
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "FinanceApp.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("FinanceApp.slnx not found above the test binaries.");
     }
 }

@@ -4,9 +4,9 @@ using System.Net.Http.Json;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 009 checkpoint 4b: <c>PATCH /api/auth/me { aiEnabled }</c>, the user's own switch
-/// (ADR-010), and the preview's rows saying which rung chose their category, a pick by
-/// hand included, for the "came from AI" marker.
+/// <c>PATCH /api/auth/me { aiEnabled }</c>, the user's own switch (ADR-010), and the preview's
+/// rows saying which rung chose their category, a pick by hand included, for the "came from AI"
+/// marker.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class AiToggleEndpointTests(PostgresFixture postgres)

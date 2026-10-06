@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SyncRun } from '@/api/finance';
 import { routeTree } from '@/routeTree';
+import '@/test-routes';
 import { stubFetch, type SeenRequest } from '@/test-utils';
 
 const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: false };
@@ -105,6 +106,27 @@ describe('MarketDataPage: sync runs', () => {
     // Newest first, as the API sends them.
     const rows = screen.getAllByTestId(/^sync-run-run-/);
     expect(rows.map((row) => row.dataset.testid)).toEqual(['sync-run-run-ok', 'sync-run-run-partial']);
+  });
+
+  /** Spec 019 web test 23: the API's pt-BR reason reaches the screen as sent. */
+  it('shows a missing key as the API explains it, under the ticker it stopped', async () => {
+    const missing = 'O brapi exige um token para BBAS3. Configure MarketData:Brapi:Token.';
+    stubApi(() => [
+      {
+        ...partial,
+        id: 'run-keyless',
+        summary: {
+          Brapi: { rowsWritten: 1247, itemsSynced: 1, itemsFailed: 1, error: missing, failures: [{ item: 'BBAS3', error: missing }] },
+          Binance: { rowsWritten: 1826, itemsSynced: 1, itemsFailed: 0, error: null, failures: [] },
+        },
+      },
+    ]);
+    renderPage();
+
+    const brapi = await screen.findByTestId('provider-summary-Brapi');
+    expect(brapi).toHaveTextContent(`BBAS3: ${missing}`);
+    expect(brapi).toHaveTextContent('1 com falha');
+    expect(screen.getByTestId('provider-summary-Binance')).toHaveTextContent('Binance · 1.826 linhas gravadas');
   });
 
   it('says so when no sync has run yet', async () => {

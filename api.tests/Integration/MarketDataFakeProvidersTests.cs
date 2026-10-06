@@ -8,8 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 006 checkpoint 5: <c>MarketData:FakeProviders</c>, the switch the E2E run uses so its
-/// real API process syncs without the network (spec E2E test 26). It is refused outside
+/// <c>MarketData:FakeProviders</c>, the switch the E2E run uses so its real API process
+/// syncs without the network (spec 006 E2E test 26). It is refused outside
 /// Development, and it drops the manual-sync window to zero so every E2E run, and every
 /// rerun within ten minutes, can trigger its sync on the shared database.
 /// </summary>

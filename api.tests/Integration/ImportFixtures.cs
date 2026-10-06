@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text;
 using Finance.Api.Domain.Import;
 using Finance.Api.Domain.Transactions;
-using Finance.Api.Infrastructure;
 
 namespace Finance.Api.Tests.Integration;
 

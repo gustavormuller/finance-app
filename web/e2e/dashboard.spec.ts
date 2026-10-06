@@ -95,6 +95,37 @@ test('an expense lowers the total balance and shows in the month', async ({ page
   await expect(page.getByTestId('recent-transactions')).toContainText('Supermercado do painel');
 });
 
+/**
+ * Spec 018 E2E: reads stay fresh for 30 s, and a write must not be hidden by them. The
+ * transaction form invalidates only the transactions; coming back to the dashboard through
+ * the sidebar, with the query cache intact, still shows the new balance.
+ */
+test('an expense added after the dashboard was read shows on it after a client-side navigation', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-dashboard-fresh'), 'Grace Hopper');
+  await createAccount(page, 'Inter', '1.000,00');
+
+  await page.goto('/');
+  await expect(stat(page, 'total-balance')).toHaveText('+1.000,00');
+
+  // Through the sidebar, not page.goto: the query cache survives, as it does for a person.
+  const nav = page.getByRole('navigation', { name: 'Principal' });
+  await nav.getByRole('link', { name: 'Lançamentos', exact: true }).click();
+  await page.getByRole('button', { name: 'Novo lançamento' }).click();
+  await page.getByLabel('Conta', { exact: true }).selectOption({ label: 'Inter' });
+  await page.getByLabel('Categoria', { exact: true }).selectOption({ label: 'Alimentação' });
+  await page.getByLabel('Valor').fill('42.90');
+  await page.getByLabel('Data').fill(today());
+  await page.getByLabel('Descrição').fill('Padaria sem recarregar');
+  await page.getByRole('button', { name: 'Criar lançamento' }).click();
+  await expect(page.getByRole('button', { name: 'Criar lançamento' })).toBeHidden();
+
+  await nav.getByRole('link', { name: 'Início', exact: true }).click();
+
+  await expect(stat(page, 'total-balance')).toHaveText('+957,10');
+  await expect(stat(page, 'month-expense')).toHaveText('−42,90');
+  await expect(page.getByTestId('recent-transactions')).toContainText('Padaria sem recarregar');
+});
+
 /** Spec E2E test 26. */
 test('a Transferência moves the balance and leaves the month totals alone', async ({ page }) => {
   await devLogin(page, uniqueEmail('e2e-dashboard-transfer'), 'Alan Turing');

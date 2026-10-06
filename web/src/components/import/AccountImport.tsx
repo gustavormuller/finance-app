@@ -18,7 +18,9 @@ import {
 } from '@/api/finance';
 import { useMe } from '@/auth/useMe';
 import { useImports } from '@/components/accounts/queries';
+import { useCategories } from '@/components/categories/queries';
 import { Button } from '@/components/ui/button';
+import { refusalMessage } from '@/lib/refusal';
 
 import DoneStep from './DoneStep';
 import FileStep from './FileStep';
@@ -63,19 +65,8 @@ function suggestionNotice({ suggested, skipped }: SuggestResult): string {
   return moved + left;
 }
 
-/** The sentence a refusal becomes, with the fields a 400 named appended. */
-function describe(error: unknown): string {
-  if (error instanceof ApiError) {
-    const fields = Object.values(error.fields).flat();
-
-    return fields.length > 0 ? fields.join(' ') : error.message;
-  }
-
-  return error instanceof Error ? error.message : 'Algo deu errado.';
-}
-
 /**
- * "Importar extrato" (015; the flow of 004 and 011): the four steps on top, this
+ * "Importar extrato": the four steps on top, this
  * account's history underneath. The account is the page's, so no step asks for one.
  * The step is a discriminated union so the tab cannot be in two steps at once, and
  * every transition is a plain assignment.
@@ -90,11 +81,11 @@ export default function AccountImport({ account }: { account: Account }): React.
 
   const me = useMe();
 
-  const categories = useQuery({ queryKey: ['categories'], queryFn: api.listCategories });
+  const categories = useCategories();
   const templates = useQuery({ queryKey: ['csv-templates'], queryFn: api.listCsvTemplates });
   const history = useImports();
   const batches = (history.data ?? []).filter((batch) => batch.accountId === account.id);
-  // The API keeps one staged batch per user (004), on whichever account it is.
+  // The API keeps one staged batch per user, on whichever account it is.
   const inReview = history.data?.find((batch) => batch.status === 'Staged') ?? null;
 
   const batchId = step.kind === 'preview' ? step.batchId : null;
@@ -110,7 +101,7 @@ export default function AccountImport({ account }: { account: Account }): React.
   const fail = (error: unknown) => {
     const openBatchId = error instanceof ApiError ? error.openBatchId : null;
 
-    setFailure({ message: describe(error), openBatchId });
+    setFailure({ message: refusalMessage(error), openBatchId });
 
     // A batch opened elsewhere (another tab) is news to the history, and to the notice
     // that replaces the drop zone while it is open.
@@ -142,7 +133,7 @@ export default function AccountImport({ account }: { account: Account }): React.
     mutationFn: async (file: File) => {
       // The extension decides the path: an OFX carries its own structure and goes
       // straight to staging; a CSV or a spreadsheet needs the user to say which
-      // column is what. A spreadsheet's preview has no delimiter (011).
+      // column is what. A spreadsheet's preview has no delimiter.
       if (/\.(csv|xlsx?)$/i.test(file.name)) {
         const preview = await api.previewCsv(file);
 
@@ -242,7 +233,7 @@ export default function AccountImport({ account }: { account: Account }): React.
                     ...item,
                     included,
                     categoryId: patch.categoryId ?? item.categoryId,
-                    // A category picked by hand is the user's (009), which drops the AI marker.
+                    // A category picked by hand is the user's, which drops the AI marker.
                     categorySource: patch.categoryId ? 'User' : item.categorySource,
                   }
                 : item,
@@ -254,8 +245,8 @@ export default function AccountImport({ account }: { account: Account }): React.
     onError: fail,
   });
 
-  // 009: rung 3 on the rows the sign default filed. The rows are refetched, not patched
-  // from the answer, which carries only counts.
+  // Rung 3 of the cascade, on the rows the sign default filed. The rows are refetched,
+  // not patched from the answer, which carries only counts.
   const suggest = useMutation({
     mutationFn: () => api.suggestCategories(batchId!),
     onMutate: () => {

@@ -6,13 +6,7 @@
  * to widen the range. Conflating them is the single most common way a list lies to
  * its reader, which is why the spec calls for them to be distinguishable.
  */
-export default function EmptyState({
-  filtered,
-  children,
-}: {
-  filtered: boolean;
-  children?: React.ReactNode;
-}): React.JSX.Element {
+export default function EmptyState({ filtered }: { filtered: boolean }): React.JSX.Element {
   return (
     <div className="text-muted-foreground glass rounded-2xl py-16 text-center">
       <p className="text-foreground text-sm font-medium">
@@ -24,8 +18,6 @@ export default function EmptyState({
           ? 'Tente ampliar o período, ou limpar os filtros de conta e categoria.'
           : 'Registre o primeiro para começar a acompanhar para onde o dinheiro vai.'}
       </p>
-
-      {children && <div className="mt-4">{children}</div>}
     </div>
   );
 }

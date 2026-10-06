@@ -36,13 +36,13 @@ public sealed record MonthTotals(string Month, decimal Income, decimal Expense);
 public sealed record CategoryTotal(Guid CategoryId, string Name, decimal Amount, decimal Share);
 
 /// <summary>
-/// 014: what was owned at the end of one calendar month, <c>Month</c> as <c>YYYY-MM</c>.
+/// What was owned at the end of one calendar month, <c>Month</c> as <c>YYYY-MM</c>.
 /// <c>Total</c> is <c>Accounts + Investments</c>.
 /// </summary>
 public sealed record NetWorthPoint(string Month, decimal Accounts, decimal Investments, decimal Total);
 
 /// <summary>
-/// The dashboard's three aggregations (005), in SQL through Dapper on the context's
+/// The dashboard's aggregations, in SQL through Dapper on the context's
 /// own connection (ARCHITECTURE.md §6).
 /// </summary>
 /// <remarks>
@@ -123,10 +123,12 @@ public sealed class DashboardQueries(AppDbContext database)
         """;
 
     /// <remarks>
-    /// 014. <c>included</c> is the set of accounts the summary's total adds up, so a
+    /// <c>included</c> is the set of accounts the summary's total adds up, so a
     /// month's <c>Accounts</c> is that total as it stood on the month's last day.
     /// <c>Investments</c> takes each asset's latest <c>PortfolioDaily</c> row on or
     /// before that day, one backwards probe of the primary key per month and asset.
+    /// The first portfolio row is likewise one forward probe per asset: a plain MIN over
+    /// the user's rows read all of them, and <c>bounds</c> is evaluated twice.
     /// The series opens at the first month with a transaction or a portfolio row, or
     /// at the last month when opening balances are all there is (they have no date),
     /// and never before the window.
@@ -147,9 +149,16 @@ public sealed class DashboardQueries(AppDbContext database)
         bounds AS (
             SELECT LEAST(
                        (SELECT min(f."Start") FROM flows f),
-                       (SELECT date_trunc('month', min(d."Date")::timestamp)::date
-                        FROM "PortfolioDaily" d
-                        WHERE d."UserId" = @userId),
+                       (SELECT date_trunc('month', min(first."Date")::timestamp)::date
+                        FROM "Assets" s
+                        CROSS JOIN LATERAL (
+                            SELECT d."Date"
+                            FROM "PortfolioDaily" d
+                            WHERE d."UserId" = @userId AND d."AssetId" = s."Id"
+                            ORDER BY d."Date"
+                            LIMIT 1
+                        ) first
+                        WHERE s."UserId" = @userId),
                        (SELECT make_date(@toYear, @toMonth, 1) WHERE EXISTS (SELECT 1 FROM included))
                    ) AS "Start"
         ),
@@ -242,7 +251,7 @@ public sealed class DashboardQueries(AppDbContext database)
     }
 
     /// <summary>
-    /// 014: the month-end net worth of at most <paramref name="months"/> months ending
+    /// The month-end net worth of at most <paramref name="months"/> months ending
     /// with <paramref name="lastMonth"/>, oldest first, from the first month with data.
     /// </summary>
     public async Task<IReadOnlyList<NetWorthPoint>> NetWorthAsync(

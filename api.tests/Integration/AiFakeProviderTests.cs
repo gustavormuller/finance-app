@@ -8,9 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 009 checkpoint 2: <c>Ai:FakeProvider</c>, the switch the E2E run will use (spec tests
-/// 28-29), built like 006's <c>MarketData:FakeProviders</c>: on in Development only, and
-/// the boot is refused anywhere else. Its usage rows say <c>fake</c>.
+/// <c>Ai:FakeProvider</c>, the switch the E2E run uses (spec 009 tests 28-29), built like
+/// 006's <c>MarketData:FakeProviders</c>: on in Development only, and the boot is refused
+/// anywhere else. Its usage rows say <c>fake</c>.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class AiFakeProviderTests(PostgresFixture postgres)

@@ -218,6 +218,43 @@ public sealed class CsvStatementParserTests
         Assert.Equal("Alimentação", Assert.Single(table.Records).Fields[1]);
     }
 
+    /// <summary>
+    /// Windows-1252 puts punctuation where Latin-1 has control characters: 0x96 is an en
+    /// dash, 0x93 and 0x94 are curly quotes, 0x80 is the euro sign.
+    /// </summary>
+    [Fact]
+    public void Windows_1252_punctuation_decodes_to_the_characters_it_stands_for()
+    {
+        byte[] bytes =
+        [
+            .. Encoding.Latin1.GetBytes("Data;Descrição\n10/09/2026;Pix "), 0x96,
+            .. Encoding.Latin1.GetBytes(" "), 0x93, .. Encoding.Latin1.GetBytes("João"), 0x94,
+            .. Encoding.Latin1.GetBytes(" "), 0x80, .. Encoding.Latin1.GetBytes("5\n"),
+        ];
+
+        var table = CsvStatementParser.Parse(StatementText.Decode(bytes), ';', hasHeader: true);
+
+        Assert.Equal("Pix – “João” €5", Assert.Single(table.Records).Fields[1]);
+    }
+
+    /// <summary>The five bytes Windows-1252 leaves undefined still decode, one character each.</summary>
+    [Fact]
+    public void Every_byte_decodes_to_one_character()
+    {
+        var bytes = Enumerable.Range(0, 256).Select(value => (byte)value).ToArray();
+
+        Assert.Equal(256, StatementText.Decode(bytes).Length);
+    }
+
+    /// <summary>Valid UTF-8 is never read as Windows-1252, where "–" would become "â€“".</summary>
+    [Fact]
+    public void Utf8_punctuation_stays_utf8()
+    {
+        const string text = "Data;Descrição\n10/09/2026;Pix – “João” €5\n";
+
+        Assert.Equal(text, StatementText.Decode(Encoding.UTF8.GetBytes(text)));
+    }
+
     [Fact]
     public void Utf8_with_and_without_a_bom_decodes_the_same()
     {

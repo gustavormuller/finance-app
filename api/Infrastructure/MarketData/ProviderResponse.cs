@@ -6,7 +6,7 @@ using Finance.Api.Application.MarketData;
 namespace Finance.Api.Infrastructure.MarketData;
 
 /// <summary>
-/// What the four adapters do alike with a response: a <c>429</c> becomes
+/// What the adapters do alike with a response: a <c>429</c> becomes
 /// <see cref="ProviderRateLimitedException"/>, and any failure to read the body becomes
 /// <see cref="ProviderResponseInvalidException"/> (006, tests 7 and 8). Numbers go from
 /// the JSON text straight to <c>decimal</c>, never through <c>double</c> (test 9).
@@ -21,6 +21,24 @@ internal static class ProviderResponse
             throw new ProviderRateLimitedException(provider, response.Headers.RetryAfter?.Delta);
         }
     }
+
+    /// <summary>
+    /// Throws <see cref="ProviderKeyMissingException"/> on a <c>401</c> or <c>403</c> when
+    /// <paramref name="key"/> is empty. With a key configured, the refusal is about that key
+    /// (or the plan behind it) and is the caller's to judge.
+    /// </summary>
+    public static void ThrowIfKeyMissing(
+        HttpResponseMessage response, string provider, string key, string symbol, string setting)
+    {
+        if (string.IsNullOrEmpty(key) && IsRefusal(response.StatusCode))
+        {
+            throw new ProviderKeyMissingException(provider, symbol, setting);
+        }
+    }
+
+    /// <summary>What a provider answers when it will not serve without (another) key.</summary>
+    public static bool IsRefusal(HttpStatusCode status) =>
+        status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden;
 
     /// <summary>
     /// Parses the body and hands its root to <paramref name="read"/>. Malformed JSON, a
