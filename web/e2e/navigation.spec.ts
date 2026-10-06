@@ -3,8 +3,8 @@ import { expect, test } from '@playwright/test';
 import { createAccount, devLogin, uniqueEmail } from './support';
 
 /**
- * Spec 024: the shell around every page. The sidebar's links, the pages reached only by
- * their address, and what an address that names nothing shows.
+ * Spec 024: the shell around every page. The sidebar's links, the page reached only by its
+ * address or a link, and what an address that names nothing shows.
  */
 
 test('the sidebar opens every page and marks the one shown', async ({ page }) => {
@@ -12,13 +12,15 @@ test('the sidebar opens every page and marks the one shown', async ({ page }) =>
   await page.goto('/');
 
   const nav = page.getByRole('navigation', { name: 'Principal' });
-  // Seven pages and no "Importar": a statement is imported from its account (015).
+  // Eight pages and no "Importar": a statement is imported from its account (015), and the
+  // catalogue joined the menu after Comparar (025).
   await expect(nav.getByRole('link')).toHaveText([
     'Início',
     'Lançamentos',
     'Contas',
     'Investimentos',
     'Comparar',
+    'Dados de mercado',
     'Categorias',
     'Configurações',
   ]);
@@ -27,6 +29,7 @@ test('the sidebar opens every page and marks the one shown', async ({ page }) =>
     ['Contas', 'Contas', /\/accounts$/],
     ['Investimentos', 'Investimentos', /\/investments$/],
     ['Comparar', 'Comparar', /\/compare$/],
+    ['Dados de mercado', 'Dados de mercado', /\/market-data$/],
     ['Categorias', 'Categorias', /\/categories$/],
     ['Configurações', 'Configurações', /\/settings$/],
     ['Início', 'Início', /\/$/],
@@ -44,11 +47,8 @@ test('the sidebar opens every page and marks the one shown', async ({ page }) =>
   await expect(nav.locator('a[data-status="active"]')).toHaveCount(1);
 });
 
-test('the pages outside the sidebar open by their address', async ({ page }) => {
+test('the returns page, outside the sidebar, opens by its address', async ({ page }) => {
   await devLogin(page, uniqueEmail('e2e-nav-address'), 'Grace Hopper');
-
-  await page.goto('/market-data');
-  await expect(page.getByRole('heading', { level: 2, name: 'Dados de mercado' })).toBeVisible();
 
   await page.goto('/investments/returns');
   await expect(page.getByRole('heading', { level: 2, name: 'Rentabilidade' })).toBeVisible();

@@ -28,8 +28,8 @@ async function addNewAsset(page: Page, ticker: string) {
 
   const form = page.getByRole('form', { name: 'Cadastrar e adicionar ativo' });
   await form.getByLabel('Ticker').fill(ticker);
-  // Exact: "Símbolo no provedor" contains the word too. Class and currency default to
-  // StockBr and BRL.
+  // Exact: "Símbolo no provedor" contains the word too. The class defaults to StockBr, and
+  // brapi's currency is BRL. Yahoo is the default provider since 025; brapi's fake closes at 10.
   await form.getByLabel('Provedor', { exact: true }).selectOption('Brapi');
   await form.getByLabel('Símbolo no provedor').fill(ticker);
   await form.getByRole('button', { name: 'Cadastrar e adicionar' }).click();
@@ -328,6 +328,8 @@ test('an asset found in the catalogue is added once, and removed once nothing is
   await register.getByLabel('Classe').selectOption('Crypto');
   await register.getByLabel('Provedor', { exact: true }).selectOption('CoinGecko');
   await register.getByLabel('Símbolo no provedor').fill('bitcoin');
+  // The form suggests USD for CoinGecko (025); reais, chosen over it, are refused.
+  await register.getByLabel('Moeda').selectOption('BRL');
   await register.getByRole('button', { name: 'Cadastrar e adicionar' }).click();
   await expect(
     register.locator('div').filter({ has: page.getByLabel('Moeda', { exact: true }) }).getByRole('alert'),
