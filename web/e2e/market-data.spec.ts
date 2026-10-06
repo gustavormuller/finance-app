@@ -81,7 +81,7 @@ test('a manual sync on the fake providers appears as Succeeded, by provider', as
   await expect(run.getByTestId('sync-run-status')).toHaveText('Concluída', { timeout: 15_000 });
   await expect(run).toContainText('Manual');
   await expect(run.getByTestId('provider-summary-Brapi')).toContainText('brapi');
-  await expect(run.getByTestId('provider-summary-Brapi')).toContainText('itens sincronizados');
+  await expect(run.getByTestId('provider-summary-Brapi')).toContainText(/ite(m|ns) sincronizados?/);
   await expect(run.getByTestId('provider-summary-Binance')).toContainText(/linhas? gravadas?/);
   await expect(run.getByTestId('provider-summary-Bcb')).toContainText('Banco Central (SGS)');
   await expect(run.getByText('com falha')).toHaveCount(0);
