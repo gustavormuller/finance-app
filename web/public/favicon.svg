@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 022: "F." on the Obsidiana ground; the full stop is the violet one that ends the heading. -->
+  <defs>
+    <radialGradient id="glow" cx="0.28" cy="0.18" r="0.95">
+      <stop offset="0" stop-color="#1b1f3b"/>
+      <stop offset="1" stop-color="#0b0c12"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <path fill="#f4f5f8" d="M164 120H348V188H240V226H312V288H240V392H164Z"/>
+  <circle cx="296" cy="354" r="38" fill="#8b73ff"/>
+</svg>
