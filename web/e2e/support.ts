@@ -39,14 +39,23 @@ export function uniqueEmail(prefix: string) {
 /**
  * An account by way of the real screen, so every spec starts from a state a person could reach.
  * `openingBalance` is typed as a person would, e.g. `1.000,00`; omitted, the field stays empty (0).
+ * `type` is the enum member (`Checking` unless given) and `currency` the typed code (BRL unless given).
  */
-export async function createAccount(page: Page, name: string, openingBalance?: string) {
+export async function createAccount(
+  page: Page,
+  name: string,
+  openingBalance?: string,
+  { type = 'Checking', currency }: { type?: string; currency?: string } = {},
+) {
   await page.goto('/accounts');
   await page.getByRole('button', { name: 'Nova conta' }).click();
   await page.getByLabel('Nome').fill(name);
   // By value, not label: the option reads "Conta corrente" but the wire contract is
   // still the English enum member.
-  await page.getByLabel('Tipo').selectOption('Checking');
+  await page.getByLabel('Tipo').selectOption(type);
+  if (currency !== undefined) {
+    await page.getByLabel('Moeda').fill(currency);
+  }
   if (openingBalance !== undefined) {
     await page.getByLabel('Saldo inicial').fill(openingBalance);
   }
