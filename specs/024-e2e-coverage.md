@@ -43,18 +43,20 @@ Marked **(review)** where the spec picked a default a person should confirm.
 The site's routes (`web/src/routeTree.tsx`): `/login`, and behind the sign-in `/`, `/transactions`,
 `/import` (a redirect), `/accounts`, `/accounts/$accountId` (tabs `transactions`, `import`,
 `details`), `/categories`, `/market-data`, `/investments`, `/investments/returns`,
-`/investments/$assetId`, `/investments/$assetId/returns`, `/settings`. The shell around them
-(`App.tsx`, `ProtectedLayout.tsx`) has the theme toggle, the sidebar with the sign-out, and the
-health footer.
+`/investments/$assetId`, `/investments/$assetId/returns`, `/compare` (026, merged while this spec
+was under way), `/settings`. The shell around them (`App.tsx`, `ProtectedLayout.tsx`) has the theme
+toggle, the sidebar with the sign-out, and the health footer.
 
-**Before:** 33 tests in 13 files of `web/e2e`, plus 5 in the separate PWA suite.
-**After:** 87 tests in 16 files of `web/e2e` (80 run, 7 `test.fixme` for the bugs below), plus the
+**Before:** 33 tests in 13 files of `web/e2e`, plus 5 in the separate PWA suite; 026 then brought
+`compare.spec.ts` with 3.
+**After:** 91 tests in 17 files of `web/e2e` (84 run, 7 `test.fixme` for the bugs below), plus the
 same 5 in the PWA suite.
 
-**Flows:** 108 listed below. Before this spec 33 were covered, 15 partly and 60 were gaps. After
-it, 104 map to a passing test and 4 (AUTH-5, NAV-4, TX-10, CAT-5) only to `test.fixme` tests naming
-5 of the 7 bugs below; the other two sit beside the passing tests of ACC-2 and IMP-16. 16 more
-flows are listed as not E2E-reachable (the last table).
+**Flows:** 119 listed below. Before this spec 33 were covered, 15 partly and 60 were gaps; `/compare`
+arrived with 11 more, 6 covered by 026's own tests and 5 gaps. After it, 115 map to a passing test
+and 4 (AUTH-5, NAV-4, TX-10, CAT-5) only to `test.fixme` tests naming 5 of the 7 bugs below; the
+other two sit beside the passing tests of ACC-2 and IMP-16. 17 more flows are listed as not
+E2E-reachable (the last table).
 
 "Before" names the test that covered the flow when this spec was written; **GAP** means none
 did, *partial* means a test touched the flow without asserting its outcome. "After" names the
@@ -69,7 +71,7 @@ test that covers it now, by file and title.
 | AUTH-3 | Sair returns to `/login`, and the cookie is gone | `auth` | `auth` "logging out returns to the login page and leaves / protected" |
 | AUTH-4 | `/login?error=unverified\|cancelled\|auth_failed` explains itself; `/login`, an unknown code or notice show nothing | GAP | `auth` "the login page explains each way a sign-in can come back, and nothing else" |
 | AUTH-5 | A write, and Sair, from a tab whose session ended in another tab | GAP | **bugs 5 and 6**: `auth` "a write after the session ended in another tab is explained in Portuguese", "Sair from a tab whose session already ended lands on the login page" (`fixme`) |
-| NAV-1 | The sidebar's six pages, no Importar, the current one marked | GAP | `navigation` "the sidebar opens every page and marks the one shown" |
+| NAV-1 | The sidebar's seven pages (Comparar since 026), no Importar, the current one marked | GAP | `navigation` "the sidebar opens every page and marks the one shown" |
 | NAV-2 | `/market-data` and `/investments/returns` open by address | partial | `navigation` "the pages outside the sidebar open by their address" |
 | NAV-3 | An account or asset id that does not exist says so (`/accounts/$id`, `/investments/$id`, `/investments/$id/returns`) | GAP | `navigation` "an account or an asset that does not exist says so" |
 | NAV-4 | An address that matches no page | GAP | **bug 1**: `navigation` "an address that matches no page answers in Portuguese" (`fixme`) |
@@ -208,6 +210,25 @@ test that covers it now, by file and title.
 | RET-4 | Nothing held, or nothing valued: nothing to measure | GAP | `returns` "with nothing held, the returns page has nothing to measure"; `investments` "a new ticker shows "Sem cotação"…" |
 | RET-5 | The benchmark rows and a chart reference toggled | partial | `returns` 36 |
 
+### Compare (`/compare`, 026)
+
+The page arrived with 026's merge (master `3bf0a31`), with `compare.spec.ts` and its 3 tests in a
+syncing project after `returns`. "Before" here is what 026 brought.
+
+| # | Flow | Before | After |
+|---|---|---|---|
+| CMP-1 | Fewer than two series: the empty state, nothing drawn | `compare` "fewer than two series ask for another, and nothing is drawn" | unchanged |
+| CMP-2 | A benchmark or a catalogue asset found by search, added, removed | `compare` 12 and 13 | unchanged |
+| CMP-3 | Two assets and CDI over a custom period, each in its own currency, and the chart | `compare` "two catalogue assets and CDI side by side, over ten days and then a year" | unchanged |
+| CMP-4 | A preset refetches; the log scale; both in the address | same | unchanged |
+| CMP-5 | Converting to R$ and to US$ at PTAX | `compare` "converting to reais and to dollars, and the address opened again" | unchanged |
+| CMP-6 | The address alone rebuilds a comparison | same | unchanged |
+| CMP-7 | A search with no match; accents and case ignored; a series already chosen | GAP | `compare` "the search, six series at most, a period with no data, a refused period and a series left out" |
+| CMP-8 | A series with no data in the period, left out of the chart and saying so | GAP | same |
+| CMP-9 | Six series at most | GAP | same |
+| CMP-10 | A period no series has data in | GAP | same |
+| CMP-11 | A period the API refuses (dates the wrong way round) | GAP | same |
+
 ### Bugs the new tests found
 
 Each is kept as a `test.fixme` with its reason, and none is fixed here.
@@ -233,10 +254,11 @@ Each is kept as a `test.fixme` with its reason, and none is fixed here.
 | A provider failure listed under a sync run | The fake providers never fail. |
 | A stale price ("Cotação desatualizada") | The fakes always close on the sync's day. |
 | No dollar rate synced ("Sem cotação do dólar sincronizada") | Every fake sync stores USDBRL, and benchmarks are shared by every test. |
-| Returns in US$, an asset's FX split, and the benchmarks' figures | The fakes store one benchmark point per sync day, so whether a period's first day has a rate depends on the database's history, not on the test. |
+| Returns in US$, an asset's FX split, and the benchmarks' figures | Since 026 the fake stores a benchmark value for every day it is asked for, but a database kept between runs also holds what earlier syncs wrote (one point per sync day before 026), and a sync only fetches the days after the latest stored one. Whether a period's first day has a rate is the database's history, not the test's. |
+| Two series with no period in common ("As séries escolhidas não têm um período em comum"), a series whose data stops a week early ("dados até…"), and a start moved to a series' first day ("Começa em…") | Every fake series spans the same days, except as a kept database's history makes them differ. |
 | The AI budget spent (402), the provider timing out (504) or failing (502), an analysis that fails, a 409 from another tab's generation | The fake provider always answers at once, and a call costs cents against R$ 15. |
 | An analysis for a month that has not begun | The month selector stops at the current month. |
-| A page failing to load ("Não foi possível carregar…") and the in-flight states ("Carregando…", "Verificando…", "Gerando…") | Needs the API to fail or hang mid-suite; it is shared by every test, and an in-flight state lasts milliseconds. |
+| A page failing to load ("Não foi possível carregar…", the comparison's included) and the in-flight states ("Carregando…", "Verificando…", "Gerando…") | Needs the API to fail or hang mid-suite; it is shared by every test, and an in-flight state lasts milliseconds. |
 | The footer's `degraded` / `unreachable` on the dev server | Same; the PWA suite covers the unreachable API (HEALTH-3). |
 | Storage that cannot be read (theme, currency choice) | A private window's blocked storage is not something a test context offers. |
 | A password-protected spreadsheet | Needs an encrypted workbook fixture; the API's integration tests cover it. |
@@ -264,11 +286,14 @@ catalogue (decision 6).
 | `market-data.spec.ts` | 2 → 4 | MKT-1, MKT-3, MKT-4 |
 | `investments.spec.ts` | 4 → 9 | INV-2 to INV-11, DASH-5, MKT-3 |
 | `returns.spec.ts` | 1 → 2 | RET-3 to RET-5 |
+| `compare.spec.ts` (026) | 3 → 4 | CMP-7 to CMP-11 |
 | `smoke.spec.ts`, `health.spec.ts` | 3 → 3 | unchanged |
 
 `support.ts` gains `fixture`, `uploadStatement`, `ofxStatement`, `importStep`, `commitImport`,
 `uniqueTicker`, `utcDaysAgo`, `localToday`, `localMonthDay` and `showDashboardMonth`, and
-`createAccount` takes a type and a currency, so the specs stop keeping their own copies.
+`createAccount` takes a type and a currency and waits for `/accounts` to settle, so the specs stop
+keeping their own copies. `compare.spec.ts` keeps 026's own `uniqueTicker` and `utcDaysAgo`, left as
+merged.
 
 ## Phase 2 — the tests E2E makes redundant
 
@@ -362,7 +387,8 @@ and 82 cases out of 16 more).
 
 ### API — `api.tests/Unit`
 
-53 test files and 2 harnesses (`AiProviderHarness`, `MarketDataProviderHarness`), all kept.
+57 test files (4 of them 026's) and 2 harnesses (`AiProviderHarness`, `MarketDataProviderHarness`),
+all kept.
 
 | Files | Class | Why kept |
 |---|---|---|
@@ -376,12 +402,13 @@ and 82 cases out of 16 more).
 | `BrapiProvider`, `BcbSgsProvider`, `CoinGeckoProvider`, `BinanceProvider`, `TwelveDataProvider`, `AnthropicAiProvider`, `OpenAiProvider`, `MarketDataResilience` | c | adapters against canned HTTP; E2E runs on fakes |
 | `AiOptions`, `MarketDataOptions`, `ReturnsOptions`, `MarketDataSetup`, `PriceProviderRegistry`, `MonthlyAnalysisPrompt`, `AiCategorisationRequest`, `GoogleUserInfo`, `MarketDataSyncJob`, `SyncErrorText` | c | configuration, wiring, prompts, the Google claim, the schedule, and failure texts the fakes never produce |
 | `AiTypes`, `InvestmentsTypes`, `MarketDataTypes`, `ReturnsTypes`, `FakeAiProvider`, `FakeMarketDataProviders`, `HarnessSanity` | c | no-float guards and the test infrastructure's self-checks |
+| `ComparePeriods`, `ComparisonSampling`, `PtaxConversion`, `SeriesComparison` (026) | c | the comparison's calculation core; `compare.spec.ts` drives the page on fake series |
 
 ### API — `api.tests/Integration`
 
-61 test files and 9 fixtures (`DashboardFixtures`, `IdentityApiFactory`, `ImportFixtures`,
-`InvestmentsApi`, `MarketDataApi`, `MarketDataSyncFakes`, `PostgresFixture`, `ReturnsFixtures`,
-`TransactionsFixtures`).
+63 test files (2 of them 026's) and 9 fixtures (`DashboardFixtures`, `IdentityApiFactory`,
+`ImportFixtures`, `InvestmentsApi`, `MarketDataApi`, `MarketDataSyncFakes`, `PostgresFixture`,
+`ReturnsFixtures`, `TransactionsFixtures`).
 
 | File | Class | Planned deletion | Covered by (E2E) | Kept, and why |
 |---|---|---|---|---|
@@ -410,14 +437,15 @@ and 82 cases out of 16 more).
 | `AiPersistenceTests`, `ImportPersistenceTests`, `InvestmentsPersistenceTests`, `MarketDataPersistenceTests`, `TransactionPersistenceTests`, `ReferentialIntegrityTests`, `IdentitySchemaTests`, `MigrationStepTests` | c | — | — | the EF model, constraints and migrations (policy) |
 | `AiBootTests`, `ReturnsBootTests`, `AiFakeProviderTests`, `MarketDataFakeProvidersTests`, `MarketDataSyncWiringTests`, `PostgresContainerTests` | c | — | — | boot checks, wiring and the infrastructure's self-checks |
 | `AiGatewayTests`, `AiGatewayGateTests`, `AiGatewayTimeoutTests`, `AnalysisJobTests`, `AnalysisInputQueriesTests`, `MarketDataSyncTests`, `MarketDataSyncFailureTests` | c | — | — | the budget, timeouts and job lifecycle, what the AI is sent, and sync windows and failures: none reachable on the fakes |
+| `CompareEndpointTests`, `CompareFiguresTests` (026) | c | — | — | the comparison's validation and figures (026), kept as calculation core and endpoint validation |
 
 ### Summary
 
 | Suite | Test files | (a) | (b) | (c) | Tests before | Tests after the plan |
 |---|---|---|---|---|---|---|
 | web (Vitest) | 41 | 9 | 32 | 0 | 298 | 170, in 32 files |
-| API unit | 53 | 0 | 17 | 36 | 1 101 together (`dotnet test`) | 1 099 together, in the same 114 files |
-| API integration | 61 | 0 | 24 | 37 | | |
+| API unit | 57 | 0 | 17 | 40 | 1 140 together (`dotnet test`) | 1 138 together, in the same 120 files |
+| API integration | 63 | 0 | 24 | 39 | | |
 
 ### Proposed "Testing" note for `docs/ARCHITECTURE.md`
 
