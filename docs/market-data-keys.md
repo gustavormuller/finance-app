@@ -2,19 +2,44 @@
 
 Which provider keys the market-data sync can use, what each one unlocks, and how to set
 them. Everything here was checked against the live APIs and the providers' own pages on
-**2026-09-25**. Free-tier limits change; the linked pages are the source of truth.
+**2026-09-25**, and Yahoo Finance on **2026-10-06**. Free-tier limits change; the linked
+pages are the source of truth.
 
-The app runs without any key. Keys only widen what it can price.
+**Nothing needs a key (025).** Yahoo Finance, BCB and Binance price every asset class the
+app knows, with full history, and none of them takes a key. The brapi token, the Twelve Data
+key and the CoinGecko demo key are optional: they only serve an asset someone keeps on those
+providers. The S&P 500 benchmark (IVVB11) comes from Yahoo.
 
 ## At a glance
 
 | Provider | Key needed? | Without a key | With the key | Setting |
 |---|---|---|---|---|
-| BCB SGS | no | CDI, SELIC, IPCA, USDBRL | — | — |
+| Yahoo Finance | no | B3 (`PETR4.SA`), US stocks (`AAPL`), indices (`^BVSP`, `^GSPC`), crypto in USD (`BTC-USD`), FX (`BRL=X`), whole history; the IVVB11 benchmark | — | — |
+| BCB SGS | no | CDI, SELIC, IPCA, USDBRL, from 1994-07-01 | — | — |
 | Binance | no | crypto pairs quoted in BRL (`BTCBRL`, `ETHBRL`, `SOLBRL`, `USDTBRL`, …), 5 years of history | — | — |
 | CoinGecko | optional | crypto in USD, the last 365 days | the same 365 days, with a quota of your own | `MarketData:CoinGecko:DemoKey` |
-| brapi | for most tickers | `PETR4`, `VALE3`, `MGLU3`, `ITUB4` only | every B3 ticker, and the IVVB11 benchmark | `MarketData:Brapi:Token` |
-| Twelve Data | yes | nothing | US stocks | `MarketData:TwelveData:Key` |
+| brapi | optional; for most tickers | `PETR4`, `VALE3`, `MGLU3`, `ITUB4` only | every B3 ticker | `MarketData:Brapi:Token` |
+| Twelve Data | optional; yes for any request | nothing | US stocks | `MarketData:TwelveData:Key` |
+
+Yahoo's endpoint is unofficial and for personal use only (ARCHITECTURE.md, "Yahoo Finance").
+
+## Moving an asset to Yahoo
+
+An asset registered on brapi, Twelve Data or CoinGecko keeps working only while its key does.
+To move it, open `/market-data`, find it under "Ativos", click **Editar**, choose "Yahoo
+Finance" and type its Yahoo symbol, or keep the one suggested:
+
+| On | Example | Yahoo symbol |
+|---|---|---|
+| brapi | `PETR4`, `HGLG11`, `IVVB11` | `PETR4.SA`, `HGLG11.SA`, `IVVB11.SA` |
+| Twelve Data | `AAPL` | `AAPL` |
+| CoinGecko (USD) | `bitcoin` | `BTC-USD` |
+
+Save, then click **Sincronizar agora**. The row says "Histórico completo na próxima
+sincronização." until the sync has replaced the asset's prices with Yahoo's whole history;
+positions holding it are recalculated in the same run. A crypto asset in reais stays on
+Binance: Yahoo has no `BTC-BRL`. The currency of an asset does not change, so a symbol quoted
+in another currency is refused.
 
 When a provider refuses because its key is empty, the sync run on `/market-data` says
 so under the ticker, e.g. "O brapi exige um token para BBAS3. Configure
@@ -27,9 +52,8 @@ request.
 
 **What it unlocks.** Without a token brapi answers four tickers: PETR4, VALE3, MGLU3 and
 ITUB4. Everything else gets HTTP 401 `MISSING_TOKEN`. That covers any other B3 stock,
-FII, ETF or BDR, unknown tickers too, and **IVVB11**, the S&P 500 benchmark that
-`MarketData:PriceBenchmarks` reads through brapi. Until a token is set, every run shows
-IVVB11 as failed, and the S&P 500 comparison on the returns pages reads "Sem dados".
+FII, ETF or BDR, unknown tickers too. Since 025 the IVVB11 benchmark comes from Yahoo, and a
+B3 asset can be moved to Yahoo, so the token only matters for an asset kept on brapi.
 
 **Sign up.** <https://brapi.dev/dashboard> (it redirects to the login and sign-up page).
 Plans: <https://brapi.dev/pricing>. Docs: <https://brapi.dev/docs>.
@@ -74,15 +98,23 @@ credit card), then create the key in the Developer Dashboard. The steps are in
 **Free tier ("Demo").** 10,000 call credits a month; the pricing page listed 100 calls
 a minute.
 
-## Binance and BCB: nothing to set
+## Yahoo, Binance and BCB: nothing to set
 
+- **Yahoo Finance** (`query1.finance.yahoo.com`) needs no account, no key, no cookie: it
+  answered from Brazil on 2026-10-06 with a browser `User-Agent`
+  (`MarketData:Yahoo:UserAgent`). It rate-limits clients that call too fast; the sync spaces
+  its requests a second apart (`MarketData:Yahoo:RequestInterval`) and retries a 429 with
+  backoff. When it still refuses, the run says "O provedor recusou por excesso de
+  requisições; tente mais tarde." A 401 or 403 reads "O Yahoo Finance recusou o acesso. …":
+  if it persists, Yahoo has started to demand a cookie and the adapter must change.
 - **Binance** public market data (`api.binance.com`) needs no account and no key. A
   five-year backfill of one pair is two requests. Binance refuses some countries, the
   United States among them, with HTTP 451. The server must run in a country Binance
   serves; it answered from Brazil on 2026-09-25. From a refused region, the run shows
   "Falha de comunicação com o provedor." for every Binance asset.
 - **BCB SGS** is open. Series 12 (CDI), 11 (SELIC), 433 (IPCA) and 1 (USD) were checked
-  live on 2026-09-25 and match `appsettings.json`.
+  live on 2026-09-25 and match `appsettings.json`. They are loaded from 1994-07-01
+  (`MarketData:Bcb:HistoryStart`), in windows of 5 years.
 
 ## Setting a key
 
@@ -140,7 +172,7 @@ refuses to run otherwise.
 3. Click **Sincronizar agora**. A manual sync can run once every 10 minutes. The new row
    says "Em andamento" until it finishes.
 4. In that row, the provider's line shows rows written and no "exige um token" or
-   "exige uma chave" failure. For brapi, IVVB11 no longer fails either.
+   "exige uma chave" failure.
 
 If the line still says "exige …", the API did not receive the setting. Check
 `dotnet user-secrets list` in development. In production, check the `.env` line name
