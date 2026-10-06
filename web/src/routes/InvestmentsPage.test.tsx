@@ -252,6 +252,7 @@ const petr4Market: MarketAsset = {
   providerSymbol: 'PETR4',
   isActive: true,
   lastSyncedAt: null,
+  historyLoadedAt: '2026-09-01T12:00:00Z',
   createdAt: '2026-09-01T12:00:00Z',
 };
 
@@ -321,6 +322,8 @@ describe('InvestmentsPage: adding an asset', () => {
     await userEvent.type(within(form).getByLabelText('Ticker'), 'PETR4');
     await userEvent.selectOptions(within(form).getByLabelText('Classe'), 'StockBr');
     await userEvent.selectOptions(within(form).getByLabelText('Provedor'), 'Brapi');
+    // The symbol is suggested from the ticker (025); typed over, it is the person's.
+    await userEvent.clear(within(form).getByLabelText('Símbolo no provedor'));
     await userEvent.type(within(form).getByLabelText('Símbolo no provedor'), 'PETR4');
     await userEvent.selectOptions(within(form).getByLabelText('Moeda'), 'BRL');
     await userEvent.click(within(form).getByRole('button', { name: 'Cadastrar e adicionar' }));

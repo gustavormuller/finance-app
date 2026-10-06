@@ -17,6 +17,9 @@ public static class InvestmentEndpoints
 {
     private const int NicknameLength = 100;
 
+    /// <summary>Why an index or an exchange rate cannot be held (025, decision 15).</summary>
+    private const string CompareOnly = "Índices e câmbio servem para comparação e não entram na carteira.";
+
     /// <summary>
     /// Either <c>marketAssetId</c>, or a catalogue registration as 006's
     /// <c>POST /api/market-data/assets</c> takes it (spec: "also accepts").
@@ -87,6 +90,11 @@ public static class InvestmentEndpoints
                 {
                     return Problems.Validation("marketAssetId", "Ativo não encontrado no catálogo.");
                 }
+
+                if (!market.Class.CanBeHeld())
+                {
+                    return Problems.Validation("marketAssetId", CompareOnly);
+                }
             }
             else
             {
@@ -95,6 +103,11 @@ public static class InvestmentEndpoints
                 if (MarketDataEndpoints.Validate(catalogue, options.Value) is { } invalid)
                 {
                     return invalid;
+                }
+
+                if (!request.Class.CanBeHeld())
+                {
+                    return Problems.Validation("class", CompareOnly);
                 }
 
                 // An entry already in the catalogue under the same provider and symbol is

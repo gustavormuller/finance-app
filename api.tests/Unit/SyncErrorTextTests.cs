@@ -40,6 +40,18 @@ public sealed class SyncErrorTextTests
             new ProviderKeyMissingException("Acme", "XYZ", "MarketData:Acme:Key"),
             "O provedor Acme exige uma chave de acesso para XYZ. Configure MarketData:Acme:Key."
         },
+        {
+            new ProviderSymbolUnknownException("Yahoo", "PETR4.S"),
+            "O Yahoo Finance não encontrou o símbolo PETR4.S. Confira o símbolo do ativo no catálogo."
+        },
+        {
+            new ProviderBlockedException("Yahoo", "PETR4.SA"),
+            "O Yahoo Finance recusou o acesso. Tente de novo mais tarde; se persistir, ele passou a exigir cookie e o adaptador precisa mudar."
+        },
+        {
+            new ProviderSymbolUnknownException("Acme", "XYZ"),
+            "O provedor Acme não encontrou o símbolo XYZ. Confira o símbolo do ativo no catálogo."
+        },
     };
 
     [Theory]

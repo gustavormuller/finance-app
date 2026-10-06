@@ -37,6 +37,12 @@ internal static class MarketDataProviderHarness
         },
         TwelveData = new TwelveDataOptions { BaseUrl = "https://api.twelvedata.com/", Key = "twelvedata-test-key" },
         Binance = new BinanceOptions { BaseUrl = "https://api.binance.com/api/v3/" },
+        Yahoo = new YahooOptions
+        {
+            BaseUrl = "https://query1.finance.yahoo.com/v8/finance/chart/",
+            UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
+            RequestInterval = TimeSpan.FromSeconds(1),
+        },
     };
 
     /// <summary><see cref="Options"/> as the app runs before the owner has set any key (019).</summary>

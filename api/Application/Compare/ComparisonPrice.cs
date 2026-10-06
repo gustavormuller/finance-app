@@ -6,8 +6,9 @@ namespace Finance.Api.Application.Compare;
 public static class ComparisonPrice
 {
     /// <summary>
-    /// The close. Once prices carry an adjusted close (025), this line becomes
-    /// <c>price.AdjustedClose ?? price.Close</c>: the total return, dividends reinvested.
+    /// The total return, dividends reinvested: the adjusted close where the provider sends one
+    /// (Yahoo, 025), else the traded close. The coalesce is per row; 025 replaces an asset's
+    /// prices whole when its source changes, so one series never mixes the two.
     /// </summary>
-    public static decimal ValueOf(Price price) => price.Close;
+    public static decimal ValueOf(Price price) => price.AdjustedClose ?? price.Close;
 }

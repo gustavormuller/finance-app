@@ -11,6 +11,11 @@ internal sealed class FakePriceProvider(ProviderKind kind) : IPriceProvider
 {
     public ProviderKind Kind => kind;
 
+    /// <summary>Yahoo's are 1900-01-01 and true (025); the defaults are every other provider's.</summary>
+    public DateOnly? HistoryStart { get; init; }
+
+    public bool RevisesHistory { get; init; }
+
     public List<(string Symbol, DateOnly From, DateOnly To)> Calls { get; } = [];
 
     public Func<string, DateOnly, DateOnly, IReadOnlyList<DailyClose>> Respond { get; set; } =

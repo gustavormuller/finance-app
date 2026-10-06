@@ -40,6 +40,26 @@ public sealed class ProviderKeyMissingException(string provider, string symbol, 
 }
 
 /// <summary>
+/// The provider says it has no such symbol (025: Yahoo's 404). Unlike an empty series, the
+/// sync shows it, because the symbol was typed by a person and is most likely mistyped.
+/// </summary>
+public sealed class ProviderSymbolUnknownException(string provider, string symbol)
+    : MarketDataProviderException(provider, $"{provider} does not know the symbol {symbol}.")
+{
+    public string Symbol { get; } = symbol;
+}
+
+/// <summary>
+/// A keyless provider refused the request (025: Yahoo's 401 or 403). There is no key to
+/// fix; the provider is blocking automated access, or started to demand a cookie.
+/// </summary>
+public sealed class ProviderBlockedException(string provider, string symbol)
+    : MarketDataProviderException(provider, $"{provider} refused the request for {symbol}.")
+{
+    public string Symbol { get; } = symbol;
+}
+
+/// <summary>
 /// The provider answered with a body that is not the documented shape: malformed JSON, a
 /// missing field, a value that is not a number or a date (006, test 8).
 /// </summary>

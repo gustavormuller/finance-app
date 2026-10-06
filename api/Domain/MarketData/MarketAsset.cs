@@ -33,5 +33,18 @@ public sealed class MarketAsset
 
     public DateTimeOffset? LastSyncedAt { get; set; }
 
+    /// <summary>
+    /// When the asset's whole history was last loaded from its current provider (025). Null:
+    /// the next sync loads it and replaces whatever prices are stored, as for a new asset or
+    /// one whose provider or symbol was just edited.
+    /// </summary>
+    public DateTimeOffset? HistoryLoadedAt { get; set; }
+
+    /// <summary>
+    /// The earliest day whose stored close a sync changed, filled in or removed, until every
+    /// holder's snapshots have been rebuilt from it (025; ADR-011). Null when none is pending.
+    /// </summary>
+    public DateOnly? PricesRevisedFrom { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }

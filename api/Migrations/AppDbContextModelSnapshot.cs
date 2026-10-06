@@ -523,6 +523,9 @@ namespace Finance.Api.Migrations
                         .IsRequired()
                         .HasColumnType("char(3)");
 
+                    b.Property<DateTimeOffset?>("HistoryLoadedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -533,6 +536,9 @@ namespace Finance.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly?>("PricesRevisedFrom")
+                        .HasColumnType("date");
 
                     b.Property<int>("Provider")
                         .HasColumnType("integer");
@@ -562,6 +568,9 @@ namespace Finance.Api.Migrations
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<decimal?>("AdjustedClose")
+                        .HasColumnType("numeric(18,8)");
 
                     b.Property<decimal>("Close")
                         .HasColumnType("numeric(18,8)");

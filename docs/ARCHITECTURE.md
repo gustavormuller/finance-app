@@ -401,7 +401,7 @@ public interface IBenchmarkProvider { Task<IReadOnlyList<DailyValue>> GetSeriesA
 public interface IAiProvider        { Task<AiCompletion> CompleteAsync(AiRequest request, CancellationToken ct); }
 ```
 
-Concrete justification, not dogma: there are already four market sources (brapi, BCB, CoinGecko/Binance, Twelve Data) and the AI provider may change. This is exactly the case ports-and-adapters was invented for.
+Concrete justification, not dogma: there are already five market sources (Yahoo, brapi, BCB, CoinGecko/Binance, Twelve Data) and the AI provider may change. This is exactly the case ports-and-adapters was invented for.
 
 **Deliberately not adopted:**
 
@@ -459,13 +459,22 @@ movements       id, user_id, asset_id, date,
 
 ```
 market_assets   id, ticker, name, class, currency, provider, provider_symbol,
-                is_active, last_synced_at, created_at    -- unique (provider, provider_symbol)
-prices          market_asset_id, date, close NUMERIC(18,8)   -- PK (market_asset_id, date)
+                is_active, last_synced_at, history_loaded_at, prices_revised_from,
+                created_at                               -- unique (provider, provider_symbol)
+prices          market_asset_id, date, close NUMERIC(18,8),
+                adjusted_close NUMERIC(18,8) NULL        -- PK (market_asset_id, date)
 benchmarks      code, date, value NUMERIC(18,8)              -- PK (code, date); CDI, SELIC, IPCA, USDBRL, IVVB11
 sync_runs       id, started_at, finished_at, trigger, status, summary JSONB
 ```
 
 *Corrected in 006:* `prices` is keyed by `market_asset_id`, an FK to the shared `market_assets` catalogue — not by an `asset_key` string, and not by `assets.id`. Two people holding PETR4 point at the same catalogue row and so share the same price series. The currency lives on the catalogue row; prices are stored in it. None of these four tables has a `user_id` or a query filter.
+
+*Amended in 025:* `close` is the raw traded price, the one a split movement (007) is valued
+against; `adjusted_close` is the total-return series (splits and dividends), filled by Yahoo
+only. `history_loaded_at` is null until the asset's whole history has been loaded from its
+current provider; `prices_revised_from` keeps the earliest day whose stored close a sync
+changed, until every holder's snapshots are rebuilt from it (ADR-011). The catalogue also
+holds what is compared but never held: classes `index` and `currency` (`^BVSP`, `BRL=X`).
 
 **Never store a consolidated position as a column.** The position on any date is derived from the sum of `movements` up to that date. That is what makes it possible to recompute everything when an old entry is corrected — and it will be.
 
@@ -533,15 +542,62 @@ Normalize everything to base 100 on the date of the first contribution:
 
 | Source | Covers | Free tier | Adapter |
 |---|---|---|---|
+| Yahoo Finance chart | B3 stocks, FIIs, ETFs, BDRs; US stocks; indices; crypto in USD; FX; the IVVB11 benchmark | no key, no sign-up; unofficial, **personal use only** | `YahooProvider` (025), the primary source |
 | BCB / SGS | CDI, SELIC, IPCA, PTAX | unlimited, no key | `BcbSgsProvider` (benchmarks) |
-| brapi.dev | BR stocks, FIIs, ETFs, BDRs; the IVVB11 benchmark | 4 tickers keyless; free token 15,000 req/month, 3 months of history | `BrapiProvider` |
-| CoinGecko | crypto in USD | keyless 365 days; Demo key 10,000 req/month, same history | `CoinGeckoProvider` |
 | Binance public | crypto pairs quoted in BRL | no key, no sign-up | `BinanceProvider` (019) |
-| Twelve Data | US stocks | key required; 800 req/day | `TwelveDataProvider` |
+| brapi.dev | BR stocks, FIIs, ETFs, BDRs | 4 tickers keyless; free token 15,000 req/month, 3 months of history | `BrapiProvider`, optional |
+| CoinGecko | crypto in USD | keyless 365 days; Demo key 10,000 req/month, same history | `CoinGeckoProvider`, optional |
+| Twelve Data | US stocks | key required; 800 req/day | `TwelveDataProvider`, optional |
 
-Which key unlocks what, and how to set each one: `docs/market-data-keys.md`. A provider
+Since 025 nothing needs a key: Yahoo, BCB and Binance cover every asset class the app prices.
+brapi, CoinGecko and Twelve Data stay as adapters, a fallback for an asset Yahoo stops
+serving. Which key unlocks what, and how to set each one: `docs/market-data-keys.md`. A provider
 that refuses because its key is empty fails only that ticker, and the sync run says which
 setting to fill in (019).
+
+### Yahoo Finance — primary, keyless, personal use only (025)
+
+Amended on 2026-10-06 with the owner's approval. This section replaces "Do not use Yahoo
+Finance", which stood here until then.
+
+```
+GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}
+    ?period1={unix}&period2={now}&interval=1d&events=div%2Csplit&includeAdjustedClose=true
+User-Agent: {a desktop browser's}
+```
+
+One request per asset returns its whole daily history: B3 since 2000 (`PETR4.SA`), the
+Ibovespa since 1993 (`^BVSP`), the S&P 500 since 1927 (`^GSPC`), US stocks (`AAPL`), crypto in
+dollars (`BTC-USD`) and exchange rates (`BRL=X`, `EURBRL=X`), with split and dividend events and
+a split- and dividend-adjusted close beside the close. It has no IFIX, no crypto in reais
+(Binance covers that) and incomplete FII dividends.
+
+**Terms.** There is no official API. The endpoint is the one Yahoo's own pages use, and the
+widely used yfinance library describes it as "intended for personal use only". This app uses
+it because its one user is its owner. **This must be revisited before anyone else uses the
+app** (ADR-010).
+
+**Risks.** It is undocumented, so it can change shape or disappear without notice. It
+rate-limits clients that call too fast (HTTP 429), sometimes for hours. It may start to demand
+a cookie and a crumb, as it did for its download endpoint; today it does not.
+
+**Mitigations.**
+- It is one adapter behind `IPriceProvider` (ADR-015). If it breaks, an asset moves to another
+  provider by editing its catalogue entry, and the next sync reloads its prices (025).
+- External data enters only through the nightly sync (principle 6): about one request per
+  asset a night, started at least a second apart and retried with backoff on a 429. No screen
+  ever waits on Yahoo; every screen reads Postgres, so an outage leaves yesterday's prices in
+  place.
+- Every asset class has another source: brapi for B3, Twelve Data for US stocks, Binance and
+  CoinGecko for crypto, BCB for the dollar.
+
+**What the adapter stores.** Yahoo's `close` is split-adjusted backwards in time. `Price.Close`
+is the raw traded price, because 007 records a split as a movement that adds quantity, so the
+adapter multiplies each close by every later split's ratio. `Price.AdjustedClose` is Yahoo's
+`adjclose` (total return). A bar is dated in the exchange's time zone, and today's unfinished
+session is never stored. Yahoo rebases `adjclose` at every dividend and split, so the sync
+re-reads the last week of each Yahoo asset and reloads its whole history when a stored day no
+longer matches (spec 025, decisions 5–13).
 
 ### BCB / SGS — free, official, no key
 
@@ -553,6 +609,10 @@ https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados?formato=json
 Series: daily CDI, SELIC, monthly IPCA, PTAX dollar. The codes are configuration
 (`MarketData:Bcb:Series`): CDI 12 and SELIC 11 in percent per day, IPCA 433 in percent per
 month, USDBRL 1 as a level. All four were checked against the live API on 2026-09-25.
+
+History reaches back to `MarketData:Bcb:HistoryStart`, 1994-07-01: before the Plano Real the
+values are in older currencies. Since 2025-03-26 SGS refuses a window longer than 10 years and
+a long request can time out, so the adapter asks in windows of at most 5 years (025).
 
 ### brapi.dev
 
@@ -590,8 +650,8 @@ the UTC day it opens and its close is that day's last price. A Binance asset mus
 quoted in BRL, with a symbol ending in BRL. Binance refuses some countries (the United
 States among them) with HTTP 451, so the server must run where it is served.
 
-Binance for crypto in reais with full history; CoinGecko (in USD, 365 days without a paid
-plan) if a coin has no BRL pair.
+Binance for crypto in reais with full history; Yahoo (`BTC-USD`, 025) for crypto in dollars
+with full history; CoinGecko (in USD, 365 days without a paid plan) as the fallback.
 
 ### US stocks — Twelve Data
 
@@ -606,7 +666,7 @@ Authorization: apikey {KEY}
 
 Finnhub (60 req/min) is an equivalent alternative.
 
-**Do not use Yahoo Finance.** No official API — the libraries scrape undocumented endpoints, may violate the terms of use and break without warning.
+Since 025 US stocks come from Yahoo; Twelve Data is the fallback.
 
 ### Consumption strategy
 
@@ -614,7 +674,9 @@ A daily overnight job fetches quotes and indicators and writes to `prices` / `be
 
 Estimated consumption: ~40 requests/day across all sources. Enormous headroom in every free tier, even with 10 users — market data is shared, so more users do not increase the calls.
 
-Initial backfill: a one-off historical load of 5 years per asset, respecting rate limits.
+Initial backfill (025): a Yahoo asset's whole history in one request, the BCB series from
+1994-07-01 in windows of 5 years, and 5 years (`BackfillYears`) on the other providers. Each is
+loaded once: a series synced before 025 gets its older years on the next run, not every night.
 
 ---
 
@@ -684,7 +746,7 @@ This is the only cost that scales linearly with users. With the per-user ceiling
 
 ### Phase 4 — Investments
 - [ ] Registering assets and movements
-- [ ] Daily job: brapi, BCB, CoinGecko/Binance, Twelve Data
+- [ ] Daily job: Yahoo, BCB, Binance; brapi, CoinGecko, Twelve Data as fallbacks
 - [ ] Historical backfill
 - [ ] TWR computation
 - [ ] XIRR computation
@@ -761,7 +823,9 @@ MAIL_FROM=
 # Cloudflare
 CLOUDFLARE_TUNNEL_TOKEN=
 
-# Market data (006, 019) — all optional; see docs/market-data-keys.md. Binance and BCB need none.
+# Market data (006, 019, 025) — all optional; see docs/market-data-keys.md. Yahoo, BCB and
+# Binance need none, and serve everything; these keys only serve assets kept on brapi,
+# CoinGecko or Twelve Data.
 MarketData__Brapi__Token=
 MarketData__CoinGecko__DemoKey=
 MarketData__TwelveData__Key=
@@ -799,7 +863,7 @@ In production these live in the VPS `.env`, outside git, `chmod 600`.
 | Cloudflare Tunnel, Caddy, Postgres, in-process jobs | R$0 |
 | Identity + Google OAuth | R$0 |
 | Resend / SES | R$0 |
-| BCB, brapi, CoinGecko, Binance, Twelve Data | R$0 |
+| Yahoo, BCB, Binance (brapi, CoinGecko, Twelve Data optional) | R$0 |
 | Backup on B2/R2 | <R$1 |
 | AI (with ceiling) | R$10–15 |
 | **Total** | **~R$14–19** |
@@ -875,6 +939,11 @@ Invitations and allowlists were considered and discarded: both put the gate at s
 The correct gate is `ai_enabled` per user: one column, one check, and the only resource with relevant marginal cost stays controlled without stopping anyone from using the app.
 *Requires:* per-IP rate limit on sign-up, upload size limit, published Google consent screen.
 *Becoming a SaaS =* `ai_enabled` derives from the active plan instead of being manual.
+*Note (025):* open registration is in tension with the primary price source. Yahoo Finance's
+endpoint is unofficial and for personal use only, and the owner is today the app's only
+user. Before anyone else uses the app, revisit both: move the shared catalogue to sources
+whose terms allow serving others, or close registration. Any signed-in user can also edit a
+catalogue entry's source (025), which every holder of that entry shares.
 
 ### ADR-011 — Daily derived snapshots, recomputable
 Portfolio value per day is expensive to compute on demand and mandatory for TWR. `portfolio_daily` is a derivation materialised by the nightly job, never the source of truth.
@@ -902,6 +971,7 @@ Concrete justification: four market sources already mapped (brapi, BCB, CoinGeck
 *Criterion for new ports:* is there more than one real or foreseen implementation? If not, call directly.
 **Amendment (006).** The market-data port is two ports, not one: `IPriceProvider` (provider symbol → daily closes) and `IBenchmarkProvider` (series code → daily values), both in `Application/MarketData/`, replacing `IMarketDataProvider`. A close and a benchmark value are different shapes with different keys, and each adapter implements the port that fits. `IPriceProvider` has three implementations today (brapi, CoinGecko, Twelve Data), resolved by `IPriceProviderRegistry.For(ProviderKind)`. `IBenchmarkProvider` has one today, BCB SGS; it passes the criterion above on a *foreseen* second source — a benchmark such as USDBRL or IVVB11 served by brapi or Twelve Data instead of, or alongside, BCB.
 *Update (019):* Binance is a fourth `IPriceProvider`, for crypto quoted in BRL. It is one class and one registration, as the registry intends.
+*Update (025):* Yahoo Finance is a fifth `IPriceProvider`, and the primary one: B3, US stocks, indices, crypto in USD and FX, keyless, for personal use only (External data sources). The port gained two members with defaults, so the other adapters did not change: `HistoryStart`, how far back a whole-history load asks (Yahoo: 1900), and `RevisesHistory`, whether stored days change at the source (Yahoo rebases its adjusted close), which makes the sync re-read an overlap. The IVVB11 price benchmark is read through Yahoo instead of brapi, so no benchmark needs a key.
 
 ### ADR-016 — No Repository over EF Core
 `DbContext` is already a Unit of Work and `DbSet<T>` is already a repository. A repository layer would forward calls, lose `IQueryable` composition and add no testability that integration tests with Postgres in a container do not already deliver.

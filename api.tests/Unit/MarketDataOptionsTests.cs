@@ -24,16 +24,16 @@ public sealed class MarketDataOptionsTests
                 .Select(pair => (pair.Key, pair.Value.Code, pair.Value.Unit)));
     }
 
-    /// <summary>The job is on in production; IVVB11 is a brapi price stored as a benchmark level.</summary>
+    /// <summary>The job is on in production; IVVB11 is a Yahoo price stored as a benchmark level, keyless (025).</summary>
     [Fact]
-    public void Appsettings_turns_on_the_nightly_job_and_serves_IVVB11_from_brapi()
+    public void Appsettings_turns_on_the_nightly_job_and_serves_IVVB11_from_yahoo()
     {
         var options = Bind();
 
         Assert.True(options.ScheduledSync);
         var ivvb11 = Assert.Single(options.PriceBenchmarks);
         Assert.Equal(
-            ("IVVB11", Finance.Api.Domain.MarketData.ProviderKind.Brapi, "IVVB11", BenchmarkUnit.Level),
+            ("IVVB11", Finance.Api.Domain.MarketData.ProviderKind.Yahoo, "IVVB11.SA", BenchmarkUnit.Level),
             (ivvb11.Key, ivvb11.Value.Provider, ivvb11.Value.Symbol, ivvb11.Value.Unit));
         Assert.Equal((3, TimeSpan.FromSeconds(2), 5), (
             options.Resilience.RetryAttempts, options.Resilience.RetryBaseDelay, options.Resilience.FailuresToBreak));
@@ -44,6 +44,18 @@ public sealed class MarketDataOptionsTests
     public void Appsettings_points_Binance_at_its_public_api()
     {
         Assert.Equal("https://api.binance.com/api/v3/", Bind().Binance.BaseUrl);
+    }
+
+    /// <summary>025: Yahoo needs no key either, but a browser's User-Agent and a pace; BCB reaches back to the Plano Real.</summary>
+    [Fact]
+    public void Appsettings_points_Yahoo_at_its_chart_endpoint_and_BCB_at_1994()
+    {
+        var options = Bind();
+
+        Assert.Equal("https://query1.finance.yahoo.com/v8/finance/chart/", options.Yahoo.BaseUrl);
+        Assert.StartsWith("Mozilla/5.0 (Windows NT 10.0;", options.Yahoo.UserAgent);
+        Assert.Equal(TimeSpan.FromSeconds(1), options.Yahoo.RequestInterval);
+        Assert.Equal(new DateOnly(1994, 7, 1), options.Bcb.HistoryStart);
     }
 
     [Fact]

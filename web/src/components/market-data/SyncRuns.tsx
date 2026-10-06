@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
 import { api, type ProviderSyncSummary, type SyncRun } from '@/api/finance';
 import Alert from '@/components/Alert';
@@ -40,6 +41,16 @@ export default function SyncRuns() {
   });
 
   const running = runs.data?.[0]?.status === 'Running';
+
+  // A run that ends may have loaded whole histories (025): the catalogue below says so.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      void queryClient.invalidateQueries({ queryKey: ['market-assets'] });
+    }
+
+    wasRunning.current = running;
+  }, [running, queryClient]);
 
   return (
     <section aria-labelledby="sync-runs-heading" className="grid gap-4">

@@ -39,7 +39,8 @@ public sealed class MarketDataSyncEndpointTests(PostgresFixture postgres)
         var runId = (await sync.Content.ReadFromJsonAsync<Accepted>(ct))!.SyncRunId;
         var run = await FinishedAsync(client, runId, ct);
         Assert.Equal(("Manual", "Succeeded"), (run.Trigger, run.Status));
-        Assert.Equal(2, run.Summary["Brapi"].ItemsSynced); // PETR4 and the IVVB11 benchmark
+        Assert.Equal(1, run.Summary["Brapi"].ItemsSynced); // PETR4
+        Assert.Equal(1, run.Summary["Yahoo"].ItemsSynced); // the IVVB11 benchmark (025)
         Assert.Contains(api.Brapi.Calls, call => call.Symbol == "PETR4");
 
         var yesterday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
