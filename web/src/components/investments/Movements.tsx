@@ -14,7 +14,7 @@ import { INVESTMENTS, useMovements } from './queries';
 
 /**
  * The asset's movements, oldest first as the API replays them, with add, edit and
- * delete (spec 007 UI). A rule broken on a write comes back as a 400 and is shown under
+ * delete. A rule broken on a write comes back as a 400 and is shown under
  * its field; a delete that would uncover a later sell is a 409, shown as sent.
  */
 export default function Movements({ assetId, currency }: { assetId: string; currency: string }) {

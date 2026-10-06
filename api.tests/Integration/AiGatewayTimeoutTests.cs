@@ -5,10 +5,10 @@ using Finance.Api.Domain.Ai;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 009 checkpoint 3: the gateway times every provider call out by purpose, on its clock:
-/// 30 s for categorisation (decision 4), <c>Ai:Analysis:TimeoutSeconds</c> for the analysis.
-/// A timeout is <see cref="AiProviderTimeoutException"/> (CP4's <c>504</c>) and is recorded
-/// with an estimate; the caller's own cancellation stays a cancellation.
+/// The gateway times every provider call out by purpose, on its clock: 30 s for categorisation
+/// (009, decision 4), <c>Ai:Analysis:TimeoutSeconds</c> for the analysis. A timeout is
+/// <see cref="AiProviderTimeoutException"/> (the <c>504</c>) and is recorded with an estimate;
+/// the caller's own cancellation stays a cancellation.
 /// </summary>
 public sealed partial class AiGatewayTests
 {

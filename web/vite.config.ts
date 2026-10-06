@@ -88,6 +88,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // 018: each test file still gets its own module graph and globals (a fresh VM
+    // context), but the worker and its jsdom set-up are reused: the suite ran in about
+    // half the time of the default process-per-file pool, every test green.
+    pool: 'vmThreads',
     setupFiles: ['./src/setupTests.ts'],
     // Tests see every stylesheet as empty, except this one read as text: pwa.test.ts
     // checks the colours in the manifest and index.html against the theme's tokens.

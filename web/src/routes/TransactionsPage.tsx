@@ -3,10 +3,15 @@ import { Link, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { api, type Transaction } from '@/api/finance';
+import { useAccounts } from '@/components/accounts/queries';
 import Amount from '@/components/Amount';
 import Alert from '@/components/Alert';
+import { useCategories } from '@/components/categories/queries';
 import EmptyState from '@/components/EmptyState';
+import { saveFile } from '@/lib/download';
 import { formatDate } from '@/lib/labels';
+import { currentMonth, monthDays } from '@/lib/months';
+import { refusalMessage } from '@/lib/refusal';
 import TransactionForm from '@/components/TransactionForm';
 import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -23,43 +28,25 @@ import {
 
 const PAGE_SIZE = 50;
 
-/** The current month, which is what the spec asks the filter to open on. */
-function currentMonth() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  return { from: isoDay(first), to: isoDay(last) };
-}
-
-/** Local calendar day, not UTC: toISOString() would shift the date west of UTC. */
-function isoDay(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  // Arriving from an import's done step, or from an account (015): show that batch or
+  // Arriving from an import's done step, or from an account: show that batch or
   // that account, whatever the dates, rather than the current month with most of it
   // filtered out.
   const { importBatchId, accountId } = useSearch({ strict: false }) as { importBatchId?: string; accountId?: string };
   const [filter, setFilter] = useState(
     importBatchId || accountId
       ? { from: '', to: '', accountId: accountId ?? '', categoryId: '', importBatchId: importBatchId ?? '' }
-      : { ...currentMonth(), accountId: '', categoryId: '', importBatchId: '' },
+      : { ...monthDays(currentMonth()), accountId: '', categoryId: '', importBatchId: '' },
   );
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [creating, setCreating] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  const accounts = useQuery({ queryKey: ['accounts'], queryFn: api.listAccounts });
-  const categories = useQuery({ queryKey: ['categories'], queryFn: api.listCategories });
+  const accounts = useAccounts();
+  const categories = useCategories();
 
   const query = { ...filter, page, pageSize: PAGE_SIZE };
   const transactions = useQuery({
@@ -89,6 +76,14 @@ export default function TransactionsPage() {
     onError: (error: Error) => setFailure(error.message),
   });
 
+  // 021: every row the filter selects, not only this page, as the file the API names.
+  const exporting = useMutation({
+    mutationFn: () => api.exportTransactions(filter),
+    onMutate: () => setFailure(null),
+    onSuccess: ({ blob, fileName }) => saveFile(blob, fileName),
+    onError: (error: Error) => setFailure(refusalMessage(error)),
+  });
+
   const page1 = (change: Partial<typeof filter>) => {
     // Any change to the filter invalidates the page number: page 3 of the old result
     // is not page 3 of the new one, and landing on an empty page reads as a bug.
@@ -110,9 +105,19 @@ export default function TransactionsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-3xl font-semibold tracking-tight">Lançamentos</h2>
 
-        {!creating && !editing && (
-          <Button onClick={() => setCreating(true)}>Novo lançamento</Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={total === 0 || exporting.isPending}
+            onClick={() => exporting.mutate()}
+          >
+            {exporting.isPending ? 'Exportando…' : 'Exportar CSV'}
+          </Button>
+
+          {!creating && !editing && (
+            <Button onClick={() => setCreating(true)}>Novo lançamento</Button>
+          )}
+        </div>
       </div>
 
       {(creating || editing) && (

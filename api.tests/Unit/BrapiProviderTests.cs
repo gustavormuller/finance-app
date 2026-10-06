@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Finance.Api.Application.MarketData;
 using Finance.Api.Infrastructure.MarketData;
 using static Finance.Api.Tests.Unit.MarketDataProviderHarness;
@@ -97,6 +97,33 @@ public sealed class BrapiProviderTests
             .GetDailyClosesAsync("PETR4", new DateOnly(2024, 1, 2), new DateOnly(2024, 1, 8), CancellationToken.None);
 
         Assert.Null(handler.Single().Headers.Authorization);
+    }
+
+    /// <summary>019 test 11: brapi serves four tickers without a token and refuses the rest, IVVB11 included.</summary>
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task A_refusal_with_no_token_configured_is_a_missing_key_naming_the_setting(HttpStatusCode status)
+    {
+        var handler = new FakeHttpHandler(status, Fixture("brapi-quote-missing-token.json"));
+
+        var error = await Assert.ThrowsAsync<ProviderKeyMissingException>(() =>
+            new BrapiProvider(handler.Client(), Microsoft.Extensions.Options.Options.Create(Keyless()), new FixedClock(Now))
+                .GetDailyClosesAsync("BBAS3", new DateOnly(2024, 1, 2), new DateOnly(2024, 1, 8), CancellationToken.None));
+
+        Assert.Equal(("Brapi", "BBAS3", "MarketData:Brapi:Token"), (error.Provider, error.Symbol, error.Setting));
+    }
+
+    /// <summary>019 test 12: with a token set, a refusal is about that token, as before.</summary>
+    [Fact]
+    public async Task A_refusal_with_a_token_configured_is_the_key_refused()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.Unauthorized, """{"error":true,"message":"Token inválido","code":"INVALID_TOKEN"}""");
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => Provider(handler).GetDailyClosesAsync(
+            "BBAS3", new DateOnly(2024, 1, 2), new DateOnly(2024, 1, 8), CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
     }
 
     [Fact]

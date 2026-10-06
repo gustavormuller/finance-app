@@ -60,8 +60,7 @@ public sealed class GoogleCallbackTests(PostgresFixture postgres)
         Assert.Equal(email, body.Email);
         Assert.Equal("Ada Lovelace", body.DisplayName);
 
-        // ADR-010: AI ships disabled and is enabled per person, by hand, in the
-        // database. Nothing in this feature can turn it on.
+        // ADR-010: AI ships disabled.
         Assert.False(body.AiEnabled);
     }
 

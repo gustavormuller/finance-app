@@ -6,8 +6,8 @@ import { createAccount, devLogin, openImportTab, uniqueEmail } from './support';
 
 /**
  * Spec E2E tests 63 to 66, against the real API and a real PostgreSQL, with the
- * fixture files in ./fixtures. Since 015 every import starts from the account's own
- * tab, where choosing a file starts it.
+ * fixture files in ./fixtures. Every import starts from the account's own tab, where
+ * choosing a file starts it.
  */
 
 const OFX = fileURLToPath(new URL('./fixtures/extrato.ofx', import.meta.url));

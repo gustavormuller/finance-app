@@ -63,7 +63,6 @@ public sealed class SnapshotBuilderTests
         Assert.Equal(1100m, rows[0].ValueBrl);
     }
 
-    /// <summary>A rebuild from a date still counts the movements before it.</summary>
     [Fact]
     public void Building_from_a_date_counts_earlier_movements()
     {
@@ -120,8 +119,8 @@ public sealed class SnapshotBuilderTests
     }
 
     /// <summary>
-    /// Not in the spec (DEFERRED, 007 CP2): a USD buy dated before the first known
-    /// rate costs at the earliest rate after it, and days with no rate yet are skipped.
+    /// Not in the spec: a USD buy dated before the first known rate costs at the
+    /// earliest rate after it, and days with no rate yet are skipped.
     /// </summary>
     [Fact]
     public void Buy_before_the_first_rate_costs_at_the_earliest_later_rate()

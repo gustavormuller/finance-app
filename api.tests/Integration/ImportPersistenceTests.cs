@@ -13,8 +13,8 @@ namespace Finance.Api.Tests.Integration;
 /// committed transactions.
 /// </summary>
 /// <remarks>
-/// The HTTP versions of 36-38 arrive with the endpoints. These exist so isolation is
-/// the storage layer's guarantee and not each endpoint's courtesy.
+/// The HTTP versions are in ImportSecurityTests. These exist so isolation is the
+/// storage layer's guarantee and not each endpoint's courtesy.
 /// </remarks>
 [Collection(nameof(PostgresCollection))]
 public sealed class ImportPersistenceTests(PostgresFixture postgres)

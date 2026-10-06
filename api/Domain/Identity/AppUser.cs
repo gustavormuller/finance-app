@@ -16,7 +16,7 @@ public sealed class AppUser : IdentityUser<Guid>
     /// <summary>
     /// Whether this user may spend money on the AI module. ADR-008 and ADR-010: the
     /// one resource with a marginal cost, off by default, switched on per person by
-    /// hand. No endpoint in 002 changes it.
+    /// hand.
     /// </summary>
     public bool AiEnabled { get; set; }
 

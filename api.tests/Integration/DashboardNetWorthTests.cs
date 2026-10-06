@@ -109,6 +109,40 @@ public sealed class DashboardNetWorthTests(PostgresFixture postgres)
         Assert.Equal(invested.GetProperty("totalBrl").GetDecimal(), series[^1].Investments);
     }
 
+    /// <summary>
+    /// Spec 018 test 2: with no transactions, the series opens at the month of the caller's
+    /// earliest daily row across assets, whichever asset has it; another user's earlier row
+    /// does not move it.
+    /// </summary>
+    [Fact]
+    public async Task The_series_opens_at_the_callers_earliest_daily_row_across_assets()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var api = await InvestmentsApi.StartAsync(postgres, cancellationToken);
+        var user = await api.SignInAsync("net-worth-first-row", cancellationToken);
+        var other = await api.SignInAsync("net-worth-first-row-other", cancellationToken);
+        var petr4 = await api.CatalogueAsync("PETR4", cancellationToken);
+
+        var later = await api.HoldAsync(user.Id, petr4, cancellationToken);
+        var earlier = await api.HoldAsync(user.Id, await api.CatalogueAsync("VALE3", cancellationToken), cancellationToken);
+        var theirs = await api.HoldAsync(other.Id, petr4, cancellationToken);
+        await api.DailyAsync(later, cancellationToken, (ThisMonth.AddMonths(-1), 1m, 10m, 1m, 10m));
+        await api.DailyAsync(earlier, cancellationToken, (ThisMonth.AddMonths(-2).AddDays(3), 1m, 20m, 1m, 20m));
+        await api.DailyAsync(theirs, cancellationToken, (ThisMonth.AddMonths(-6), 1m, 99m, 1m, 99m));
+
+        var series = await user.Client.GetFromJsonAsync<List<NetWorthItem>>(
+            "/api/dashboard/net-worth", cancellationToken);
+
+        Assert.Equal(
+            [
+                new NetWorthItem(ThisMonth.AddMonths(-2).Key(), 0m, 20m, 20m),
+                new NetWorthItem(ThisMonth.AddMonths(-1).Key(), 0m, 30m, 30m),
+                new NetWorthItem(ThisMonth.Key(), 0m, 30m, 30m),
+            ],
+            series);
+    }
+
     /// <summary>Spec integration test 4.</summary>
     [Fact]
     public async Task A_foreign_currency_account_is_left_out()

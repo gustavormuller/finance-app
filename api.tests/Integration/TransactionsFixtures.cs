@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Text.Json;
 using Finance.Api.Domain.Transactions;
 using Finance.Api.Infrastructure;
@@ -11,10 +11,10 @@ namespace Finance.Api.Tests.Integration;
 internal sealed record SignedInUser(HttpClient Client, Guid Id);
 
 /// <summary>
-/// Shared setup for 003's persistence tests. They work against
-/// <see cref="AppDbContext"/> directly rather than over HTTP, because the endpoints
-/// do not exist yet and the guarantees under test — the query filter, the column
-/// types, the foreign keys — are the storage layer's, not the API's.
+/// Shared setup for 003's tests. The persistence tests work against
+/// <see cref="AppDbContext"/> directly rather than over HTTP, because the guarantees
+/// under test — the query filter, the column types, the foreign keys — are the
+/// storage layer's, not the API's.
 /// </summary>
 internal static class TransactionsFixtures
 {
@@ -67,7 +67,7 @@ internal static class TransactionsFixtures
     };
 
     /// <summary>
-    /// The default name deliberately avoids all eight seeded categories: every user
+    /// The default name deliberately avoids all the seeded categories: every user
     /// now starts with those, and the unique index counts a second top-level "Food"
     /// as the duplicate it is.
     /// </summary>
@@ -128,6 +128,21 @@ internal static class TransactionsFixtures
 
         return document.RootElement.TryGetProperty("errors", out var errors)
             ? [.. errors.EnumerateObject().Select(field => field.Name)]
+            : [];
+    }
+
+    /// <summary>The messages a problem-details response gave for one field; empty when it named no such field.</summary>
+    public static async Task<IReadOnlyList<string>> ProblemMessagesAsync(
+        HttpResponseMessage response,
+        string field,
+        CancellationToken cancellationToken)
+    {
+        using var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync(cancellationToken));
+
+        return document.RootElement.TryGetProperty("errors", out var errors)
+            && errors.TryGetProperty(field, out var messages)
+            ? [.. messages.EnumerateArray().Select(message => message.GetString()!)]
             : [];
     }
 

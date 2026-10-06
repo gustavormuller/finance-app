@@ -7,8 +7,8 @@ using static Finance.Api.Tests.Integration.TransactionsFixtures;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 007 checkpoint 3: the movement routes and the synchronous rebuild behind them. Spec
-/// integration tests 16 (HTTP half), 17, 19, 20 and 21.
+/// The movement routes and the synchronous rebuild behind them. Spec 007 integration
+/// tests 16 (HTTP half), 17, 19, 20 and 21.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed partial class InvestmentMovementEndpointTests(PostgresFixture postgres)

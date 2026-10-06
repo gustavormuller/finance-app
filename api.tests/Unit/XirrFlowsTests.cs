@@ -5,7 +5,7 @@ using Finance.Api.Domain.Transactions;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// XIRR's flows for one asset (008, decision 4, and the CP1/CP2 defaults), from the investor's
+/// XIRR's flows for one asset (008, decision 4, and spec-silent defaults), from the investor's
 /// side: buys out at cost plus fees, sells in at proceeds less fees, dividends and JCP in net
 /// of fees, the opening value out and the closing value in. Each movement keeps its real date,
 /// and a USD one converts at 007's rule for that date.
@@ -53,7 +53,7 @@ public sealed class XirrFlowsTests
     }
 
     /// <summary>
-    /// TWR moves a buy made before the asset's first close onto that close (DEFERRED, 008 CP1).
+    /// TWR moves a buy made before the asset's first close onto that close.
     /// XIRR has no daily value to match, so the buy keeps its own date.
     /// </summary>
     [Fact]

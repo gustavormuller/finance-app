@@ -81,7 +81,7 @@ public sealed class MoneyWeightedReturnTests
         Assert.Null(MoneyWeightedReturn.Compute([Flow(0, -1000m), Flow(1, back)]));
 
     /// <summary>
-    /// CP1's warning: over forty years, (1 + r)^(t/365) at either end of the bracket is past
+    /// Over forty years, (1 + r)^(t/365) at either end of the bracket is past
     /// the decimal range (0.01^-40 and 11^40). Bisection evaluates both ends, so it must not
     /// overflow. Roots: 0.5^(1/40) - 1 = -0.017179401454748939456 and 1000^(1/40) - 1 =
     /// 0.188502227437018437730 over 14 600 days (Python); Calc: -0.0171794014547489 and
