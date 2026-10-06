@@ -1,35 +1,25 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { createAccount, createTransaction, devLogin, uniqueEmail } from './support';
+import {
+  createAccount,
+  createTransaction,
+  devLogin,
+  localMonthDay,
+  localToday,
+  showDashboardMonth,
+  uniqueEmail,
+} from './support';
 
 /**
  * Spec 005 E2E tests 24 to 26, against the real API and a real PostgreSQL.
  *
  * Every test signs in as a brand-new user, so the only rows are the ones it creates,
  * and the seeded categories include Transferência (spec 005 integration test 19).
+ *
+ * The current month and the hero's chips are relative to today by definition, so those
+ * tests date their rows from today (`localToday`, `localMonthDay`); the rest use fixed
+ * dates and page the month selector back to them.
  */
-
-/**
- * Today as the browser sees it, `YYYY-MM-DD`. The dashboard's current month is the
- * local one, so the transactions have to land in it too.
- */
-function today() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
-/** The 15th of the previous local month, `YYYY-MM-DD`: safely inside it on any day. */
-function lastMonth() {
-  const date = new Date();
-  date.setDate(15);
-  date.setMonth(date.getMonth() - 1);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-
-  return `${date.getFullYear()}-${month}-15`;
-}
 
 /** The balance row of the account called `name`; its test id carries the account id. */
 function accountBalance(page: Page, name: string) {
@@ -51,8 +41,16 @@ test('signing in lands on the dashboard, empty until there is an account', async
   await expect(page.getByTestId('current-user')).toHaveText('Ada Lovelace');
 
   // A brand-new user has nothing recorded: the empty state, not a page of zeros.
-  await expect(page.getByTestId('dashboard-empty')).toBeVisible();
+  const empty = page.getByTestId('dashboard-empty');
+  await expect(empty).toBeVisible();
   await expect(page.getByTestId('total-balance')).toBeHidden();
+
+  // 024: its two ways out.
+  await empty.getByRole('link', { name: 'Registrar um lançamento' }).click();
+  await expect(page).toHaveURL(/\/transactions$/);
+  await page.goto('/');
+  await empty.getByRole('link', { name: 'Importar um extrato' }).click();
+  await expect(page).toHaveURL(/\/accounts$/);
 
   await createAccount(page, 'Nubank', '1.500,00');
   await page.goto('/');
@@ -66,7 +64,12 @@ test('signing in lands on the dashboard, empty until there is an account', async
   await expect(stat(page, 'month-net')).toHaveText('+0,00');
   await expect(page.getByTestId('monthly-chart')).toBeVisible();
   await expect(page.getByTestId('category-breakdown')).toBeVisible();
-  await expect(page.getByTestId('recent-transactions')).toBeVisible();
+
+  // 024: an account with no transaction has nothing recent, and the way to the list.
+  const recent = page.getByTestId('recent-transactions');
+  await expect(recent).toContainText('Nenhum lançamento ainda.');
+  await recent.getByRole('link', { name: 'Ver todos os lançamentos' }).click();
+  await expect(page).toHaveURL(/\/transactions$/);
 });
 
 /** Spec E2E test 25. */
@@ -82,7 +85,7 @@ test('an expense lowers the total balance and shows in the month', async ({ page
     account: 'Inter',
     category: 'Alimentação',
     amount: '42.90',
-    date: today(),
+    date: localToday(),
     description: 'Supermercado do painel',
   });
 
@@ -114,7 +117,7 @@ test('an expense added after the dashboard was read shows on it after a client-s
   await page.getByLabel('Conta', { exact: true }).selectOption({ label: 'Inter' });
   await page.getByLabel('Categoria', { exact: true }).selectOption({ label: 'Alimentação' });
   await page.getByLabel('Valor').fill('42.90');
-  await page.getByLabel('Data').fill(today());
+  await page.getByLabel('Data').fill(localToday());
   await page.getByLabel('Descrição').fill('Padaria sem recarregar');
   await page.getByRole('button', { name: 'Criar lançamento' }).click();
   await expect(page.getByRole('button', { name: 'Criar lançamento' })).toBeHidden();
@@ -135,7 +138,7 @@ test('a Transferência moves the balance and leaves the month totals alone', asy
     account: 'Itaú',
     category: 'Alimentação',
     amount: '100.00',
-    date: today(),
+    date: localToday(),
     description: 'Feira',
   });
 
@@ -151,7 +154,7 @@ test('a Transferência moves the balance and leaves the month totals alone', asy
     category: 'Transferência',
     direction: 'Saída',
     amount: '300.00',
-    date: today(),
+    date: localToday(),
     description: 'Pagamento da fatura',
   });
   await createTransaction(page, {
@@ -159,7 +162,7 @@ test('a Transferência moves the balance and leaves the month totals alone', asy
     category: 'Transferência',
     direction: 'Entrada',
     amount: '50.00',
-    date: today(),
+    date: localToday(),
     description: 'Resgate da poupança',
   });
 
@@ -190,14 +193,14 @@ test('the hero shows net worth, its change over the month and the sparkline', as
     account: 'Caixa',
     category: 'Alimentação',
     amount: '100.00',
-    date: lastMonth(),
+    date: localMonthDay(1),
     description: 'Mercado do mês passado',
   });
   await createTransaction(page, {
     account: 'Caixa',
     category: 'Alimentação',
     amount: '42.90',
-    date: today(),
+    date: localToday(),
     description: 'Padaria',
   });
 
@@ -210,4 +213,88 @@ test('the hero shows net worth, its change over the month and the sparkline', as
   await expect(page.getByTestId('net-worth-change-twelve')).toBeHidden();
   await expect(page.getByTestId('hero-invested')).toBeHidden();
   await expect(page.getByTestId('net-worth-chart')).toBeVisible();
+});
+
+/**
+ * 024: with fourteen months of history, last December and the month a year ago are both
+ * in the series, whatever today is. Nothing moved between them and last month, so every
+ * chip is this month's expense.
+ */
+test("with more than a year of history the hero also shows the year's and twelve months' change", async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-net-worth-year'), 'Katherine Johnson');
+  await createAccount(page, 'Caixa', '1.000,00');
+  await createTransaction(page, { account: 'Caixa', category: 'Moradia', amount: '100', date: localMonthDay(14), description: 'Aluguel antigo' });
+  await createTransaction(page, { account: 'Caixa', category: 'Alimentação', amount: '42.90', date: localToday(), description: 'Padaria' });
+
+  await page.goto('/');
+
+  await expect(stat(page, 'net-worth-total')).toHaveText('+857,10');
+  await expect(page.getByTestId('net-worth-change-month')).toHaveText('1 mês −42,90');
+  await expect(page.getByTestId('net-worth-change-year')).toHaveText('No ano −42,90');
+  await expect(page.getByTestId('net-worth-change-twelve')).toHaveText('12 meses −42,90');
+});
+
+/** 024: what each account row says beyond its balance. */
+test('a credit card in debt counts against the total, an account in dollars stays out of it', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-dashboard-accounts'), 'Grace Hopper');
+  await createAccount(page, 'Corrente', '1.000,00');
+  await createAccount(page, 'Cartão', '-500,00', { type: 'CreditCard' });
+  await createAccount(page, 'Conta em dólar', '100,00', { currency: 'USD' });
+
+  await page.goto('/');
+
+  await expect(stat(page, 'total-balance')).toHaveText('+500,00');
+  await expect(stat(page, 'net-worth-total')).toHaveText('+500,00');
+  await expect(accountBalance(page, 'Cartão')).toHaveText('−500,00');
+  await expect(page.locator('[data-testid^="account-balance-"]').filter({ hasText: 'Cartão' })).toContainText('Cartão de crédito');
+  const dollars = page.locator('[data-testid^="account-balance-"]').filter({ hasText: 'Conta em dólar' });
+  await expect(dollars).toContainText('Conta corrente · USD, fora do total');
+  await expect(dollars.getByTestId('amount')).toHaveText('+100,00');
+});
+
+/**
+ * 024: a fixed month, reached with the selector: its totals, how much of the income it
+ * kept, and the breakdown on both sides. A month with nothing says so.
+ */
+test('the month selector shows a past month, what it kept, and both sides of its breakdown', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-dashboard-month'), 'Alan Turing');
+  await createAccount(page, 'Inter');
+  await createTransaction(page, { account: 'Inter', category: 'Salário', amount: '3000', date: '2026-08-05', description: 'Salário de agosto' });
+  await createTransaction(page, { account: 'Inter', category: 'Alimentação', amount: '600', date: '2026-08-10', description: 'Mercado do mês' });
+  await createTransaction(page, { account: 'Inter', category: 'Lazer', amount: '150', date: '2026-08-12', description: 'Show' });
+  await createTransaction(page, { account: 'Inter', category: 'Outras receitas', amount: '500', date: '2026-08-20', description: 'Venda de livros' });
+
+  await page.goto('/');
+
+  // Nothing worth paging to after the current month.
+  await expect(page.getByRole('button', { name: 'Próximo mês' })).toBeDisabled();
+  await showDashboardMonth(page, '2026-08', 'agosto de 2026');
+  await expect(page.getByRole('button', { name: 'Próximo mês' })).toBeEnabled();
+
+  await expect(stat(page, 'month-income')).toHaveText('+3.500,00');
+  await expect(stat(page, 'month-expense')).toHaveText('−750,00');
+  await expect(stat(page, 'month-net')).toHaveText('+2.750,00');
+  await expect(page.getByText('79% do que entrou')).toBeVisible();
+
+  const breakdown = page.getByTestId('category-breakdown');
+  await expect(breakdown).toContainText('Por categoria · agosto de 2026');
+  const rows = breakdown.getByTestId('category-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText(/Alimentação\s*80,0%\s*−600,00/);
+  await expect(rows.nth(1)).toContainText(/Lazer\s*20,0%\s*−150,00/);
+
+  await breakdown.getByRole('button', { name: 'Receitas' }).click();
+  await expect(breakdown.getByRole('button', { name: 'Receitas' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(rows.nth(0)).toContainText(/Salário\s*85,7%\s*\+3\.000,00/);
+  await expect(rows.nth(1)).toContainText(/Outras receitas\s*14,3%\s*\+500,00/);
+
+  await page.getByRole('button', { name: 'Mês anterior' }).click();
+  await expect(page.getByTestId('selected-month')).toHaveText('julho de 2026');
+  await expect(breakdown).toContainText('Nada registrado neste mês.');
+  await expect(stat(page, 'month-income')).toHaveText('+0,00');
+  await expect(page.getByText(/do que entrou/)).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Próximo mês' }).click();
+  await expect(page.getByTestId('selected-month')).toHaveText('agosto de 2026');
+  await expect(stat(page, 'month-net')).toHaveText('+2.750,00');
 });
