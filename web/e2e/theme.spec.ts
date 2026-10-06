@@ -30,6 +30,35 @@ test('the theme chosen is kept across a reload', async ({ page }) => {
 });
 
 /**
+ * Spec 012 decision 3: Sistema, the default, follows the operating system while the
+ * page is open, not only at load; Claro and Escuro overrule it until Sistema is chosen
+ * again.
+ */
+test('Sistema follows the operating system, live', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/login');
+  const html = page.locator('html');
+
+  await expect(page.getByRole('button', { name: 'Sistema' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(html).toHaveClass(/\bdark\b/);
+
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(html).not.toHaveClass(/\bdark\b/);
+
+  await page.getByRole('button', { name: 'Escuro' }).click();
+  await expect(html).toHaveClass(/\bdark\b/);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(html).toHaveClass(/\bdark\b/);
+
+  await page.getByRole('button', { name: 'Sistema' }).click();
+  await expect(html).not.toHaveClass(/\bdark\b/);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Sistema' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(html).not.toHaveClass(/\bdark\b/);
+});
+
+/**
  * 012 amendment 1, test 9: a border colour next to `glass` shows. A new account is
  * selected, and the selected card is outlined in the primary colour, not `--border`.
  */

@@ -1,4 +1,6 @@
-import { expect, type Page } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Establishes a session through the development-only login endpoint, because
@@ -67,10 +69,35 @@ export async function openImportTab(page: Page, account: string) {
   await expect(page.getByRole('heading', { name: '1. Arquivo' })).toBeVisible();
 }
 
+/** A file under ./fixtures, as a path Playwright can upload. */
+export function fixture(name: string) {
+  return fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
+}
+
 /**
- * A transaction by way of the real form. `direction` answers the Saída/Entrada question
- * the form asks only for a Transfer category.
+ * Chooses a statement on the account's import tab, which starts the upload: a fixture by
+ * name, or a file made by the test. The caller waits for the step it expects next.
  */
+export async function uploadStatement(
+  page: Page,
+  account: string,
+  file: string | { name: string; mimeType: string; buffer: Buffer },
+) {
+  await openImportTab(page, account);
+  await page.getByLabel('Escolher arquivo').setInputFiles(typeof file === 'string' ? fixture(file) : file);
+}
+
+/** The import's current step; the history underneath offers the same verbs for other batches. */
+export function importStep(page: Page): Locator {
+  return page.getByTestId('import-step');
+}
+
+/** Confirms the batch in review and waits for the done step. */
+export async function commitImport(page: Page) {
+  await importStep(page).getByRole('button', { name: 'Confirmar importação' }).click();
+  await expect(page.getByRole('heading', { name: '4. Concluído' })).toBeVisible();
+}
+
 /**
  * Narrows the transactions list to a date range. The list opens on the current month,
  * and the fixtures are fixed dates, so a test that looks for its rows shows their month
@@ -81,6 +108,10 @@ export async function showTransactionsBetween(page: Page, from: string, to: stri
   await page.getByLabel('Até', { exact: true }).fill(to);
 }
 
+/**
+ * A transaction by way of the real form. `direction` answers the Saída/Entrada question
+ * the form asks only for a Transfer category.
+ */
 export async function createTransaction(
   page: Page,
   values: {
@@ -152,4 +183,55 @@ export async function syncMarketData(page: Page) {
       { timeout: 15_000 },
     )
     .toBe('Succeeded');
+}
+
+/** A ticker no earlier run registered: the market-data catalogue is shared and never emptied. */
+export function uniqueTicker(prefix: string) {
+  return `${prefix}${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
+}
+
+/** `days` before today in UTC, the API's calendar, as `YYYY-MM-DD`. */
+export function utcDaysAgo(days: number) {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Today on the browser's calendar, `YYYY-MM-DD`: what the dashboard calls the current month. */
+export function localToday() {
+  return localMonthDay(0, new Date().getDate());
+}
+
+/**
+ * Day `day` of the month `monthsBack` months before the browser's current one,
+ * `YYYY-MM-DD`. The 15th by default, which is inside that month whatever today is.
+ */
+export function localMonthDay(monthsBack: number, day = 15) {
+  const date = new Date();
+  date.setDate(1);
+  date.setMonth(date.getMonth() - monthsBack);
+
+  return [date.getFullYear(), date.getMonth() + 1, day].map((part) => String(part).padStart(2, '0')).join('-');
+}
+
+/**
+ * Pages the dashboard's month selector back to `month` (`YYYY-MM`), labelled `label` as
+ * the selector writes it, so a test on fixed dates holds whatever the current month is.
+ * The selector opens on the browser's month, so that is the clock read here.
+ */
+export async function showDashboardMonth(page: Page, month: string, label: string) {
+  const selected = page.getByTestId('selected-month');
+  await expect(selected).toBeVisible();
+
+  const current = await page.evaluate(() => {
+    const now = new Date();
+    return now.getFullYear() * 12 + now.getMonth();
+  });
+  const [year, number] = month.split('-').map(Number);
+  const back = current - (year! * 12 + number! - 1);
+  expect(back, 'the month must not be in the future').toBeGreaterThanOrEqual(0);
+
+  for (let i = 0; i < back; i++) {
+    await page.getByRole('button', { name: 'Mês anterior' }).click();
+  }
+
+  await expect(selected).toHaveText(label);
 }
