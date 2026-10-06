@@ -24,6 +24,12 @@ public static class MarketDataSetup
         services.AddPriceProvider<CoinGeckoProvider>();
         services.AddPriceProvider<TwelveDataProvider>();
         services.AddPriceProvider<BinanceProvider>();
+
+        // 025: a whole history is a megabyte of JSON, a tenth of it compressed. Yahoo's 429 is a
+        // burst to wait out rather than a verdict for the night.
+        services.AddSingleton<YahooPacer>();
+        services.AddPriceProvider<YahooProvider>(retryRateLimits: true)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
         services.AddTransient<IPriceProviderRegistry>(provider => FakesOn(provider)
             ? FakeMarketDataProviders.Registry
             : new PriceProviderRegistry(provider.GetServices<IPriceProvider>()));
@@ -73,10 +79,10 @@ public static class MarketDataSetup
 
     // Transient, like the typed clients: a provider never outlives the handler rotation
     // of the factory.
-    private static IHttpClientBuilder AddPriceProvider<TProvider>(this IServiceCollection services)
+    private static IHttpClientBuilder AddPriceProvider<TProvider>(this IServiceCollection services, bool retryRateLimits = false)
         where TProvider : class, IPriceProvider
     {
-        var builder = services.AddHttpClient<TProvider>().WithResilience();
+        var builder = services.AddHttpClient<TProvider>().WithResilience(retryRateLimits);
         services.AddTransient<IPriceProvider>(provider => provider.GetRequiredService<TProvider>());
         return builder;
     }
@@ -88,12 +94,13 @@ public static class MarketDataSetup
     /// and it lives in a singleton registry, so the circuit outlives each client.
     /// </summary>
     /// <remarks>
-    /// A 429 is neither retried nor counted against the circuit: the adapter turns it into
+    /// A 429 is never counted against the circuit, and is not retried unless
+    /// <paramref name="retryRateLimits"/> (Yahoo, 025): the adapter turns the last one into
     /// <see cref="ProviderRateLimitedException"/> and the sync stops asking that provider
     /// for the rest of the run. Five failures open the circuit: every attempt in the
     /// sampling window failed, and at least five were made.
     /// </remarks>
-    private static IHttpClientBuilder WithResilience(this IHttpClientBuilder builder)
+    private static IHttpClientBuilder WithResilience(this IHttpClientBuilder builder, bool retryRateLimits = false)
     {
         builder.ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan);
         builder.AddResilienceHandler("market-data", (pipeline, context) =>
@@ -107,7 +114,13 @@ public static class MarketDataSetup
                     Delay = settings.RetryBaseDelay,
                     BackoffType = DelayBackoffType.Exponential,
                     UseJitter = true,
-                    ShouldHandle = args => ValueTask.FromResult(IsTransient(args.Outcome)),
+                    ShouldHandle = args => ValueTask.FromResult(
+                        IsTransient(args.Outcome)
+                        || (retryRateLimits && args.Outcome.Result?.StatusCode == HttpStatusCode.TooManyRequests)),
+
+                    // A rate limit's Retry-After can be hours; waiting it out would hold the whole
+                    // run. Three short backoffs, then the provider rests until the next run.
+                    ShouldRetryAfterHeader = !retryRateLimits,
                 })
                 .AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
                 {
