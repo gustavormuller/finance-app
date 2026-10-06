@@ -39,6 +39,7 @@ Each spec contains:
 | 017 | cleanup | comments that earn their place, no dead code |
 | 019 | market-data-keyless | Binance crypto in BRL, a missing key explains itself, the keys guide |
 | 020 | architecture | a review against the ADRs, one home for duplicated logic |
+| 021 | export-transactions | the filtered transactions as a CSV Excel pt-BR opens as a table |
 
 One number per session set. If a feature needs more than three sessions, it was scoped
 too large — split it.

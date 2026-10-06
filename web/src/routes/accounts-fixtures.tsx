@@ -4,7 +4,7 @@ import { render } from '@testing-library/react';
 
 import type { Account, AccountBalance, Category, ImportBatch, Transaction } from '@/api/finance';
 import { routeTree } from '@/routeTree';
-import { stubFetch, type SeenRequest } from '@/test-utils';
+import { stubFetch, type SeenRequest, type StubAnswer } from '@/test-utils';
 
 /**
  * What the accounts page reads, for the tests of `/accounts` and of the import inside
@@ -47,7 +47,7 @@ export interface AccountsApi {
   transactions?: Transaction[];
 }
 
-type Answer = { status?: number; body?: unknown } | undefined;
+type Answer = StubAnswer | undefined;
 
 /**
  * Answers every read the accounts page makes from `state`, which a test may change

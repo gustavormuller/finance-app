@@ -8,8 +8,10 @@ import Amount from '@/components/Amount';
 import Alert from '@/components/Alert';
 import { useCategories } from '@/components/categories/queries';
 import EmptyState from '@/components/EmptyState';
+import { saveFile } from '@/lib/download';
 import { formatDate } from '@/lib/labels';
 import { currentMonth, monthDays } from '@/lib/months';
+import { refusalMessage } from '@/lib/refusal';
 import TransactionForm from '@/components/TransactionForm';
 import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -74,6 +76,14 @@ export default function TransactionsPage() {
     onError: (error: Error) => setFailure(error.message),
   });
 
+  // 021: every row the filter selects, not only this page, as the file the API names.
+  const exporting = useMutation({
+    mutationFn: () => api.exportTransactions(filter),
+    onMutate: () => setFailure(null),
+    onSuccess: ({ blob, fileName }) => saveFile(blob, fileName),
+    onError: (error: Error) => setFailure(refusalMessage(error)),
+  });
+
   const page1 = (change: Partial<typeof filter>) => {
     // Any change to the filter invalidates the page number: page 3 of the old result
     // is not page 3 of the new one, and landing on an empty page reads as a bug.
@@ -95,9 +105,19 @@ export default function TransactionsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-3xl font-semibold tracking-tight">Lançamentos</h2>
 
-        {!creating && !editing && (
-          <Button onClick={() => setCreating(true)}>Novo lançamento</Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={total === 0 || exporting.isPending}
+            onClick={() => exporting.mutate()}
+          >
+            {exporting.isPending ? 'Exportando…' : 'Exportar CSV'}
+          </Button>
+
+          {!creating && !editing && (
+            <Button onClick={() => setCreating(true)}>Novo lançamento</Button>
+          )}
+        </div>
       </div>
 
       {(creating || editing) && (
