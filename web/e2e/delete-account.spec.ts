@@ -74,8 +74,11 @@ test('a delete from a tab whose session ended in another one says so, and delete
   await expect(page).toHaveURL(/\/settings$/);
   await expect(zone.getByRole('button', { name: 'Excluir definitivamente' })).toBeEnabled();
 
-  // Signing in again finds the same account, with what it held.
+  // Signing in again finds the same account, with what it held, and seeds no second set
+  // of default categories.
   await devLogin(page, email, 'Sessão Encerrada');
   await page.goto('/accounts');
   await expect(page.getByRole('heading', { name: 'Ainda aqui', exact: true })).toBeVisible();
+  await page.goto('/categories');
+  await expect(page.getByTestId('category-name')).toHaveCount(9);
 });
