@@ -15,7 +15,9 @@ namespace Finance.Api.Infrastructure.MarketData;
 /// latest close is always 10 (007's E2E reads it as the value), and a buy dated some days
 /// back has a real return (008's E2E test 36). A close depends on the run that fetched it,
 /// since it is counted back from that run's <c>to</c>; the sync never refetches a stored
-/// day. A benchmark series gets one value, 0.05, dated <c>to</c>. None of it means anything.
+/// day. A benchmark series gets 0.05 on every day in <c>[from, to]</c>, so the comparison's
+/// E2E (026) has a CDI to accumulate and a PTAX to convert at; the latest USDBRL is still
+/// 0.05, which 016's E2E reads. None of it means anything.
 /// </remarks>
 public static class FakeMarketDataProviders
 {
@@ -41,6 +43,9 @@ public static class FakeMarketDataProviders
     {
         public Task<IReadOnlyList<DailyValue>> GetSeriesAsync(
             string code, DateOnly from, DateOnly to, CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<DailyValue>>([new DailyValue(to, 0.05m)]);
+            Task.FromResult<IReadOnlyList<DailyValue>>(
+                Enumerable.Range(0, Math.Max(0, to.DayNumber - from.DayNumber + 1))
+                    .Select(i => new DailyValue(from.AddDays(i), 0.05m))
+                    .ToList());
     }
 }

@@ -4,6 +4,8 @@ import type {
   AnalysisStatus,
   CategoryKind,
   CategorySource,
+  CompareCurrency,
+  ComparePeriodKind,
   ImportBatchStatus,
   ImportSource,
   MarketAssetClass,
@@ -198,6 +200,56 @@ export const returnsPeriodLabels: Record<ReturnsPeriodKind, string> = {
 };
 
 export const returnsPeriods: ReturnsPeriodKind[] = ['inception', 'ytd', '12m', 'custom'];
+
+/** 026's periods, short as a finance page writes them; `comparePeriodTitles` spells each out. */
+export const comparePeriodLabels: Record<ComparePeriodKind, string> = {
+  '1m': '1M',
+  '6m': '6M',
+  ytd: 'YTD',
+  '1y': '1A',
+  '5y': '5A',
+  '10y': '10A',
+  max: 'Máx',
+  custom: 'Personalizado',
+};
+
+export const comparePeriodTitles: Record<ComparePeriodKind, string> = {
+  '1m': '1 mês',
+  '6m': '6 meses',
+  ytd: 'No ano',
+  '1y': '1 ano',
+  '5y': '5 anos',
+  '10y': '10 anos',
+  max: 'Desde o começo das séries',
+  custom: 'De uma data a outra',
+};
+
+export const comparePeriods: ComparePeriodKind[] = ['1m', '6m', 'ytd', '1y', '5y', '10y', 'max', 'custom'];
+
+export const compareCurrencyLabels: Record<CompareCurrency, string> = {
+  original: 'Moeda original',
+  BRL: 'Converter para R$',
+  USD: 'Converter para US$',
+};
+
+export const compareCurrencies: CompareCurrency[] = ['original', 'BRL', 'USD'];
+
+/**
+ * The stored benchmark series a comparison offers (026), keyed by the code the API takes, in
+ * the order they are listed. An unknown code is shown as sent.
+ */
+export const compareBenchmarks: { code: string; name: string; description: string }[] = [
+  { code: 'CDI', name: 'CDI', description: 'Taxa DI, acumulada' },
+  { code: 'SELIC', name: 'SELIC', description: 'Taxa Selic, acumulada' },
+  { code: 'IPCA', name: 'IPCA', description: 'Inflação oficial, acumulada' },
+  { code: 'USDBRL', name: 'Dólar (PTAX)', description: 'Reais por dólar, do Banco Central' },
+  { code: 'IVVB11', name: 'S&P 500 (IVVB11)', description: 'ETF do S&P 500 negociado em reais' },
+];
+
+/** How a currency code reads beside a figure: `R$`, `US$`, or the code itself. */
+export function currencySymbol(code: string): string {
+  return code === 'BRL' ? 'R$' : code === 'USD' ? 'US$' : code;
+}
 
 /**
  * `2026-09-13` as `13/09/2026`.

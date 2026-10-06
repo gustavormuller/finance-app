@@ -7,6 +7,7 @@ import './routes/AccountsPage';
 import './routes/AssetPage';
 import './routes/AssetReturnsPage';
 import './routes/CategoriesPage';
+import './routes/ComparePage';
 import './routes/DashboardPage';
 import './routes/ImportPage';
 import './routes/InvestmentsPage';

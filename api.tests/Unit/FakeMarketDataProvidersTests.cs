@@ -48,6 +48,15 @@ public sealed class FakeMarketDataProvidersTests
         Assert.All(closes, close => Assert.InRange(close.Close, 5m, 10m));
     }
 
+    /// <summary>026's E2E compares against CDI and converts at PTAX; 016's reads the latest USDBRL as 0.05.</summary>
+    [Fact]
+    public async Task A_benchmark_series_is_0_05_on_every_day_from_from_to_to()
+    {
+        var values = await FakeMarketDataProviders.Benchmarks.GetSeriesAsync("USDBRL", To.AddDays(-9), To, CancellationToken.None);
+
+        Assert.Equal(Enumerable.Range(0, 10).Select(i => new DailyValue(To.AddDays(-9 + i), 0.05m)), values);
+    }
+
     [Fact]
     public async Task The_same_range_gives_the_same_closes()
     {

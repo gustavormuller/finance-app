@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useNavigate } from '@tanstack/react-router';
-import { House, Landmark, ListOrdered, Settings, Tags, TrendingUp, type LucideIcon } from 'lucide-react';
+import { ChartLine, House, Landmark, ListOrdered, Settings, Tags, TrendingUp, type LucideIcon } from 'lucide-react';
 
 import { useMe } from '../auth/useMe';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ const LINKS: [string, string, LucideIcon][] = [
   ['/transactions', 'Lançamentos', ListOrdered],
   ['/accounts', 'Contas', Landmark],
   ['/investments', 'Investimentos', TrendingUp],
+  ['/compare', 'Comparar', ChartLine],
   ['/categories', 'Categorias', Tags],
   ['/settings', 'Configurações', Settings],
 ];

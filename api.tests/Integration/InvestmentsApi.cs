@@ -1,3 +1,4 @@
+using Finance.Api.Application.Compare;
 using Finance.Api.Application.MarketData;
 using Finance.Api.Application.Returns;
 using Finance.Api.Domain.Investments;
@@ -25,10 +26,12 @@ internal sealed class InvestmentsApi : IAsyncDisposable
             services.AddSingleton<IBenchmarkProvider>(Bcb);
             if (clock is not null)
             {
-                // Only the returns read the fake "today". The host's own clock stays real,
-                // or the session cookie would be issued already expired.
+                // Only the returns and the comparison read the fake "today". The host's own
+                // clock stays real, or the session cookie would be issued already expired.
                 services.AddScoped(provider => new ReturnsQueries(
                     provider.GetRequiredService<AppDbContext>(), clock, provider.GetRequiredService<IOptions<ReturnsOptions>>()));
+                services.AddScoped(provider => new CompareQueries(
+                    provider.GetRequiredService<AppDbContext>(), clock, provider.GetRequiredService<IOptions<MarketDataOptions>>()));
             }
         });
     }
