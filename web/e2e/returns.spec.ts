@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { devLogin, syncMarketData, uniqueEmail } from './support';
+import { devLogin, syncMarketData, uniqueEmail, uniqueTicker, utcDaysAgo } from './support';
 
 /**
  * Spec 008 E2E (test 36), against the real API process and a real PostgreSQL.
@@ -18,21 +18,17 @@ import { devLogin, syncMarketData, uniqueEmail } from './support';
  * (playwright.config.ts): it never races test 26's 202, and it waits out a 429.
  */
 
-/** A ticker no earlier run registered. */
-function uniqueTicker() {
-  return `RET${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-}
+/** `2026-09-13` as the screens write it, `13/09/2026`. */
+const shown = (day: string) => day.split('-').reverse().join('/');
 
-/** `days` before today in UTC, the API's calendar, as `YYYY-MM-DD`. */
-function utcDaysAgo(days: number) {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** Spec E2E test 36, and 016's test 14 on the way. */
+/**
+ * Spec E2E test 36, and 016's test 14 on the way. 024: the hero's No ano, a custom period
+ * and its refusal, and the benchmark table.
+ */
 test('a buy 30 days back shows a non-zero TWR and the comparison chart', async ({ page }) => {
   await devLogin(page, uniqueEmail('e2e-returns'), 'Ada Lovelace');
 
-  const ticker = uniqueTicker();
+  const ticker = uniqueTicker('RET');
   await page.goto('/investments');
   await page.getByRole('button', { name: 'Cadastrar novo ativo' }).click();
   const asset = page.getByRole('form', { name: 'Cadastrar e adicionar ativo' });
@@ -59,6 +55,13 @@ test('a buy 30 days back shows a non-zero TWR and the comparison chart', async (
   await expect(hero.getByTestId('hero-twr')).toHaveText('+2,99%');
   await expect(hero.getByTestId('hero-xirr')).toContainText('+43,05% a.a.');
   await expect(hero.getByTestId('comparison-chart')).toBeVisible();
+  await expect(hero).toContainText(`desde ${shown(utcDaysAgo(30))}`);
+
+  // No ano starts on the 1st of January (the API's UTC year), or at the buy if it is later.
+  const january = `${new Date().getUTCFullYear()}-01-01`;
+  await hero.getByRole('button', { name: 'No ano' }).click();
+  await expect(hero.getByRole('button', { name: 'No ano' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(hero).toContainText(`desde ${shown(utcDaysAgo(30) > january ? utcDaysAgo(30) : january)}`);
 
   await page.getByRole('link', { name: 'Rentabilidade' }).click();
   await expect(page.getByRole('heading', { name: 'Rentabilidade' })).toBeVisible();
@@ -75,13 +78,56 @@ test('a buy 30 days back shows a non-zero TWR and the comparison chart', async (
   await expect(chart).toBeVisible();
   await expect(chart.locator('.recharts-line path')).not.toHaveCount(0);
 
+  // Every benchmark has its row beside the portfolio's. Their figures depend on how many
+  // days of fake series the database has kept, so only the rows are asserted.
+  for (const code of ['CDI', 'SELIC', 'IPCA6', 'USDBRL', 'IVVB11']) {
+    await expect(page.getByTestId(`benchmark-row-${code}`)).toBeVisible();
+  }
+
+  // A reference taken off the chart and put back. CDI has a value from every sync.
+  const references = page.getByRole('group', { name: 'Referências no gráfico' });
+  const lines = chart.locator('.recharts-line');
+  await expect.poll(() => lines.count()).toBeGreaterThanOrEqual(2);
+  const drawn = await lines.count();
+  await references.getByRole('button', { name: 'CDI' }).click();
+  await expect(references.getByRole('button', { name: 'CDI' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(lines).toHaveCount(drawn - 1);
+  await references.getByRole('button', { name: 'CDI' }).click();
+  await expect(lines).toHaveCount(drawn);
+
   // A period change refetches, and 12 months clamps to the buy.
   await page.getByRole('button', { name: '12 meses' }).click();
   await expect(page.getByRole('button', { name: '12 meses' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+2,99%');
+
+  // A custom period with no flow in it: 9,80 on its base day (21 days back) to 9,91.
+  await page.getByRole('button', { name: 'Personalizado' }).click();
+  const custom = page.getByRole('form', { name: 'Período personalizado' });
+  await custom.getByLabel('De').fill(utcDaysAgo(20));
+  await custom.getByLabel('Até').fill(utcDaysAgo(10));
+  await custom.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.getByTestId('returns-period')).toHaveText(`${shown(utcDaysAgo(20))} a ${shown(utcDaysAgo(10))} · 11 dias`);
+  await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+1,12%');
+
+  // Dates the wrong way round are refused under the first.
+  await custom.getByLabel('De').fill(utcDaysAgo(5));
+  await custom.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(custom.getByRole('alert')).toHaveText('A data inicial deve ser anterior ou igual à data final.');
+
+  await page.getByRole('button', { name: 'Desde o início' }).click();
   await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+2,99%');
 
   // The asset's own row, and its own page.
   await page.getByRole('link', { name: ticker }).click();
   await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+2,99%');
   await expect(page.getByTestId('comparison-chart')).toBeVisible();
+});
+
+/** 024: with nothing held there is no period to measure. */
+test('with nothing held, the returns page has nothing to measure', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-returns-empty'), 'Grace Hopper');
+  await page.goto('/investments/returns');
+
+  await expect(page.getByText('Nenhuma posição valorizada neste período.')).toBeVisible();
+  await expect(page.getByTestId('returns-period')).toHaveCount(0);
 });

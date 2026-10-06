@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { devLogin, uniqueEmail } from './support';
+import { devLogin, uniqueEmail, uniqueTicker as uniqueTickerWith } from './support';
 
 /**
  * Spec 006 E2E, against the real API process and a real PostgreSQL.
@@ -14,15 +14,13 @@ import { devLogin, uniqueEmail } from './support';
  */
 
 /** A ticker no earlier run registered: the catalogue is shared and never emptied. */
-function uniqueTicker() {
-  return `E2E${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-}
+const uniqueTicker = () => uniqueTickerWith('E2E');
 
 async function registerAsset(
   page: Page,
   ticker: string,
   name: string,
-  { provider = 'Brapi', assetClass = 'StockBr', symbol = ticker } = {},
+  { provider = 'Brapi', assetClass = 'StockBr', symbol = ticker, currency = 'BRL' } = {},
 ) {
   const form = page.getByRole('form', { name: 'Cadastrar ativo' });
   await form.getByLabel('Ticker').fill(ticker);
@@ -31,7 +29,7 @@ async function registerAsset(
   // Exact: "Símbolo no provedor" contains the word too.
   await form.getByLabel('Provedor', { exact: true }).selectOption(provider);
   await form.getByLabel('Símbolo no provedor').fill(symbol);
-  await form.getByLabel('Moeda').selectOption('BRL');
+  await form.getByLabel('Moeda').selectOption(currency);
   await form.getByRole('button', { name: 'Cadastrar ativo' }).click();
 }
 
@@ -53,6 +51,38 @@ test('registers a ticker, finds it by search, and refuses it twice', async ({ pa
 
   await registerAsset(page, ticker, 'De novo');
   await expect(page.getByRole('alert')).toHaveText(`O símbolo '${ticker}' já está cadastrado no provedor Brapi.`);
+});
+
+/** 024: the API's rules for a pair or a currency a provider cannot price, each under its field. */
+test('a registration a provider cannot price is refused under the field that is wrong', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-market-refused'), 'Grace Hopper');
+  await page.goto('/market-data');
+  const form = page.getByRole('form', { name: 'Cadastrar ativo' });
+  const under = (label: string) => form.locator('div').filter({ has: page.getByLabel(label, { exact: true }) }).getByRole('alert');
+
+  await registerAsset(page, uniqueTicker(), 'Par em dólar', { provider: 'Binance', assetClass: 'Crypto', symbol: 'BTCUSDT' });
+  await expect(under('Símbolo no provedor')).toHaveText('Use um par da Binance cotado em reais, terminado em BRL (ex.: BTCBRL).');
+
+  await registerAsset(page, uniqueTicker(), 'Binance em dólar', {
+    provider: 'Binance',
+    assetClass: 'Crypto',
+    symbol: 'BTCBRL',
+    currency: 'USD',
+  });
+  await expect(under('Moeda')).toHaveText('Ativos da Binance são cotados em BRL.');
+
+  await registerAsset(page, uniqueTicker(), 'CoinGecko em reais', { provider: 'CoinGecko', assetClass: 'Crypto', symbol: 'bitcoin' });
+  await expect(under('Moeda')).toHaveText('Ativos do CoinGecko são cotados em USD.');
+});
+
+test('a search with no match says so', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-market-search'), 'Alan Turing');
+  await page.goto('/market-data');
+
+  await page.getByLabel('Buscar ativo').fill(uniqueTicker());
+  await page.getByRole('button', { name: 'Buscar' }).click();
+
+  await expect(page.getByText('Nenhum ativo corresponde a esta busca.')).toBeVisible();
 });
 
 /** Spec E2E test 26. */
