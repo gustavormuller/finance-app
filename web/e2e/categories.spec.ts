@@ -59,6 +59,8 @@ test('a category and a subcategory are created, renamed and deleted', async ({ p
 
   await page.getByRole('button', { name: 'Nova categoria' }).click();
   await page.getByLabel('Nome').fill('Educação');
+  // The kinds are wire members, read in Portuguese.
+  await expect(page.getByLabel('Tipo', { exact: true }).locator('option')).toHaveText(['Receita', 'Despesa', 'Transferência']);
   await expect(page.getByLabel('Tipo', { exact: true })).toHaveValue('Expense');
   await page.getByRole('button', { name: 'Criar categoria' }).click();
   await expect(row(page, 'Educação')).toBeVisible();
@@ -78,10 +80,19 @@ test('a category and a subcategory are created, renamed and deleted', async ({ p
   await expect(row(page, 'Cursos')).toHaveCount(0);
   await parent.click();
 
+  // The edit form opens right under the row it edits, on its values, and is the only form.
   await page.getByRole('button', { name: 'Editar Cursos' }).click();
-  await page.getByLabel('Nome').fill('Cursos online');
+  const formRow = row(page, 'Cursos').locator('xpath=following-sibling::tr[1]');
+  await expect(formRow.getByLabel('Nome')).toHaveValue('Cursos');
+  await expect(page.getByLabel('Nome')).toHaveCount(1);
+  await formRow.getByLabel('Nome').fill('Cursos online');
   await page.getByRole('button', { name: 'Salvar', exact: true }).click();
   await expect(row(page, 'Cursos online')).toBeVisible();
+
+  // A search that matches a subcategory keeps its main category beside it.
+  await page.getByLabel('Buscar categoria').fill('online');
+  await expect(names(page)).toHaveText(['Educação', 'Cursos online']);
+  await page.getByLabel('Buscar categoria').fill('');
 
   // The transaction form offers it with its main category's name in front.
   await page.goto('/transactions');
@@ -116,9 +127,15 @@ test('a name in use and a category with transactions are refused with the reason
   await expect(page.getByRole('alert')).toHaveText("'Alimentação' ainda tem 1 lançamento(s). Recategorize-os ou exclua-os antes.");
   await expect(row(page, 'Alimentação')).toBeVisible();
 
-  // A kind left with no category says so instead of showing an empty table.
+  // A kind left with no category says so instead of showing an empty table, and a new
+  // category of that kind fills it.
   await page.getByRole('button', { name: 'Excluir Transferência' }).click();
   await expect(kind(page, 'Transferências')).toContainText('Nenhuma categoria deste tipo.');
+  await page.getByRole('button', { name: 'Nova categoria' }).click();
+  await page.getByLabel('Nome').fill('Entre contas');
+  await page.getByLabel('Tipo', { exact: true }).selectOption({ label: 'Transferência' });
+  await page.getByRole('button', { name: 'Criar categoria' }).click();
+  await expect(kind(page, 'Transferências').getByTestId('category-name')).toHaveText(['Entre contas']);
 });
 
 /**

@@ -41,9 +41,14 @@ test('Sistema follows the operating system, live', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: 'Sistema' })).toHaveAttribute('aria-pressed', 'true');
   await expect(html).toHaveClass(/\bdark\b/);
+  // Spec 022 test 5: the toolbar follows the theme applied under Sistema too.
+  const themeColors = page.locator('meta[name="theme-color"]');
+  await expect(themeColors.first()).toHaveAttribute('content', '#0b0c12');
+  await expect(themeColors.last()).toHaveAttribute('content', '#0b0c12');
 
   await page.emulateMedia({ colorScheme: 'light' });
   await expect(html).not.toHaveClass(/\bdark\b/);
+  await expect(themeColors.first()).toHaveAttribute('content', '#f1f2f7');
 
   await page.getByRole('button', { name: 'Escuro' }).click();
   await expect(html).toHaveClass(/\bdark\b/);

@@ -63,6 +63,7 @@ test('with AI on, "Sugerir com IA" changes the preview rows in place (fake provi
 
   await expect(importStep(page).getByRole('status')).toHaveText('3 categorias sugeridas pela IA.');
   await expect(page.getByTestId('ai-marker')).toHaveCount(3);
+  await expect(page.getByTestId('ai-marker').first()).toHaveAccessibleName('Sugerida pela IA');
   // The fake answers each row's kind with its first category that is not a default.
   await expect(firstRow.locator('option:checked')).toHaveText('Alimentação');
   await expect(
@@ -156,6 +157,17 @@ test('"Gerar análise" on the dashboard fills the card with the month\'s analysi
 
   await page.getByRole('link', { name: 'Configurações' }).click();
   await expect(page.getByTestId('ai-spend')).toContainText('2 chamadas');
+
+  // With AI off again, the month's analysis stays readable and only Regenerar says why it is off.
+  await switchAi(page, false);
+  await page.goto('/');
+  await showDashboardMonth(page, FIXTURE_MONTH.key, FIXTURE_MONTH.label);
+  await expect(content).toContainText(`Análise de teste de ${FIXTURE_MONTH.key}`);
+  const regenerate = card.getByRole('button', { name: 'Regenerar' });
+  await expect(regenerate).toBeDisabled();
+  await expect(regenerate).toHaveAccessibleDescription(
+    'A IA está desligada na sua conta. Ligue-a em Configurações para gerar a análise.',
+  );
 });
 
 /** 024: with AI off, both of its buttons stay on screen, disabled, saying where to turn it on. */
@@ -184,9 +196,26 @@ test('the AI switch is saved both ways, beside its spend and what it sends', asy
   await page.goto('/settings');
 
   await expect(page.getByTestId('ai-spend')).toHaveText(/^R\$\s0,00 de R\$\s15,00 em [a-zç]+ de \d{4} · 0 chamadas$/);
+
+  // 009 decision 10: what leaves the server, and to whom, beside the switch.
   const disclosure = page.getByTestId('ai-disclosure');
   for (const heading of ['O que é enviado ao provedor de IA', 'Sugerir com IA, na importação', 'Análise do mês, no painel']) {
     await expect(disclosure.getByRole('heading', { name: heading })).toBeVisible();
+  }
+  for (const phrase of [
+    'Anthropic (Claude) ou a OpenAI (ChatGPT)',
+    'Com a IA desligada, nada é enviado.',
+    'normalizada: em maiúsculas, sem acentos e sem números',
+    'se cada uma dessas linhas é um débito ou um crédito',
+    'os nomes das suas categorias.',
+    'Não são enviados valores, datas nem contas.',
+    'os nomes, tipos e saldos das suas contas',
+    'nos três últimos meses',
+    'Um PIX enviado a uma pessoa leva o nome dela.',
+    'os três totais da sua carteira de investimentos',
+    'Não são enviados lançamentos um a um, descrições originais, datas nem descrições de receitas.',
+  ]) {
+    await expect(disclosure).toContainText(phrase);
   }
 
   await switchAi(page, true);

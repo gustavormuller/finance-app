@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import {
@@ -46,7 +48,16 @@ test('an OFX is uploaded, reviewed, committed and its rows appear in the list', 
   await createAccount(page, 'Nubank');
   await createTransaction(page, { account: 'Nubank', category: 'Lazer', amount: '30', date: '2026-09-04', description: 'Lançado à mão' });
 
-  await uploadOfx(page, 'Nubank');
+  // The tab is the account's: it names it, and asks for no account. The list of accounts
+  // stays beside the file step and steps aside for the review's table (015).
+  await openImportTab(page, 'Nubank');
+  await expect(page.getByText('Arraste aqui o extrato da conta Nubank')).toBeVisible();
+  await expect(page.getByLabel('Conta', { exact: true })).toHaveCount(0);
+  const accounts = page.getByRole('list', { name: 'Suas contas' });
+  await expect(accounts).toBeVisible();
+  await page.getByLabel('Escolher arquivo').setInputFiles(fixture('extrato.ofx'));
+  await expect(page.getByRole('heading', { name: '3. Revisão' })).toBeVisible();
+  await expect(accounts).toBeHidden();
 
   await expect(page.getByTestId('preview-counts')).toHaveText(/3 prontas · 0 duplicadas · 0 inválidas · 3 a importar/);
   await expect(page.getByRole('row', { name: /NETFLIX\.COM/ })).toBeVisible();
@@ -62,6 +73,16 @@ test('an OFX is uploaded, reviewed, committed and its rows appear in the list', 
   await expect(page.getByRole('row', { name: /EMPRESA LTDA/ }).getByTestId('amount')).toHaveText('+3.000,00');
   await expect(page.getByRole('row', { name: /PAG\*IFOOD/ }).getByTestId('amount')).toHaveText('−1.234,56');
   await expect(page.getByRole('row', { name: /Lançado à mão/ })).toHaveCount(0);
+
+  // Exported from here, the file is that import's rows, whatever their dates (021).
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar CSV' }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe('lancamentos.csv');
+  const exported = (await readFile(await download.path())).toString('utf8');
+  expect(exported.split('\r\n').filter((line) => line !== '').length).toBe(4);
+  expect(exported).toContain('NETFLIX.COM');
+  expect(exported).not.toContain('Lançado à mão');
 
   await page.getByRole('link', { name: 'Mostrar todos' }).click();
   await expect(page.getByText('Mostrando apenas os lançamentos de uma importação.')).toHaveCount(0);
@@ -170,6 +191,17 @@ for (const file of ['bb-extrato.xlsx', 'bb-extrato-2026-08.xls']) {
     await expect(preview.getByText('3 ago 2026')).toBeVisible();
     await expect(preview.getByText('−187,43')).toBeVisible();
 
+    // Typed cells arrive written in the declared number format, so a change of format is
+    // a new preview from the API, read the same way.
+    await expect(importStep(page)).toContainText('Células de data e número da planilha são convertidas para o formato escolhido');
+    const arrived = importStep(page).locator('section').filter({ has: page.getByRole('heading', { name: 'Como o arquivo chegou' }) });
+    await expect(arrived).toContainText('-187,43');
+    await page.getByLabel('Formato dos números').selectOption('en-US');
+    await expect(arrived).toContainText('-187.43');
+    await expect(preview.getByText('−187,43')).toBeVisible();
+    await page.getByLabel('Formato dos números').selectOption('pt-BR');
+    await expect(arrived).toContainText('-187,43');
+
     await page.getByRole('button', { name: 'Continuar' }).click();
 
     await expect(page.getByRole('heading', { name: '3. Revisão' })).toBeVisible();
@@ -221,6 +253,12 @@ test('the account shows the import in its card, and a review in progress is foun
   await expect(card.getByTestId('amount')).toHaveText('+2.709,54');
   await expect(card).toContainText(/Último extrato em \d{2}\/\d{2}/);
   await expect(page.getByTestId('import-history-row')).toHaveCount(1);
+  await expect(page.getByTestId('import-history-row')).toContainText('extrato.ofx');
+
+  // Each account's history is its own.
+  await openImportTab(page, 'Inter');
+  await expect(page.getByText('Nenhuma importação nesta conta ainda.')).toBeVisible();
+  await expect(page.getByTestId('import-history-row')).toHaveCount(0);
 });
 
 /**
@@ -243,6 +281,14 @@ test('the review lets a duplicate in, leaves a row out, refiles one and filters 
 
   const counts = page.getByTestId('preview-counts');
   await expect(counts).toHaveText(/8 prontas · 1 duplicadas · 2 inválidas · 8 a importar/);
+
+  // A row is offered the categories its sign allows, and Transferência, which takes either.
+  const offered = async (text: string) =>
+    (await stagedRow(page, 'Ready', text).getByRole('combobox').locator('option').allTextContents()).sort();
+  expect(await offered('CONTA DE LUZ CEMIG')).toEqual(
+    ['Alimentação', 'Lazer', 'Moradia', 'Outros', 'Saúde', 'Transferência', 'Transporte'].sort(),
+  );
+  expect(await offered('EMPRESA XYZ LTDA')).toEqual(['Outras receitas', 'Salário', 'Transferência'].sort());
 
   // Each change is saved before the next: the rows are disabled until it is. A click and
   // not uncheck(): the tick follows the query cache a moment after the click, not in it.
@@ -295,6 +341,7 @@ test('a statement with debit and credit columns and two-digit years', async ({ p
   await expect(importStep(page)).toContainText('1 linha ignorada acima da tabela.');
   await page.getByLabel('Formato da data').fill('dd/MM/yy');
   await page.getByLabel('Sinal').selectOption('DebitCredit');
+  await expect(page.getByLabel('Coluna de valor')).toHaveCount(0);
   await page.getByLabel('Coluna de data').selectOption('Data');
   await page.getByLabel('Coluna de débito').selectOption('Débito (R$)');
   await page.getByLabel('Coluna de crédito').selectOption('Crédito (R$)');
@@ -472,6 +519,8 @@ test("next month's statement: the overlap is duplicate, a dollar row is invalid,
   await expect(page.getByTestId('preview-counts')).toHaveText(/6 prontas · 5 duplicadas · 1 inválidas · 6 a importar/);
   await expect(stagedRow(page, 'Invalid', 'AMAZON.COM')).toContainText('Moeda diferente da conta (USD)');
   await expect(stagedRow(page, 'Ready', 'NETFLIX.COM').getByRole('combobox').locator('option:checked')).toHaveText('Lazer');
+  // Filed by history, not by the AI: no marker.
+  await expect(stagedRow(page, 'Ready', 'NETFLIX.COM').getByTestId('ai-marker')).toHaveCount(0);
 
   await commitImport(page);
   await expect(page.getByTestId('commit-summary')).toHaveText('6 lançamentos importados');

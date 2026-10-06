@@ -48,9 +48,27 @@ test('registers a ticker, finds it by search, and refuses it twice', async ({ pa
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText(ticker);
   await expect(rows.first()).toContainText('Ativo de teste E2E');
+  await expect(rows.first()).toContainText('Ação (B3)');
+  await expect(rows.first()).toContainText(`brapi (${ticker})`);
 
   await registerAsset(page, ticker, 'De novo');
   await expect(page.getByRole('alert')).toHaveText(`O símbolo '${ticker}' já está cadastrado no provedor Brapi.`);
+
+  // 019: each provider says what it prices, and a Binance pair is stored in capitals.
+  const form = page.getByRole('form', { name: 'Cadastrar ativo' });
+  await expect(form.getByLabel('Provedor', { exact: true }).locator('option')).toHaveText([
+    'brapi (B3: ações, FIIs, ETFs)',
+    'CoinGecko (cripto)',
+    'Twelve Data (ações dos EUA)',
+    'Binance (cripto em reais)',
+  ]);
+  const pair = uniqueTicker();
+  await registerAsset(page, pair, 'Par em minúsculas', { provider: 'Binance', assetClass: 'Crypto', symbol: `${pair.toLowerCase()}brl` });
+  await expect(form.getByLabel('Ticker')).toHaveValue('');
+  await page.getByLabel('Buscar ativo').fill(pair);
+  await page.getByRole('button', { name: 'Buscar' }).click();
+  await expect(rows.first()).toContainText(`Binance (${pair}BRL)`);
+  await expect(rows.first()).toContainText('Criptomoeda');
 });
 
 /** 024: the API's rules for a pair or a currency a provider cannot price, each under its field. */
@@ -73,6 +91,7 @@ test('a registration a provider cannot price is refused under the field that is 
 
   await registerAsset(page, uniqueTicker(), 'CoinGecko em reais', { provider: 'CoinGecko', assetClass: 'Crypto', symbol: 'bitcoin' });
   await expect(under('Moeda')).toHaveText('Ativos do CoinGecko são cotados em USD.');
+  await expect(page.getByText('One or more validation errors occurred.')).toHaveCount(0);
 });
 
 test('a search with no match says so', async ({ page }) => {

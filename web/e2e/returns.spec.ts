@@ -70,6 +70,8 @@ test('a buy 30 days back shows a non-zero TWR and the comparison chart', async (
   // no fees, the XIRR is that return over 30 days, a year's rate: (1000/971)^(365/30) - 1.
   await expect(page.getByTestId('returns-period')).toContainText('30 dias');
   await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+2,99%');
+  // Under a year the TWR is the period's alone; the XIRR is always a year's rate.
+  await expect(page.getByTestId('headline-twr')).not.toContainText('a.a.');
   await expect(page.getByTestId('headline-xirr').getByTestId('headline-value')).toHaveText('+43,05% a.a.');
   await expect(page.getByTestId('benchmark-row-portfolio')).toContainText('+2,99%');
 
@@ -109,18 +111,25 @@ test('a buy 30 days back shows a non-zero TWR and the comparison chart', async (
   await expect(page.getByTestId('returns-period')).toHaveText(`${shown(utcDaysAgo(20))} a ${shown(utcDaysAgo(10))} · 11 dias`);
   await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+1,12%');
 
-  // Dates the wrong way round are refused under the first.
+  // One day is written in the singular.
+  await custom.getByLabel('De').fill(utcDaysAgo(10));
+  await custom.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.getByTestId('returns-period')).toHaveText(`${shown(utcDaysAgo(10))} a ${shown(utcDaysAgo(10))} · 1 dia`);
+
+  // Dates the wrong way round are refused under the first, never with the 400's English title.
   await custom.getByLabel('De').fill(utcDaysAgo(5));
   await custom.getByRole('button', { name: 'Aplicar' }).click();
   await expect(custom.getByRole('alert')).toHaveText('A data inicial deve ser anterior ou igual à data final.');
+  await expect(page.getByText('One or more validation errors occurred.')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Desde o início' }).click();
   await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+2,99%');
 
-  // The asset's own row, and its own page.
+  // The asset's own row, and its own page. A BRL asset has no FX split.
   await page.getByRole('link', { name: ticker }).click();
   await expect(page.getByTestId('headline-twr').getByTestId('headline-value')).toContainText('+2,99%');
   await expect(page.getByTestId('comparison-chart')).toBeVisible();
+  await expect(page.getByTestId('fx-split')).toHaveCount(0);
 });
 
 /** 024: with nothing held there is no period to measure. */

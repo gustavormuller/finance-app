@@ -50,7 +50,10 @@ function underMovementField(page: Page, label: string) {
 }
 
 /** A movement through the real form, dated today (its default). */
-async function recordMovement(page: Page, values: { kind: string; quantity?: string; unitPrice?: string; amount?: string; fees?: string }) {
+async function recordMovement(
+  page: Page,
+  values: { kind: string; quantity?: string; unitPrice?: string; amount?: string; fees?: string; notes?: string },
+) {
   await page.getByRole('button', { name: 'Nova movimentação' }).click();
   const form = page.getByRole('form', { name: 'Movimentação' });
   await form.getByLabel('Tipo').selectOption(values.kind);
@@ -58,6 +61,7 @@ async function recordMovement(page: Page, values: { kind: string; quantity?: str
   if (values.unitPrice !== undefined) await form.getByLabel('Preço unitário').fill(values.unitPrice);
   if (values.amount !== undefined) await form.getByLabel('Valor recebido').fill(values.amount);
   if (values.fees !== undefined) await form.getByLabel('Taxas').fill(values.fees);
+  if (values.notes !== undefined) await form.getByLabel('Observações (opcional)').fill(values.notes);
   await form.getByRole('button', { name: 'Registrar movimentação' }).click();
   // The form closes only once the POST, and the rebuild inside it, have succeeded.
   await expect(form).toBeHidden();
@@ -129,11 +133,17 @@ test('a dividend raises Proventos and leaves the quantity alone', async ({ page 
   await holdHundredPetr4(page, 'e2e-invest-dividend');
   await expect(summaryFigure(page, 'Proventos')).toHaveText('R$ 0,00');
 
-  await recordMovement(page, { kind: 'Dividend', amount: '12,34' });
+  await recordMovement(page, { kind: 'Dividend', amount: '12,34', notes: 'Provento de setembro' });
 
   await expect(summaryFigure(page, 'Proventos')).toHaveText('R$ 12,34');
   await expect(summaryFigure(page, 'Quantidade')).toHaveText('100');
   await expect(summaryFigure(page, 'Valor')).toHaveText('R$ 1.000,00');
+
+  // 024: each movement in Portuguese, with what was paid and the note it was given.
+  const dividend = page.locator('[data-testid^="movement-"]').filter({ hasText: 'Dividendo' });
+  await expect(dividend).toContainText('R$ 12,34');
+  await expect(dividend).toContainText('Provento de setembro');
+  await expect(page.locator('[data-testid^="movement-"]').filter({ hasText: 'Compra' })).toContainText('R$ 9,50');
 });
 
 /**
@@ -158,6 +168,16 @@ test('US$ shows the position and the total at the latest dollar, and survives a 
   await expect(currency.getByRole('button', { name: 'US$' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId(`position-${assetId}`)).toContainText('US$ 20.000,00');
 
+  // 024: the asset's own page follows the choice; its prices, its movements and its value
+  // history stay in reais.
+  await page.getByTestId(`position-${assetId}`).getByRole('link', { name: 'PETR4' }).click();
+  await expect(summaryFigure(page, 'Valor')).toHaveText('US$ 20.000,00');
+  await expect(summaryFigure(page, 'Cotação')).toContainText('R$ 10,00 em');
+  await expect(page.getByTestId('currency-note')).toContainText('US$ 1 = R$ 0,05');
+  await expect(page.getByRole('heading', { name: 'Valor ao longo do tempo, em reais' })).toBeVisible();
+  await expect(page.locator('[data-testid^="movement-"]').filter({ hasText: 'Compra' })).toContainText('R$ 9,50');
+  await page.getByRole('link', { name: '← Investimentos' }).click();
+
   await currency.getByRole('button', { name: 'R$' }).click();
   await expect(page.getByTestId(`position-${assetId}`)).toContainText('R$ 1.000,00');
   await expect(page.getByTestId('currency-note')).toHaveCount(0);
@@ -179,6 +199,9 @@ test('deleting the buy makes the position disappear from the list', async ({ pag
   await page.getByRole('link', { name: '← Investimentos' }).click();
   await expect(page.getByText('Nenhuma posição em aberto.')).toBeVisible();
   await expect(page.getByTestId(`position-${assetId}`)).toHaveCount(0);
+  // 024: with nothing open, nothing contributes and nothing is invested.
+  await expect(page.getByTestId('contributors')).toHaveCount(0);
+  await expect(page.getByTestId('holdings')).toHaveCount(0);
 
   // Hidden, not gone: the asset is still held, at zero.
   await page.getByLabel('Mostrar ativos sem posição (1)').check();
@@ -212,8 +235,17 @@ test('a sell, a JCP, a split and an edit move the position; a delete that uncove
   await recordMovement(page, { kind: 'Jcp', amount: '3,21' });
   await expect(summaryFigure(page, 'Proventos')).toHaveText('R$ 3,21');
 
-  // A split of 50 more units: 100 held at half the average, the same money.
-  await recordMovement(page, { kind: 'Split', quantity: '50' });
+  // A split moves no money, so the form asks only for the quantity: 50 more units, 100 held
+  // at half the average, the same money.
+  await page.getByRole('button', { name: 'Nova movimentação' }).click();
+  const split = page.getByRole('form', { name: 'Movimentação' });
+  await split.getByLabel('Tipo').selectOption('Split');
+  await expect(split.getByLabel('Preço unitário')).toHaveCount(0);
+  await expect(split.getByLabel('Taxas')).toHaveCount(0);
+  await expect(split.getByTestId('movement-total')).toHaveCount(0);
+  await split.getByLabel('Quantidade').fill('50');
+  await split.getByRole('button', { name: 'Registrar movimentação' }).click();
+  await expect(split).toBeHidden();
   await expect(summaryFigure(page, 'Quantidade')).toHaveText('100');
   await expect(summaryFigure(page, 'Preço médio')).toHaveText('R$ 4,7745');
   await expect(summaryFigure(page, 'Valor')).toHaveText('R$ 1.000,00');
@@ -251,7 +283,10 @@ test('a movement the rules refuse is explained under its field', async ({ page }
   await form.getByRole('button', { name: 'Registrar movimentação' }).click();
   await expect(underMovementField(page, 'Quantidade')).toHaveText('Quantidade vendida maior que a posição');
 
+  // Income takes the amount received in place of quantity and price.
   await form.getByLabel('Tipo').selectOption('Dividend');
+  await expect(form.getByLabel('Quantidade')).toHaveCount(0);
+  await expect(form.getByLabel('Preço unitário')).toHaveCount(0);
   await form.getByLabel('Valor recebido').fill('0');
   await form.getByRole('button', { name: 'Registrar movimentação' }).click();
   await expect(underMovementField(page, 'Valor recebido')).toHaveText('Valor deve ser positivo');
@@ -285,6 +320,21 @@ test('an asset found in the catalogue is added once, and removed once nothing is
 
   await devLogin(page, uniqueEmail('e2e-invest-finds'), 'Katherine Johnson');
   await page.goto('/investments');
+
+  // A registration here is validated as on /market-data, each message under its field.
+  await page.getByRole('button', { name: 'Cadastrar novo ativo' }).click();
+  const register = page.getByRole('form', { name: 'Cadastrar e adicionar ativo' });
+  await register.getByLabel('Ticker').fill(uniqueTicker('CGK'));
+  await register.getByLabel('Classe').selectOption('Crypto');
+  await register.getByLabel('Provedor', { exact: true }).selectOption('CoinGecko');
+  await register.getByLabel('Símbolo no provedor').fill('bitcoin');
+  await register.getByRole('button', { name: 'Cadastrar e adicionar' }).click();
+  await expect(
+    register.locator('div').filter({ has: page.getByLabel('Moeda', { exact: true }) }).getByRole('alert'),
+  ).toHaveText('Ativos do CoinGecko são cotados em USD.');
+  await expect(page.getByText('One or more validation errors occurred.')).toHaveCount(0);
+  await register.getByRole('button', { name: 'Cancelar' }).click();
+
   const search = page.getByRole('search').filter({ has: page.getByLabel('Buscar no catálogo') });
   await search.getByLabel('Buscar no catálogo').fill(`${ticker}X`);
   await search.getByRole('button', { name: 'Buscar' }).click();
@@ -335,6 +385,8 @@ test('a new ticker shows "Sem cotação" until a sync prices it', async ({ page 
   await page.getByRole('link', { name: '← Investimentos' }).click();
   const row = page.getByTestId(`position-${assetId}`);
   await expect(row).toContainText('Sem cotação');
+  // Held but never valued: the returns have no period to measure.
+  await expect(page.getByTestId('returns-hero')).toContainText('Nenhuma posição valorizada neste período.');
 
   await syncMarketData(page);
   await expect(async () => {

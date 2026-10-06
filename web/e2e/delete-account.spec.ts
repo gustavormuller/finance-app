@@ -18,11 +18,19 @@ test('a user deletes their account, lands on the login page, and the old session
   const zone = page.getByRole('region', { name: 'Excluir minha conta' });
   const field = zone.getByLabel('Digite seu e-mail para confirmar');
   const button = zone.getByRole('button', { name: 'Excluir definitivamente' });
+
+  // The last section of the page, saying what goes with the account.
+  await expect(page.getByRole('region').last()).toHaveAccessibleName('Excluir minha conta');
+  for (const phrase of ['contas', 'lançamentos', 'importações', 'investimentos', 'análises de IA', 'Não dá para desfazer.']) {
+    await expect(zone).toContainText(phrase);
+  }
   await expect(zone).toContainText(`Para confirmar, digite ${email}.`);
   await expect(button).toBeDisabled();
 
-  await field.fill(email.toUpperCase());
-  await expect(button).toBeDisabled();
+  for (const near of [email.toUpperCase(), email.slice(0, -1), email.replace('example.com', 'example.org')]) {
+    await field.fill(near);
+    await expect(button).toBeDisabled();
+  }
   await field.fill(`  ${email}  `);
   await expect(button).toBeEnabled();
   await button.click();
@@ -64,6 +72,7 @@ test('a delete from a tab whose session ended in another one says so, and delete
 
   await expect(zone.getByRole('alert')).toHaveText('Sua sessão terminou. Entre de novo para excluir a conta.');
   await expect(page).toHaveURL(/\/settings$/);
+  await expect(zone.getByRole('button', { name: 'Excluir definitivamente' })).toBeEnabled();
 
   // Signing in again finds the same account, with what it held.
   await devLogin(page, email, 'Sessão Encerrada');

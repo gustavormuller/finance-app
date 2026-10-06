@@ -59,7 +59,8 @@ test('an account the form or the API refuses says why, under the field', async (
   await form.getByRole('button', { name: 'Criar conta' }).click();
   await expect(form.getByRole('alert')).toHaveText("Já existe uma conta chamada 'Nubank'.");
 
-  // A blank name and a currency that is not ISO 4217: a 400, every rule at once, each under its field.
+  // A blank name and a currency that is not ISO 4217: a 400, every rule at once, each under
+  // its field, and no sentence above the form (never the 400's English title).
   await form.getByLabel('Nome').fill('   ');
   await form.getByLabel('Moeda').fill('BR');
   await form.getByRole('button', { name: 'Criar conta' }).click();
@@ -67,6 +68,8 @@ test('an account the form or the API refuses says why, under the field', async (
   await expect(
     form.getByRole('alert').filter({ hasText: 'A moeda deve ser um código ISO 4217 de três letras maiúsculas.' }),
   ).toBeVisible();
+  await expect(form.getByRole('alert')).toHaveCount(2);
+  await expect(form).not.toContainText('One or more validation errors occurred.');
 
   // A balance that is not a number never leaves the page.
   await form.getByLabel('Nome').fill('Inter');
@@ -101,11 +104,16 @@ test('Detalhes da conta edits the name, the type and the opening balance', async
   await expect(card(page, 'Cartão Nubank')).toContainText('Cartão de crédito · Sem importações');
   await expect(page.getByTestId('accounts-total')).toContainText('-R$ 1.234,56');
 
-  // Saved on the server: the form reopens on the new values.
+  // Saved on the server: the form reopens on the new values, typed the way they are
+  // entered, and saving again without touching them keeps the balance.
   await page.reload();
   await expect(form.getByLabel('Nome')).toHaveValue('Cartão Nubank');
   await expect(form.getByLabel('Tipo')).toHaveValue('CreditCard');
   await expect(form.getByLabel('Saldo inicial')).toHaveValue('-1234,56');
+  await form.getByRole('button', { name: 'Salvar conta' }).click();
+  await expect(page.getByRole('status')).toHaveText('Conta salva.');
+  await page.reload();
+  await expect(page.getByTestId('account-balance')).toHaveText(/R\$\s*−1\.234,56/);
 });
 
 test("the Lançamentos tab lists the account's own rows and leads to all of them", async ({ page }) => {
@@ -121,6 +129,7 @@ test("the Lançamentos tab lists the account's own rows and leads to all of them
   const rows = page.locator('[data-testid^="account-transaction-"]');
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText('Mercado do Nubank');
+  await expect(rows).toContainText('10/09/2026 · Alimentação');
   await expect(rows.getByTestId('amount')).toHaveText('−42,00');
 
   await page.getByRole('link', { name: 'Ver todos os lançamentos da conta' }).click();
@@ -137,6 +146,13 @@ test('the tab is in the address: a reload and another account keep it', async ({
   await devLogin(page, uniqueEmail('e2e-accounts-address'), 'Grace Hopper');
   await createAccount(page, 'Primeira');
   await createAccount(page, 'Segunda');
+
+  // The old /import address, with nothing in review, opens the first account too, and an
+  // opening balance left empty is zero.
+  await page.goto('/import');
+  await expect(page).toHaveURL(/\/accounts\/[^/?]+$/);
+  await expect(page.getByRole('heading', { name: 'Primeira', exact: true })).toBeVisible();
+  await expect(page.getByTestId('account-balance')).toHaveText(/R\$\s*\+0,00/);
 
   // `/accounts` alone opens the first account, in the tab asked for.
   await page.goto('/accounts?tab=details');

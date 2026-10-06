@@ -126,6 +126,19 @@ test('editing a transaction updates its row', async ({ page }) => {
 
   await expect(edited.getByTestId('amount')).toHaveText('+61,90');
   await expect(edited).toContainText('Outras receitas');
+
+  // A transfer that arrived opens on its own direction.
+  await createTransaction(page, {
+    account: 'Cash',
+    category: 'Transferência',
+    direction: 'Entrada',
+    amount: '200',
+    date: '2026-09-11',
+    description: 'Resgate',
+  });
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
+  await page.getByRole('row', { name: /Resgate/ }).getByRole('button', { name: 'Editar' }).click();
+  await expect(page.getByRole('radio', { name: 'Entrada' })).toBeChecked();
 });
 
 /** 024: deleting asks nothing and takes only that row. */
@@ -234,8 +247,20 @@ test('the form checks what it can before sending, and Cancelar writes nothing', 
   await page.getByRole('button', { name: 'Criar lançamento' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Informe um número.' })).toBeVisible();
 
+  // The categories come grouped by kind, and only a Transferência asks for a direction,
+  // Saída unless told otherwise.
+  const category = page.getByLabel('Categoria', { exact: true });
+  expect(await category.locator('optgroup').evaluateAll((groups) => groups.map((group) => group.getAttribute('label')))).toEqual([
+    'Receita',
+    'Despesa',
+    'Transferência',
+  ]);
+  await category.selectOption({ label: 'Transferência' });
+  await expect(page.getByRole('radio', { name: 'Saída' })).toBeChecked();
+  await category.selectOption({ label: 'Lazer' });
+  await expect(page.getByRole('radio', { name: 'Saída' })).toHaveCount(0);
+
   await page.getByLabel('Conta', { exact: true }).selectOption({ label: 'Nubank' });
-  await page.getByLabel('Categoria', { exact: true }).selectOption({ label: 'Lazer' });
   await page.getByLabel('Valor').fill('12,5');
   await page.getByLabel('Data').fill('2026-09-20');
   await page.getByLabel('Descrição').fill('Nunca enviado');
@@ -246,8 +271,11 @@ test('the form checks what it can before sending, and Cancelar writes nothing', 
 
   // The same values, sent this time: a comma is a decimal separator, as the app writes money.
   await createTransaction(page, { account: 'Nubank', category: 'Lazer', amount: '12,5', date: '2026-09-20', description: 'Enviado' });
+  // A minus typed anyway does not turn an income into an expense: the sign is the category's.
+  await createTransaction(page, { account: 'Nubank', category: 'Outras receitas', amount: '-100', date: '2026-09-21', description: 'Reembolso' });
   await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
   await expect(page.getByRole('row', { name: /Enviado/ }).getByTestId('amount')).toHaveText('−12,50');
+  await expect(page.getByRole('row', { name: /Reembolso/ }).getByTestId('amount')).toHaveText('+100,00');
 });
 
 /** 024: a rule only the API knows, refused with the API's own sentence. */

@@ -26,6 +26,10 @@ test('the login page explains each way a sign-in can come back, and nothing else
     auth_failed: 'Não foi possível concluir a entrada. Tente de novo; se continuar acontecendo, o problema é do nosso lado.',
   };
 
+  await page.goto('/login');
+  await expect(page.getByRole('link', { name: 'Entrar com o Google' })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+
   for (const [code, message] of Object.entries(messages)) {
     await page.goto(`/login?error=${code}`);
     await expect(page.getByRole('alert')).toHaveText(message);
