@@ -1,20 +1,26 @@
-import { createRootRoute, createRoute } from '@tanstack/react-router';
+import { createRootRoute, createRoute, lazyRouteComponent } from '@tanstack/react-router';
 
 import { accountTabs, type AccountTab } from './lib/accounts';
-import AccountPage from './routes/AccountPage';
-import AccountsPage, { FirstAccount } from './routes/AccountsPage';
-import AssetPage from './routes/AssetPage';
-import AssetReturnsPage from './routes/AssetReturnsPage';
-import CategoriesPage from './routes/CategoriesPage';
-import DashboardPage from './routes/DashboardPage';
-import ImportPage from './routes/ImportPage';
-import InvestmentsPage from './routes/InvestmentsPage';
 import LoginPage from './routes/LoginPage';
-import MarketDataPage from './routes/MarketDataPage';
 import ProtectedLayout from './routes/ProtectedLayout';
-import ReturnsPage from './routes/ReturnsPage';
-import SettingsPage from './routes/SettingsPage';
-import TransactionsPage from './routes/TransactionsPage';
+
+// 018: each page is its own chunk, fetched when the route is first entered, so the
+// sign-in page and the shell do not wait for every page and the charts library. The
+// sign-in page and the layout stay in the entry chunk: one is the first thing a visitor
+// sees, the other frames every page.
+const AccountPage = lazyRouteComponent(() => import('./routes/AccountPage'));
+const AccountsPage = lazyRouteComponent(() => import('./routes/AccountsPage'));
+const FirstAccount = lazyRouteComponent(() => import('./routes/AccountsPage'), 'FirstAccount');
+const AssetPage = lazyRouteComponent(() => import('./routes/AssetPage'));
+const AssetReturnsPage = lazyRouteComponent(() => import('./routes/AssetReturnsPage'));
+const CategoriesPage = lazyRouteComponent(() => import('./routes/CategoriesPage'));
+const DashboardPage = lazyRouteComponent(() => import('./routes/DashboardPage'));
+const ImportPage = lazyRouteComponent(() => import('./routes/ImportPage'));
+const InvestmentsPage = lazyRouteComponent(() => import('./routes/InvestmentsPage'));
+const MarketDataPage = lazyRouteComponent(() => import('./routes/MarketDataPage'));
+const ReturnsPage = lazyRouteComponent(() => import('./routes/ReturnsPage'));
+const SettingsPage = lazyRouteComponent(() => import('./routes/SettingsPage'));
+const TransactionsPage = lazyRouteComponent(() => import('./routes/TransactionsPage'));
 
 // No component: the default root renders an Outlet, and the application shell lives
 // in App.tsx, outside the router.

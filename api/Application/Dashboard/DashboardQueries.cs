@@ -127,6 +127,8 @@ public sealed class DashboardQueries(AppDbContext database)
     /// month's <c>Accounts</c> is that total as it stood on the month's last day.
     /// <c>Investments</c> takes each asset's latest <c>PortfolioDaily</c> row on or
     /// before that day, one backwards probe of the primary key per month and asset.
+    /// The first portfolio row is likewise one forward probe per asset: a plain MIN over
+    /// the user's rows read all of them, and <c>bounds</c> is evaluated twice.
     /// The series opens at the first month with a transaction or a portfolio row, or
     /// at the last month when opening balances are all there is (they have no date),
     /// and never before the window.
@@ -147,9 +149,16 @@ public sealed class DashboardQueries(AppDbContext database)
         bounds AS (
             SELECT LEAST(
                        (SELECT min(f."Start") FROM flows f),
-                       (SELECT date_trunc('month', min(d."Date")::timestamp)::date
-                        FROM "PortfolioDaily" d
-                        WHERE d."UserId" = @userId),
+                       (SELECT date_trunc('month', min(first."Date")::timestamp)::date
+                        FROM "Assets" s
+                        CROSS JOIN LATERAL (
+                            SELECT d."Date"
+                            FROM "PortfolioDaily" d
+                            WHERE d."UserId" = @userId AND d."AssetId" = s."Id"
+                            ORDER BY d."Date"
+                            LIMIT 1
+                        ) first
+                        WHERE s."UserId" = @userId),
                        (SELECT make_date(@toYear, @toMonth, 1) WHERE EXISTS (SELECT 1 FROM included))
                    ) AS "Start"
         ),
