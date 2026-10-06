@@ -23,6 +23,7 @@ public static class MarketDataSetup
         services.AddPriceProvider<BrapiProvider>();
         services.AddPriceProvider<CoinGeckoProvider>();
         services.AddPriceProvider<TwelveDataProvider>();
+        services.AddPriceProvider<BinanceProvider>();
         services.AddTransient<IPriceProviderRegistry>(provider => FakesOn(provider)
             ? FakeMarketDataProviders.Registry
             : new PriceProviderRegistry(provider.GetServices<IPriceProvider>()));

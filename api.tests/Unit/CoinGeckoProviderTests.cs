@@ -72,6 +72,30 @@ public sealed class CoinGeckoProviderTests
         Assert.Empty(await Provider(handler).GetDailyClosesAsync("no-such-coin", From, To, CancellationToken.None));
     }
 
+    /// <summary>019 test 15: keyless works today; if CoinGecko starts refusing it, the run names the demo key.</summary>
+    [Fact]
+    public async Task A_refusal_with_no_demo_key_configured_is_a_missing_key_naming_the_setting()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.Unauthorized, """{"status":{"error_code":401,"error_message":"unauthorized"}}""");
+
+        var error = await Assert.ThrowsAsync<ProviderKeyMissingException>(() =>
+            new CoinGeckoProvider(handler.Client(), Microsoft.Extensions.Options.Options.Create(Keyless()), new FixedClock(Now))
+                .GetDailyClosesAsync("bitcoin", From, To, CancellationToken.None));
+
+        Assert.Equal(("CoinGecko", "bitcoin", "MarketData:CoinGecko:DemoKey"), (error.Provider, error.Symbol, error.Setting));
+    }
+
+    [Fact]
+    public async Task A_refusal_with_a_demo_key_configured_is_the_key_refused()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.Unauthorized, """{"status":{"error_code":401,"error_message":"unauthorized"}}""");
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(
+            () => Provider(handler).GetDailyClosesAsync("bitcoin", From, To, CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
+    }
+
     [Fact]
     public async Task Too_many_requests_is_rate_limited_not_a_crash()
     {

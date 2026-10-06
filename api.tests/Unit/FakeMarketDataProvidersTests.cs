@@ -16,6 +16,7 @@ public sealed class FakeMarketDataProvidersTests
     [InlineData(ProviderKind.Brapi)]
     [InlineData(ProviderKind.CoinGecko)]
     [InlineData(ProviderKind.TwelveData)]
+    [InlineData(ProviderKind.Binance)]
     public async Task Every_day_from_from_to_to_has_a_close_and_the_close_on_to_is_10(ProviderKind kind)
     {
         var closes = await Closes(kind, To.AddDays(-9), To);

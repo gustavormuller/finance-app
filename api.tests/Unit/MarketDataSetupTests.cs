@@ -18,6 +18,7 @@ public sealed class MarketDataSetupTests
         Assert.IsType<BrapiProvider>(registry.For(ProviderKind.Brapi));
         Assert.IsType<CoinGeckoProvider>(registry.For(ProviderKind.CoinGecko));
         Assert.IsType<TwelveDataProvider>(registry.For(ProviderKind.TwelveData));
+        Assert.IsType<BinanceProvider>(registry.For(ProviderKind.Binance));
         Assert.Equal(
             Enum.GetValues<ProviderKind>().Order(),
             services.GetServices<IPriceProvider>().Select(provider => provider.Kind).Order());
