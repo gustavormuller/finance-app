@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { api, ApiError, type Transaction } from '@/api/finance';
+import { api, type Transaction } from '@/api/finance';
 import { useAccounts } from '@/components/accounts/queries';
 import Amount from '@/components/Amount';
 import Alert from '@/components/Alert';
@@ -11,6 +11,7 @@ import EmptyState from '@/components/EmptyState';
 import { saveFile } from '@/lib/download';
 import { formatDate } from '@/lib/labels';
 import { currentMonth, monthDays } from '@/lib/months';
+import { refusalMessage } from '@/lib/refusal';
 import TransactionForm from '@/components/TransactionForm';
 import { selectClasses } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
@@ -80,10 +81,7 @@ export default function TransactionsPage() {
     mutationFn: () => api.exportTransactions(filter),
     onMutate: () => setFailure(null),
     onSuccess: ({ blob, fileName }) => saveFile(blob, fileName),
-    onError: (error: Error) => {
-      const fields = error instanceof ApiError ? Object.values(error.fields).flat() : [];
-      setFailure(fields.length > 0 ? fields.join(' ') : error.message);
-    },
+    onError: (error: Error) => setFailure(refusalMessage(error)),
   });
 
   const page1 = (change: Partial<typeof filter>) => {
