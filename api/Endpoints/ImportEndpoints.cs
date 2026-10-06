@@ -77,7 +77,7 @@ public static class ImportEndpoints
 
         // The two multipart routes opt out of the framework's antiforgery token check:
         // CSRF is covered by the Origin check every mutating /api request goes
-        // through (002), which runs before these are reached.
+        // through, which runs before these are reached.
         imports.MapPost("/preview-csv", PreviewCsvAsync).DisableAntiforgery();
         imports.MapPost("/", UploadAsync).DisableAntiforgery();
 
@@ -99,7 +99,7 @@ public static class ImportEndpoints
             };
         });
 
-        // 009: rung 3 on the rows the sign default filed. Synchronous (decision 4); the
+        // Rung 3 on the rows the sign default filed. Synchronous (009, decision 4); the
         // gateway times the call out at Ai:Categorisation:TimeoutSeconds.
         imports.MapPost("/{id:guid}/suggest", async (
             Guid id, CategorisationCascade cascade, ILoggerFactory loggers, CancellationToken cancellationToken) =>

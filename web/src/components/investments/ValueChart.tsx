@@ -10,8 +10,7 @@ import { formatMoney } from '@/lib/money';
 const shortDay = (isoDay: string) => formatDate(isoDay).slice(0, 5);
 
 /**
- * The asset's `ValueBrl` per day (spec 007 UI: a simple line, not 008's comparison;
- * 012 draws it over a fill that fades to the ground).
+ * The asset's `ValueBrl` per day: a simple line over a fill that fades to the ground.
  * One series, so no legend: the heading names it. Hovering gives the day's value; the
  * visually hidden table gives the value at each month's last row, since a row per
  * calendar day would be thousands of cells to a screen reader.

@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { accountRefusal, type Refusal } from '@/lib/accounts';
 
 /**
- * `/accounts` (015): the accounts on the left, the selected one on the right (the
+ * `/accounts`: the accounts on the left, the selected one on the right (the
  * outlet, `/accounts/$accountId`). Creating an account happens here, above both, and
  * selects the account it created.
  */

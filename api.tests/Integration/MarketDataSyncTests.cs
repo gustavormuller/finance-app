@@ -8,8 +8,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 006 checkpoint 3: <see cref="MarketDataSync"/>, spec tests 10 to 14, against fake
-/// providers and a real PostgreSQL. The spec files these under Unit, but the sync reads
+/// <see cref="MarketDataSync"/>, spec 006 tests 10 to 14, against fake providers and a
+/// real PostgreSQL. The spec files these under Unit, but the sync reads
 /// and writes through <see cref="AppDbContext"/> (ADR-016) and the upsert is PostgreSQL
 /// SQL, so they need the database.
 /// </summary>

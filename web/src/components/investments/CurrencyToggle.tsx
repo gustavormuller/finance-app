@@ -10,11 +10,11 @@ const OPTIONS: [Currency, string, string][] = [
  * R$ | US$ (016, decision 10): a segmented control like the theme's, in the header of
  * every investments page. The choice is the device's, and every page follows it.
  */
-export default function CurrencyToggle({ className }: { className?: string }): React.JSX.Element {
+export default function CurrencyToggle(): React.JSX.Element {
   const [choice, choose] = useCurrencyChoice();
 
   return (
-    <div role="group" aria-label="Moeda" className={cn('bg-secondary flex items-center gap-0.5 rounded-xl p-1', className)}>
+    <div role="group" aria-label="Moeda" className="bg-secondary flex items-center gap-0.5 rounded-xl p-1">
       {OPTIONS.map(([value, label, title]) => (
         <button
           key={value}

@@ -6,9 +6,9 @@ namespace Finance.Api.Tests.Unit;
 
 /// <summary>
 /// The declared-type half of 006 spec test 9: every value from a provider reaches the
-/// database as <c>decimal</c>. Checkpoint 1 covers the entities and the points the
-/// ports return; the parsers under <c>Infrastructure.MarketData</c> are in the same
-/// scan, so a provider DTO with a <c>double</c> fails here when it is written.
+/// database as <c>decimal</c>. The scan covers the entities, the points the ports return
+/// and the parsers under <c>Infrastructure.MarketData</c>, so a provider DTO with a
+/// <c>double</c> fails here.
 /// </summary>
 public sealed class MarketDataTypesTests
 {

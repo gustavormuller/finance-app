@@ -31,7 +31,7 @@ builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
-// 010: behind Caddy, the browser's scheme and address come from trusted proxies only.
+// Behind Caddy, the browser's scheme and address come from trusted proxies only.
 builder.Services.AddFinanceForwardedHeaders();
 
 builder.Services.AddFinanceAuthentication();
@@ -44,8 +44,6 @@ builder.Services.AddScoped<ImportCommands>();
 // 005's dashboard reads: Dapper on the context's connection (ARCHITECTURE.md section 6).
 builder.Services.AddScoped<DashboardQueries>();
 
-// 006's market-data provider adapters, the MarketData settings, the sync and its
-// nightly job (MarketData:ScheduledSync switches the job off).
 builder.Services.AddMarketDataProviders();
 builder.Services.AddMarketDataSync();
 
@@ -58,7 +56,6 @@ builder.Services.AddScoped<MovementCommands>();
 builder.Services.AddOptions<ReturnsOptions>().BindConfiguration(ReturnsOptions.Section);
 builder.Services.AddScoped<ReturnsQueries>();
 
-// 009's AI settings, the provider port, the budget and the gateway every call goes through.
 builder.Services.AddAi();
 
 var app = builder.Build();
@@ -87,10 +84,8 @@ Require(
     "the directory holding the Data Protection key ring; without one, every restart "
     + "invalidates every session");
 
-// The E2E run's network-free market-data providers never reach another environment.
 MarketDataSetup.RefuseFakeProvidersOutsideDevelopment(app.Configuration, app.Environment);
 
-// Likewise its canned AI provider.
 AiSetup.RefuseFakeProviderOutsideDevelopment(app.Configuration, app.Environment);
 
 // 009's models must each have a price, or a call would cost nothing against the budget.

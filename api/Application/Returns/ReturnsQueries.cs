@@ -50,7 +50,7 @@ public sealed record AssetReturnsView(
 /// <c>[from - 1, to]</c>. That is <c>from - 1</c> whenever something was held then, and the
 /// first contribution's day at inception, where the architecture puts base 100. XIRR opens
 /// on <c>from - 1</c> with each asset's value there (zero at inception), so the first
-/// day's cash counts (DEFERRED, 008 CP1 and CP4).
+/// day's cash counts.
 /// </remarks>
 public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions<ReturnsOptions> options)
 {

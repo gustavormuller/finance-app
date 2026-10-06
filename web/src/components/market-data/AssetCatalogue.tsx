@@ -14,8 +14,8 @@ import { REGISTRATION_FIELDS, readRegistration } from './registration';
 import RegistrationFields from './RegistrationFields';
 
 /**
- * The shared catalogue (spec 006 UI): search it, and register a ticker into it. A 400
- * is shown under the fields it names and a 409 as the API's sentence.
+ * The shared catalogue: search it, and register a ticker into it. A 400 is shown under
+ * the fields it names and a 409 as the API's sentence.
  */
 export default function AssetCatalogue() {
   const queryClient = useQueryClient();

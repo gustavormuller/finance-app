@@ -4,9 +4,9 @@ using Microsoft.Extensions.Configuration;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 009 checkpoint 2: the <c>Ai</c> settings bind from <c>appsettings.json</c>, commit no
-/// key, and are refused when a call could not be priced: a price of zero, or no price at
-/// all, would let every call past the budget (ADR-008).
+/// The <c>Ai</c> settings bind from <c>appsettings.json</c>, commit no key, and are refused
+/// when a call could not be priced: a price of zero, or no price at all, would let every
+/// call past the budget (ADR-008).
 /// </summary>
 public sealed class AiOptionsTests
 {

@@ -49,7 +49,7 @@ const SEPARATORS: Record<AmountCulture, { decimal: string; group: string; symbol
  * A header name first, exact then case-insensitive, then a 0-based index — the
  * same order the API resolves references in.
  */
-export function resolveColumn(reference: string, headers: string[] | null, width: number): number | null {
+function resolveColumn(reference: string, headers: string[] | null, width: number): number | null {
   const wanted = reference.trim();
 
   if (wanted === '') {

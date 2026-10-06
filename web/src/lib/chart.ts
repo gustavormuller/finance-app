@@ -1,5 +1,5 @@
 /**
- * What every Recharts chart shares (012): the tooltip drawn as a solid popover in the
+ * What every Recharts chart shares: the tooltip drawn as a solid popover in the
  * theme's colours, and money formatting for axes and tooltips. Colours are CSS
  * variables, so a chart follows the theme without re-rendering.
  */
@@ -25,6 +25,6 @@ export const money = (value: number) =>
 export const wholeMoney = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 
 /** The category ring's colours, in rank order; past five the rest share the muted ink. */
-export const seriesColours = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
+const seriesColours = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
 export const seriesColour = (index: number) => seriesColours[index] ?? 'var(--muted-foreground)';

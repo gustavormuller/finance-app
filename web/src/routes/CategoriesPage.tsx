@@ -27,7 +27,7 @@ const KIND_FILTERS: [KindFilter, string][] = [
 ];
 
 /**
- * `/categories` (013): one table per kind with each category's use over the last 12
+ * `/categories`: one table per kind with each category's use over the last 12
  * months, main categories and their subcategories in one tree, and every edit on the
  * row being edited — the form opens under it, never at the top of the page.
  */

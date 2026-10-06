@@ -7,8 +7,8 @@ using Finance.Api.Infrastructure.Ai;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 009 checkpoint 2: the E2E run's provider. Fixed, network-free and deterministic; its
-/// token counts follow the request, so the budget and usage paths see real numbers.
+/// The E2E run's provider. Fixed, network-free and deterministic; its token counts follow
+/// the request, so the budget and usage paths see real numbers.
 /// </summary>
 public sealed class FakeAiProviderTests
 {
@@ -83,7 +83,7 @@ public sealed class FakeAiProviderTests
         AiCategorisation.MaxTokensFor(rows.Length));
 
     /// <summary>
-    /// 009 CP4b, for spec tests 18-19 and E2E 28: each row gets the first category of its kind
+    /// For 009 spec tests 18-19 and E2E 28: each row gets the first category of its kind
     /// that is not a sign default, as a model's <c>{ rowId: categoryId }</c> would.
     /// </summary>
     [Fact]

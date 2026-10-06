@@ -11,7 +11,7 @@ import { formatMonth } from '@/lib/months';
 
 import Markdown from './Markdown';
 
-/** Spec 009: "a spinner and polling every 3 s" while the analysis is Pending or Running. */
+/** A spinner and polling every 3 s while the analysis is Pending or Running. */
 export const POLL_MS = 3000;
 
 const inProgress = (analysis: AiAnalysis | undefined) =>
@@ -25,7 +25,7 @@ function describe(error: Error): string {
 }
 
 /**
- * The dashboard's "Análise do mês" (009) for the selected month.
+ * The dashboard's "Análise do mês" for the selected month.
  *
  * The month's row is read from `GET /api/ai/analyses?month=`, which is also what is
  * polled: it answers the same shape as the by-id read, and it still finds the row when

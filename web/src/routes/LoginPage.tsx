@@ -17,7 +17,7 @@ export default function LoginPage() {
   const message = error === undefined ? undefined : MESSAGES[error];
 
   return (
-    // 012: a single glass card in the middle of the page; the product name stays in
+    // A single glass card in the middle of the page; the product name stays in
     // the shell's top bar above it.
     <section className="px-4 py-10 sm:py-20">
       <div className="glass mx-auto max-w-md rounded-2xl p-6 sm:p-8">

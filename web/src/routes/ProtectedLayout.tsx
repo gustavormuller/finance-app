@@ -6,7 +6,7 @@ import { useMe } from '../auth/useMe';
 import { Button } from '@/components/ui/button';
 import RequireAuth from './RequireAuth';
 
-// 015: no "Importar" — a statement is imported from its account, so Contas takes the
+// No "Importar" — a statement is imported from its account, so Contas takes the
 // place the import had.
 const LINKS: [string, string, LucideIcon][] = [
   ['/', 'Início', House],
@@ -21,7 +21,7 @@ const LINKS: [string, string, LucideIcon][] = [
  * The layout route every protected page hangs off. Protection lives in
  * {@link RequireAuth} so it can be tested without a page of its own.
  *
- * 012: a glass sidebar beside the page on a wide screen, a scrolling strip above it on
+ * A glass sidebar beside the page on a wide screen, a scrolling strip above it on
  * a narrow one. Who is signed in, and the way out, close the navigation.
  */
 export default function ProtectedLayout() {

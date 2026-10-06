@@ -4,7 +4,7 @@ import { api, type BreakdownKind } from '@/api/finance';
 import { lastMonths } from '@/lib/months';
 
 /** The series the chart shows. */
-export const SERIES_MONTHS = 12;
+const SERIES_MONTHS = 12;
 
 /**
  * Every dashboard query sits under `['dashboard']`, so one invalidation refreshes the
@@ -33,8 +33,8 @@ export function useMonthly(through: string) {
   });
 }
 
-/** 014: the month-ends the hero's sparkline spans, which covers the 12 meses change too. */
-export const NET_WORTH_MONTHS = 24;
+/** The month-ends the hero's sparkline spans, which covers the 12 meses change too. */
+const NET_WORTH_MONTHS = 24;
 
 /** The net-worth series up to `through`, the local month, read as {@link useMonthly} reads its own. */
 export function useNetWorth(through: string) {

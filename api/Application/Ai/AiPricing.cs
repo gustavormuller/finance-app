@@ -7,7 +7,7 @@ namespace Finance.Api.Application.Ai;
 
 /// <summary>
 /// Prices a call in BRL: the model's USD list prices from <c>Ai:Pricing</c>, at the latest
-/// stored <c>USDBRL</c> (006) or <c>Ai:UsdBrl</c> when there is none.
+/// stored <c>USDBRL</c> or <c>Ai:UsdBrl</c> when there is none.
 /// </summary>
 public sealed class AiPricing(AppDbContext db, IOptions<AiOptions> options)
 {

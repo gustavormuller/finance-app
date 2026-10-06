@@ -332,7 +332,6 @@ public sealed class TransactionEndpointTests(PostgresFixture postgres)
         Assert.Equal("inter travel", Assert.Single(byCategory!.Items).Description);
     }
 
-    /// <summary>Editing and deleting one's own transaction, the ordinary path.</summary>
     [Fact]
     public async Task A_transaction_can_be_edited_and_deleted_by_its_owner()
     {

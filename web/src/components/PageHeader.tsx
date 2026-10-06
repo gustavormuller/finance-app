@@ -1,6 +1,6 @@
 /**
- * A page's title, an optional line under it, and the page's own actions on the right
- * (012). The title stays the page's `<h2>`, which the tests and the outline rely on.
+ * A page's title, an optional line under it, and the page's own actions on the right.
+ * The title stays the page's `<h2>`, which the tests and the outline rely on.
  */
 export default function PageHeader({
   title,

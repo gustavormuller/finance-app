@@ -10,13 +10,10 @@ import HealthRoute from './routes/HealthRoute';
 const queryClient = new QueryClient();
 
 /*
- * The application shell: a top bar that does not change per route, the router's
- * output, and the readiness readout at the bottom.
- *
  * The heading and the readout sit outside the router on purpose. They render on the
  * first paint instead of after the router mounts, and an unauthenticated visit to /
- * ends up on /login — where 001's e2e specs still expect to find both after
- * navigating to /. The theme choice (012) is here too, for the same reason: it has to
+ * ends up on /login — where the smoke and health e2e specs still expect to find both
+ * after navigating to /. The theme choice is here too, for the same reason: it has to
  * be reachable on the sign-in page as well.
  *
  * The navigation is not here: it lives in ProtectedLayout, because it needs the

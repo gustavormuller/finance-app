@@ -5,8 +5,7 @@ namespace Finance.Api.Tests.Unit;
 
 /// <summary>
 /// The declared-type half of 007 spec test 9: every quantity, price, FX rate and
-/// amount in investments is <c>decimal</c> (principle 4). The namespaces 007's later
-/// checkpoints add are in the scan already, so a <c>double</c> fails when written.
+/// amount in investments is <c>decimal</c> (principle 4).
 /// </summary>
 public sealed class InvestmentsTypesTests
 {

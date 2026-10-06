@@ -25,7 +25,7 @@ public sealed class CategoryEndpointTests(PostgresFixture postgres)
         var categories = await user.Client.GetFromJsonAsync<List<TransactionsFixtures.CategoryItem>>(
             "/api/categories", cancellationToken);
 
-        // The eight seeded ones plus the two created here, flat, with the hierarchy
+        // The seeded ones plus the two created here, flat, with the hierarchy
         // expressed by parentId rather than by nesting.
         Assert.Equal(DefaultCategories.All.Count + 2, categories!.Count);
 

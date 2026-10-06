@@ -4,8 +4,8 @@ using Microsoft.Extensions.Configuration;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 006 configuration: the SGS codes and their units are in <c>appsettings.json</c>, beside
-/// each other, and bind. The codes themselves still need checking on the SGS portal.
+/// The SGS codes and their units are in <c>appsettings.json</c>, beside each other, and
+/// bind. The codes themselves still need checking on the SGS portal.
 /// </summary>
 public sealed class MarketDataOptionsTests
 {
@@ -24,7 +24,7 @@ public sealed class MarketDataOptionsTests
                 .Select(pair => (pair.Key, pair.Value.Code, pair.Value.Unit)));
     }
 
-    /// <summary>CP3: the job is on in production; IVVB11 is a brapi price stored as a benchmark level.</summary>
+    /// <summary>The job is on in production; IVVB11 is a brapi price stored as a benchmark level.</summary>
     [Fact]
     public void Appsettings_turns_on_the_nightly_job_and_serves_IVVB11_from_brapi()
     {

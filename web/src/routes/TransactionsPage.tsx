@@ -44,7 +44,7 @@ function isoDay(date: Date) {
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  // Arriving from an import's done step, or from an account (015): show that batch or
+  // Arriving from an import's done step, or from an account: show that batch or
   // that account, whatever the dates, rather than the current month with most of it
   // filtered out.
   const { importBatchId, accountId } = useSearch({ strict: false }) as { importBatchId?: string; accountId?: string };
