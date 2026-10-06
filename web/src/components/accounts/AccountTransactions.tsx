@@ -8,7 +8,7 @@ import { formatDate } from '@/lib/labels';
 const LATEST = 10;
 
 /**
- * "Lançamentos" (015): the account's latest transactions, newest first as the API
+ * "Lançamentos": the account's latest transactions, newest first as the API
  * orders them, and the way to all of them. Under `['transactions']`, so every write to
  * a transaction, and every import, refreshes it.
  */

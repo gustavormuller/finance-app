@@ -99,6 +99,31 @@ public sealed partial class MarketDataSyncTests
         Assert.Equal("O provedor não respondeu a tempo.", SyncSummaryJson.Read(run.Summary)["TwelveData"].Error);
     }
 
+    /// <summary>
+    /// 019 test 20: with no brapi token, BBAS3 is refused and PETR4 still served; the run
+    /// says which setting is empty, and a missing key does not stop the provider as a 429 does.
+    /// </summary>
+    [Fact]
+    public async Task A_missing_key_fails_its_ticker_only_and_names_the_setting()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await AssetAsync(ProviderKind.Brapi, "BBAS3", ct);
+        var keyless = await AssetAsync(ProviderKind.Brapi, "PETR4", ct);
+        brapi.Respond = (symbol, _, to) => symbol == "BBAS3"
+            ? throw new ProviderKeyMissingException("Brapi", symbol, "MarketData:Brapi:Token")
+            : [new(to, 49.26m)];
+
+        var run = await SyncAsync(ct);
+
+        Assert.Equal(SyncRunStatus.PartialFailure, run.Status);
+        Assert.Equal(["BBAS3", "PETR4"], brapi.Calls.Select(call => call.Symbol));
+        await using var db = Context();
+        Assert.Equal([keyless.Id], await db.Set<Price>().Select(price => price.MarketAssetId).ToListAsync(ct));
+        Assert.Equal(
+            [new SyncFailure("BBAS3", "O brapi exige um token para BBAS3. Configure MarketData:Brapi:Token.")],
+            SyncSummaryJson.Read(run.Summary)["Brapi"].Failures);
+    }
+
     /// <summary>A <c>429</c> means back off: the provider's remaining assets wait for the next run.</summary>
     [Fact]
     public async Task A_rate_limited_provider_is_not_asked_again_in_the_same_run()

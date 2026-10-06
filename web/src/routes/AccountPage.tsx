@@ -16,8 +16,8 @@ const TABS: [AccountTab, string][] = [
 ];
 
 /**
- * `/accounts/$accountId` (015): one account's name and balance over its tabs. The tab
- * is the `tab` search parameter, so a reload or a shared link opens the same one.
+ * `/accounts/$accountId`: one account's name and balance over its tabs. The tab is the
+ * `tab` search parameter, so a reload or a shared link opens the same one.
  */
 export default function AccountPage(): React.JSX.Element | null {
   const { accountId } = useParams({ from: '/protected/accounts/$accountId' });

@@ -2,7 +2,7 @@ import type { FxSplit as Split } from '@/api/finance';
 import { formatRate } from '@/lib/rates';
 
 /**
- * Spec 008 "FX decomposition" for a non-BRL asset, over the period: the asset in its own
+ * The FX decomposition of a non-BRL asset over the period: the asset in its own
  * currency, the exchange rate, and the total in reais, `(1 + total) = (1 + native)(1 + fx)`.
  */
 export default function FxSplit({ fx, currency }: { fx: Split; currency: string }) {

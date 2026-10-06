@@ -3,7 +3,7 @@
  *
  * The dashboard always sends the month it means, computed here from the local date:
  * the API's own default is the UTC month, which runs ahead of Brasília for three
- * hours at every month's turn (005 checkpoint 2).
+ * hours at every month's turn.
  */
 
 const MONTH_NAMES = [
@@ -44,6 +44,14 @@ export function shiftMonth(month: string, delta: number): string {
   const index = year * 12 + (number - 1) + delta;
 
   return write(Math.floor(index / 12), ((index % 12) + 12) % 12);
+}
+
+/** The first and last day of `2026-09` as `2026-09-01` and `2026-09-30`. Calendar arithmetic, no time zone. */
+export function monthDays(month: string): { from: string; to: string } {
+  const [year, number] = parts(month);
+  const last = new Date(Date.UTC(year, number, 0)).getUTCDate();
+
+  return { from: `${month}-01`, to: `${month}-${String(last).padStart(2, '0')}` };
 }
 
 /** `2026-09` as `setembro de 2026`. */

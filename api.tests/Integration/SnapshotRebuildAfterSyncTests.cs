@@ -1,7 +1,5 @@
 ﻿using System.Net;
-using System.Net.Http.Json;
 using Finance.Api.Application.MarketData;
-using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Infrastructure.Jobs;
 using Microsoft.EntityFrameworkCore;
@@ -12,9 +10,9 @@ using static Finance.Api.Tests.Integration.TransactionsFixtures;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 007 checkpoint 3b: the rebuild after the market-data sync. Spec integration test 27, the
-/// summary section (counts only: every user sees it), the gaps it fills, and its wiring
-/// after a sync.
+/// The rebuild after the market-data sync. Spec 007 integration test 27, the summary
+/// section (counts only: every user sees it), the gaps it fills, and its wiring after a
+/// sync.
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class SnapshotRebuildAfterSyncTests(PostgresFixture postgres)

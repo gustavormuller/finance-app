@@ -1,3 +1,4 @@
+using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.Returns;
 using Finance.Api.Infrastructure;
@@ -50,7 +51,7 @@ public sealed record AssetReturnsView(
 /// <c>[from - 1, to]</c>. That is <c>from - 1</c> whenever something was held then, and the
 /// first contribution's day at inception, where the architecture puts base 100. XIRR opens
 /// on <c>from - 1</c> with each asset's value there (zero at inception), so the first
-/// day's cash counts (DEFERRED, 008 CP1 and CP4).
+/// day's cash counts.
 /// </remarks>
 public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions<ReturnsOptions> options)
 {
@@ -250,10 +251,8 @@ public sealed class ReturnsQueries(AppDbContext db, TimeProvider clock, IOptions
     /// <summary>USDBRL from the latest rate on or before <paramref name="first"/> to <paramref name="last"/>: 007's FX rule.</summary>
     private async Task<IReadOnlyList<DailyPoint>> UsdBrlAsync(DateOnly first, DateOnly last, CancellationToken cancellationToken)
     {
-        var rates = db.Benchmarks.AsNoTracking().Where(rate => rate.Code == Investments.SnapshotRebuild.UsdBrl && rate.Date <= last);
-        var anchor = await rates.Where(rate => rate.Date <= first).MaxAsync(rate => (DateOnly?)rate.Date, cancellationToken);
-        return await (anchor is { } start ? rates.Where(rate => rate.Date >= start) : rates)
-            .OrderBy(rate => rate.Date).Select(rate => new DailyPoint(rate.Date, rate.Value)).ToListAsync(cancellationToken);
+        var rates = await db.UsdBrlRatesAsync(first, last, cancellationToken);
+        return [.. rates.Select(rate => new DailyPoint(rate.Date, rate.Value))];
     }
 
     private static decimal Round(decimal value, int places = RatePlaces) => Math.Round(value, places, MidpointRounding.ToEven);

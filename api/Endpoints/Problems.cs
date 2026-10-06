@@ -1,13 +1,14 @@
 ﻿using Finance.Api.Application.Ai;
 using Finance.Api.Domain.Transactions;
+using Finance.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Finance.Api.Endpoints;
 
 /// <summary>
-/// The two failure shapes 003's endpoints answer with, in one place so every route
-/// spells them the same way.
+/// The failure shapes the endpoints answer with, in one place so every route spells
+/// them the same way.
 /// </summary>
 /// <remarks>
 /// A rejected field is always a 400 naming the field, never a 403 — including when
@@ -45,16 +46,22 @@ internal static class Problems
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);
     }
 
+    /// <inheritdoc cref="Validation(ReadOnlySpan{RuleViolation?})"/>
+    public static IResult? Validation(IEnumerable<RuleViolation> violations) =>
+        Validation([.. violations.Select(violation => (RuleViolation?)violation)]);
+
     /// <summary>
     /// A refusal the caller could resolve by doing something else first — deleting
     /// the children, moving the transactions, picking another name. The reason is in
     /// the body because the spec asks the UI to show it rather than fail silently.
     /// </summary>
-    public static IResult Conflict(string reason) =>
+    /// <param name="extensions">Members the UI needs to act on the refusal, such as the id of what is in the way.</param>
+    public static IResult Conflict(string reason, IDictionary<string, object?>? extensions = null) =>
         Results.Problem(
             title: "Conflito",
             detail: reason,
-            statusCode: StatusCodes.Status409Conflict);
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: extensions);
 
     /// <summary>
     /// A refusal that resolves itself with time. <c>Retry-After</c> says how long, in
@@ -76,8 +83,8 @@ internal static class Problems
         exception is AiDisabledException or AiBudgetExceededException or AiProviderException;
 
     /// <summary>
-    /// 009: an AI gate or provider failure as the pt-BR problem its status stands for: 403
-    /// AI off, 402 budget spent, 504 timed out, 502 any other provider failure. Never the
+    /// An AI gate or provider failure as the pt-BR problem its status stands for: 403 AI
+    /// off, 402 budget spent, 504 timed out, 502 any other provider failure. Never the
     /// exception's message, which is English and may name the model.
     /// </summary>
     public static IResult Ai(Exception exception) => exception switch
@@ -108,4 +115,19 @@ internal static class Problems
     /// </summary>
     public static bool IsDuplicate(this DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: UniqueViolation };
+
+    /// <summary>Saves; false when a unique index refused the write (<see cref="IsDuplicate"/>).</summary>
+    public static async Task<bool> TrySaveAsync(this AppDbContext database, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken);
+
+            return true;
+        }
+        catch (DbUpdateException exception) when (exception.IsDuplicate())
+        {
+            return false;
+        }
+    }
 }

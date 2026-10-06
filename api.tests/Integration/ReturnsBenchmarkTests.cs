@@ -4,7 +4,7 @@ using static Finance.Api.Tests.Integration.InvestmentsApi;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 008 checkpoint 4: spec integration tests 31 and 32, the benchmarks beside the portfolio.
+/// Spec 008 integration tests 31 and 32, the benchmarks beside the portfolio.
 /// Every expected value was computed outside the code base, in Python <c>decimal</c> at 50
 /// digits, and each XIRR also in LibreOffice Calc's <c>XIRR()</c>; they agree to the 15
 /// digits Calc prints.

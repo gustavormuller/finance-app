@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Finance.Api.Tests.Unit;
 
-/// <summary>006: the container hands out one typed-client adapter per port and kind.</summary>
+/// <summary>The container hands out one typed-client adapter per port and kind.</summary>
 public sealed class MarketDataSetupTests
 {
     [Fact]
@@ -18,6 +18,7 @@ public sealed class MarketDataSetupTests
         Assert.IsType<BrapiProvider>(registry.For(ProviderKind.Brapi));
         Assert.IsType<CoinGeckoProvider>(registry.For(ProviderKind.CoinGecko));
         Assert.IsType<TwelveDataProvider>(registry.For(ProviderKind.TwelveData));
+        Assert.IsType<BinanceProvider>(registry.For(ProviderKind.Binance));
         Assert.Equal(
             Enum.GetValues<ProviderKind>().Order(),
             services.GetServices<IPriceProvider>().Select(provider => provider.Kind).Order());

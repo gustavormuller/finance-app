@@ -8,9 +8,9 @@ namespace Finance.Api.Tests.Integration;
 /// the <c>IUserOwned</c> loop from 002 filters something that is not a probe.
 /// </summary>
 /// <remarks>
-/// The HTTP half — that the three list endpoints answer B with empty arrays — arrives
-/// with the endpoints. This runs a layer below, where a mistake would be invisible to
-/// an endpoint test that only ever saw the filtered result.
+/// The HTTP half — that the three list endpoints show B none of A's rows — is in
+/// TransactionSecurityTests. This runs a layer below, where a mistake would be invisible
+/// to an endpoint test that only ever saw the filtered result.
 /// </remarks>
 [Collection(nameof(PostgresCollection))]
 public sealed class UserOwnedEntityIsolationTests(PostgresFixture postgres)
@@ -46,7 +46,7 @@ public sealed class UserOwnedEntityIsolationTests(PostgresFixture postgres)
             Assert.Empty(await asUserB.Accounts.ToListAsync(cancellationToken));
             Assert.Empty(await asUserB.Transactions.ToListAsync(cancellationToken));
 
-            // B has their own eight seeded categories and must see exactly those —
+            // B has their own seeded categories and must see exactly those —
             // "empty" would be the wrong assertion here, and would also pass if the
             // filter were hiding everything from everyone.
             var categories = await asUserB.Categories.ToListAsync(cancellationToken);

@@ -3,8 +3,8 @@ using Finance.Api.Domain.MarketData;
 namespace Finance.Api.Application.MarketData;
 
 /// <summary>
-/// A source of an asset's daily closes (006, decision 2; ADR-015). brapi, CoinGecko and
-/// Twelve Data implement it; <see cref="IPriceProviderRegistry"/> picks one by
+/// A source of an asset's daily closes (006, decision 2; ADR-015). brapi, CoinGecko,
+/// Twelve Data and Binance implement it; <see cref="IPriceProviderRegistry"/> picks one by
 /// <see cref="MarketAsset.Provider"/>.
 /// </summary>
 /// <remarks>

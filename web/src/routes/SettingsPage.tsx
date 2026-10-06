@@ -9,12 +9,11 @@ import { formatMoney } from '@/lib/money';
 import { formatMonth } from '@/lib/months';
 
 /**
- * `/settings` (009): the user's own AI switch, what switching it on sends and to whom
- * (decision 10), and this month's spend against the cap (ADR-008).
+ * `/settings`: the user's own AI switch, what switching it on sends and to whom (009,
+ * decision 10), and this month's spend against the cap (ADR-008).
  *
- * The disclosure lists exactly what 009's two features put in a request (DEFERRED, 009
- * CP4a and CP5a). It is copy, not derived from code, so a change to either request must
- * change it too.
+ * The disclosure lists exactly what the two AI features put in a request. It is copy,
+ * not derived from code, so a change to either request must change it too.
  */
 export default function SettingsPage() {
   const queryClient = useQueryClient();

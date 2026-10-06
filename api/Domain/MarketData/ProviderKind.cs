@@ -10,4 +10,7 @@ public enum ProviderKind
     Brapi = 0,
     CoinGecko = 1,
     TwelveData = 2,
+
+    /// <summary>Binance's public spot market, for crypto pairs quoted in BRL (019). Needs no key.</summary>
+    Binance = 3,
 }

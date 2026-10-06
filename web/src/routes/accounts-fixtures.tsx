@@ -5,16 +5,16 @@ import { render } from '@testing-library/react';
 import type { Account, AccountBalance, Category, ImportBatch, Transaction } from '@/api/finance';
 import { routeTree } from '@/routeTree';
 import '@/test-routes';
-import { stubFetch, type SeenRequest } from '@/test-utils';
+import { stubFetch, type SeenRequest, type StubAnswer } from '@/test-utils';
 
 /**
  * What the accounts page reads, for the tests of `/accounts` and of the import inside
- * it (015). Not a test file: vitest only runs `*.test.tsx`.
+ * it. Not a test file: vitest only runs `*.test.tsx`.
  */
 
-export const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: true };
+const me = { id: 'u1', email: 'ada@example.com', displayName: 'Ada Lovelace', aiEnabled: true };
 
-export const categories: Category[] = [
+const categories: Category[] = [
   { id: 'cat-food', name: 'Alimentação', kind: 'Expense', parentId: null, createdAt: '' },
   { id: 'cat-other', name: 'Outros', kind: 'Expense', parentId: null, createdAt: '' },
 ];
@@ -48,7 +48,7 @@ export interface AccountsApi {
   transactions?: Transaction[];
 }
 
-type Answer = { status?: number; body?: unknown } | undefined;
+type Answer = StubAnswer | undefined;
 
 /**
  * Answers every read the accounts page makes from `state`, which a test may change

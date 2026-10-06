@@ -9,9 +9,9 @@ using PositionItem = Finance.Api.Tests.Integration.InvestmentAssetEndpointTests.
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 007 checkpoint 3b: positions against the calculator, the summary and <c>POST /rebuild</c>.
-/// Spec integration tests 18, 25 and 26, and the definition of done's "truncated and
-/// rebuilt via POST /rebuild with identical results".
+/// Positions against the calculator, the summary and <c>POST /rebuild</c>. Spec 007
+/// integration tests 18, 25 and 26, and the definition of done's "truncated and rebuilt
+/// via POST /rebuild with identical results".
 /// </summary>
 [Collection(nameof(PostgresCollection))]
 public sealed class InvestmentSummaryTests(PostgresFixture postgres)

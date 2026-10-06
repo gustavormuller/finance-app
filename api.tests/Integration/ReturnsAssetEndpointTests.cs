@@ -5,8 +5,8 @@ using static Finance.Api.Tests.Integration.InvestmentsApi;
 namespace Finance.Api.Tests.Integration;
 
 /// <summary>
-/// 008 checkpoint 4: <c>GET /api/returns/assets/{id}</c>, one asset's returns with its FX
-/// split (decision 8; unit tests 22–24 at the endpoint). XIRR checked in LibreOffice Calc:
+/// <c>GET /api/returns/assets/{id}</c>, one asset's returns with its FX split (008,
+/// decision 8; unit tests 22–24 at the endpoint). XIRR checked in LibreOffice Calc:
 /// <c>0.475054807440193</c>.
 /// </summary>
 [Collection(nameof(PostgresCollection))]

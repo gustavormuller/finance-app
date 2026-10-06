@@ -11,12 +11,12 @@ import { usePortfolioSummary, usePositions } from './queries';
 import { useDisplayCurrency, type Display } from './useDisplayCurrency';
 
 /**
- * The positions table (spec 007 UI), in the API's order, by value.
+ * The positions table, in the API's order, by value.
  *
  * A position at zero — an asset just added, or one sold down to nothing — is hidden
- * until asked for (DEFERRED, 007 · CP4): the table is what you hold. The total row is
- * the API's summary, never a sum made here. Money is in the page's currency (016);
- * a unit price stays in the asset's own.
+ * until asked for: the table is what you hold. The total row is the API's summary,
+ * never a sum made here. Money is in the page's currency; a unit price stays in the
+ * asset's own.
  */
 export default function Positions() {
   const positions = usePositions();
