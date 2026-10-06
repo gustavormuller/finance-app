@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { createAccount, devLogin, openImportTab, uniqueEmail } from './support';
+import { createAccount, devLogin, openImportTab, showTransactionsBetween, uniqueEmail } from './support';
 
 /**
  * Spec E2E tests 63 to 66, against the real API and a real PostgreSQL, with the
@@ -71,6 +71,7 @@ test('uploading the same OFX again marks every row duplicate and commits nothing
   await expect(page.getByRole('heading', { name: '1. Arquivo' })).toBeVisible();
 
   await page.goto('/transactions');
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
   await expect(page.getByRole('row', { name: /NETFLIX\.COM/ })).toHaveCount(1);
 });
 
@@ -123,6 +124,7 @@ test('undoing a committed batch removes its rows from the list', async ({ page }
   await expect(page.getByText('Nenhuma importação nesta conta ainda.')).toBeVisible();
 
   await page.goto('/transactions');
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
   await expect(page.getByText(/nenhum lançamento/i)).toBeVisible();
   await expect(page.getByRole('row', { name: /NETFLIX\.COM/ })).toHaveCount(0);
 });

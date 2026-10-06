@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createAccount, createTransaction, devLogin, uniqueEmail } from './support';
+import { createAccount, createTransaction, devLogin, showTransactionsBetween, uniqueEmail } from './support';
 
 /**
  * Spec E2E tests 1 to 3, against the real API and a real PostgreSQL.
@@ -21,6 +21,7 @@ test('an expense and an income are created and shown with the correct sign', asy
     date: '2026-09-13',
     description: 'Supermercado',
   });
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
 
   const expense = page.getByRole('row', { name: /Supermercado/ });
   await expect(expense).toBeVisible();
@@ -36,6 +37,7 @@ test('an expense and an income are created and shown with the correct sign', asy
     date: '2026-09-12',
     description: 'Salário de setembro',
   });
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
 
   const income = page.getByRole('row', { name: /Salário de setembro/ });
   await expect(income).toBeVisible();
@@ -90,6 +92,7 @@ test('editing an amount updates the list', async ({ page }) => {
     date: '2026-09-10',
     description: 'Assinatura de streaming',
   });
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
 
   const row = page.getByRole('row', { name: /Assinatura de streaming/ });
   await expect(row.getByTestId('amount')).toHaveText('−55,90');

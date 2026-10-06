@@ -71,6 +71,16 @@ export async function openImportTab(page: Page, account: string) {
  * A transaction by way of the real form. `direction` answers the Saída/Entrada question
  * the form asks only for a Transfer category.
  */
+/**
+ * Narrows the transactions list to a date range. The list opens on the current month,
+ * and the fixtures are fixed dates, so a test that looks for its rows shows their month
+ * first rather than passing only while the calendar is on it.
+ */
+export async function showTransactionsBetween(page: Page, from: string, to: string) {
+  await page.getByLabel('De', { exact: true }).fill(from);
+  await page.getByLabel('Até', { exact: true }).fill(to);
+}
+
 export async function createTransaction(
   page: Page,
   values: {
