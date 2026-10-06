@@ -1,13 +1,15 @@
 ﻿using Finance.Api.Application;
 using Finance.Api.Application.Investments;
 using Finance.Api.Application.MarketData;
+using Finance.Api.Domain.MarketData;
 using Microsoft.EntityFrameworkCore;
 
 namespace Finance.Api.Infrastructure.Jobs;
 
 /// <summary>
 /// 007's nightly rebuild: after a market-data sync, every user's assets are rebuilt from
-/// yesterday (earlier where rows are missing, <see cref="SnapshotRebuild.NightlyFromAsync"/>),
+/// yesterday (earlier where rows are missing, <see cref="SnapshotRebuild.NightlyFromAsync"/>,
+/// or where the sync changed a stored close, <see cref="MarketAsset.PricesRevisedFrom"/>),
 /// and the run's <see cref="Domain.MarketData.SyncRun.Summary"/> gains a
 /// <see cref="SummaryKey"/> section. Runs under <see cref="MarketDataSyncGate"/>, after the
 /// sync, in both the scheduled job and the manual trigger.
@@ -23,6 +25,11 @@ namespace Finance.Api.Infrastructure.Jobs;
 /// <c>/market-data</c>, so it names no ticker, asset or user; a failure is logged with its
 /// ids and counted in the summary. Each asset is rebuilt in its own transaction, so one
 /// failing asset does not stop the others.
+/// </para>
+/// <para>
+/// A <see cref="MarketAsset.PricesRevisedFrom"/> mark is cleared once every holder of that
+/// market asset was rebuilt; one failure keeps it, so the next run rebuilds them again from
+/// the same day (025, decision 13).
 /// </para>
 /// </remarks>
 public sealed class SnapshotRebuildAfterSync(
@@ -40,11 +47,22 @@ public sealed class SnapshotRebuildAfterSync(
         await using var root = scopes.CreateAsyncScope();
         var db = root.ServiceProvider.GetRequiredService<AppDbContext>();
         var users = await db.Users.AsNoTracking().OrderBy(user => user.Id).Select(user => user.Id).ToListAsync(cancellationToken);
+        var revised = await db.MarketAssets.AsNoTracking().Where(asset => asset.PricesRevisedFrom != null)
+            .ToDictionaryAsync(asset => asset.Id, asset => asset.PricesRevisedFrom!.Value, cancellationToken);
 
         var part = new ProviderSyncSummary();
+        var failed = new HashSet<Guid>();
         foreach (var userId in users)
         {
-            await RebuildUserAsync(userId, yesterday, part, cancellationToken);
+            await RebuildUserAsync(userId, yesterday, revised, part, failed, cancellationToken);
+        }
+
+        // Only the marks read above: none can be set meanwhile, since the sync holds the same gate.
+        var rebuilt = revised.Keys.Where(id => !failed.Contains(id)).ToList();
+        if (rebuilt.Count > 0)
+        {
+            await db.MarketAssets.Where(asset => rebuilt.Contains(asset.Id))
+                .ExecuteUpdateAsync(set => set.SetProperty(asset => asset.PricesRevisedFrom, (DateOnly?)null), cancellationToken);
         }
 
         var run = await db.SyncRuns.SingleAsync(entity => entity.Id == syncRunId, cancellationToken);
@@ -62,19 +80,30 @@ public sealed class SnapshotRebuildAfterSync(
             syncRunId, part.ItemsSynced, part.ItemsFailed);
     }
 
-    private async Task RebuildUserAsync(Guid userId, DateOnly yesterday, ProviderSyncSummary part, CancellationToken cancellationToken)
+    private async Task RebuildUserAsync(
+        Guid userId,
+        DateOnly yesterday,
+        IReadOnlyDictionary<Guid, DateOnly> revised,
+        ProviderSyncSummary part,
+        HashSet<Guid> failed,
+        CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ActingUser>().ActAs(userId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rebuild = scope.ServiceProvider.GetRequiredService<SnapshotRebuild>();
 
-        foreach (var assetId in await db.Assets.Select(asset => asset.Id).ToListAsync(cancellationToken))
+        foreach (var held in await db.Assets.Select(asset => new { asset.Id, asset.MarketAssetId }).ToListAsync(cancellationToken))
         {
             try
             {
-                var from = await rebuild.NightlyFromAsync(assetId, yesterday, cancellationToken);
-                part.RowsWritten += await rebuild.RebuildAsync(assetId, from, cancellationToken);
+                var from = await rebuild.NightlyFromAsync(held.Id, yesterday, cancellationToken);
+                if (revised.TryGetValue(held.MarketAssetId, out var revisedFrom) && revisedFrom < from)
+                {
+                    from = revisedFrom;
+                }
+
+                part.RowsWritten += await rebuild.RebuildAsync(held.Id, from, cancellationToken);
                 part.ItemsSynced++;
             }
             catch (Exception error) when (!cancellationToken.IsCancellationRequested)
@@ -87,9 +116,10 @@ public sealed class SnapshotRebuildAfterSync(
                     return;
                 }
 
-                logger.LogError(error, "Snapshot rebuild of asset {AssetId} for user {UserId} failed.", assetId, userId);
+                logger.LogError(error, "Snapshot rebuild of asset {AssetId} for user {UserId} failed.", held.Id, userId);
                 part.ItemsFailed++;
                 part.Error = FailureText;
+                failed.Add(held.MarketAssetId);
             }
         }
     }

@@ -322,9 +322,10 @@ export type BreakdownKind = Extract<CategoryKind, 'Income' | 'Expense'>;
 
 // ---- market data ----------------------------------------------------------------
 
-export type MarketAssetClass = 'StockBr' | 'Fii' | 'EtfBr' | 'Bdr' | 'StockUs' | 'Crypto';
+/** `Index` and `Currency` are compared against, never held (025). */
+export type MarketAssetClass = 'StockBr' | 'Fii' | 'EtfBr' | 'Bdr' | 'StockUs' | 'Crypto' | 'Index' | 'Currency';
 
-export type ProviderKind = 'Brapi' | 'CoinGecko' | 'TwelveData' | 'Binance';
+export type ProviderKind = 'Yahoo' | 'Brapi' | 'CoinGecko' | 'TwelveData' | 'Binance';
 
 export type SyncTrigger = 'Scheduled' | 'Manual';
 
@@ -341,7 +342,15 @@ export interface MarketAsset {
   providerSymbol: string;
   isActive: boolean;
   lastSyncedAt: string | null;
+  /** Null until the whole history has been loaded from the current source (025). */
+  historyLoadedAt: string | null;
   createdAt: string;
+}
+
+/** Where an entry's prices come from: what can be edited after registration (025). */
+export interface MarketAssetSource {
+  provider: ProviderKind;
+  providerSymbol: string;
 }
 
 export interface MarketAssetInput {
@@ -822,6 +831,9 @@ export const api = {
 
   registerMarketAsset: (input: MarketAssetInput) =>
     request<MarketAsset>('/api/market-data/assets', { method: 'POST', body: JSON.stringify(input) }),
+
+  updateMarketAssetSource: (id: string, source: MarketAssetSource) =>
+    request<MarketAsset>(`/api/market-data/assets/${id}`, { method: 'PATCH', body: JSON.stringify(source) }),
 
   listSyncRuns: () => request<SyncRun[]>('/api/market-data/sync-runs'),
 

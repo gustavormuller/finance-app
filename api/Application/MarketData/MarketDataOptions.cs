@@ -44,6 +44,8 @@ public sealed class MarketDataOptions
 
     public BinanceOptions Binance { get; set; } = new();
 
+    public YahooOptions Yahoo { get; set; } = new();
+
     public MarketDataResilienceOptions Resilience { get; set; } = new();
 }
 
@@ -77,6 +79,14 @@ public sealed class MarketDataResilienceOptions
 public sealed class BcbOptions
 {
     public string BaseUrl { get; set; } = "";
+
+    /// <summary>
+    /// How far back every series reaches (025): 1994-07-01, the Plano Real, before which the
+    /// values are in older currencies. Null: <see cref="MarketDataOptions.BackfillYears"/>
+    /// back, as before 025. It must not precede any configured series' first value, or the
+    /// sync asks for the missing years every night.
+    /// </summary>
+    public DateOnly? HistoryStart { get; set; }
 
     /// <summary>Benchmark code (<c>CDI</c>) to its SGS series and unit.</summary>
     public Dictionary<string, SgsSeries> Series { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -158,4 +168,16 @@ public sealed class TwelveDataOptions
 public sealed class BinanceOptions
 {
     public string BaseUrl { get; set; } = "";
+}
+
+/// <summary>Yahoo Finance's chart endpoint (025): no key, but a browser's manners.</summary>
+public sealed class YahooOptions
+{
+    public string BaseUrl { get; set; } = "";
+
+    /// <summary>Sent as <c>User-Agent</c>: Yahoo answers a browser's more readily than a library's.</summary>
+    public string UserAgent { get; set; } = "";
+
+    /// <summary>The least time between the starts of two requests to Yahoo, across the process.</summary>
+    public TimeSpan RequestInterval { get; set; }
 }

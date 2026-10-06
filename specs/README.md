@@ -43,6 +43,7 @@ Each spec contains:
 | 021 | export-transactions | the filtered transactions as a CSV Excel pt-BR opens as a table |
 | 022 | pwa | manifest, icons, a service worker that never touches `/api` |
 | 023 | delete-account | "Excluir minha conta": everything the user owns, in one transaction |
+| 025 | yahoo-full-history | Yahoo Finance first and keyless, raw and adjusted closes, full history back to 1994 |
 | 026 | compare | any catalogue asset or benchmark side by side, base 100, in its own currency or at PTAX |
 
 One number per session set. If a feature needs more than three sessions, it was scoped

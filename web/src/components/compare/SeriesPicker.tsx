@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -143,7 +144,11 @@ export default function SeriesPicker({
 
       {!full && searched && found.length === 0 && (
         <p className="text-muted-foreground text-sm">
-          Nada encontrado com esse ticker ou nome. Ativos novos entram no catálogo em Dados de mercado ou em Investimentos.
+          Nada encontrado com esse ticker ou nome. Ativos novos entram no catálogo em{' '}
+          <Link to="/market-data" className="text-primary font-semibold hover:underline">
+            Dados de mercado
+          </Link>{' '}
+          ou em Investimentos.
         </p>
       )}
     </section>

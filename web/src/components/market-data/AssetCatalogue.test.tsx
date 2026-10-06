@@ -16,6 +16,7 @@ const petr4: MarketAsset = {
   providerSymbol: 'PETR4',
   isActive: true,
   lastSyncedAt: null,
+  historyLoadedAt: '2026-09-24T12:00:00Z',
   createdAt: '2026-09-24T12:00:00Z',
 };
 
@@ -43,6 +44,8 @@ async function fillRegistration(values: { ticker: string; name?: string; class: 
   }
   await userEvent.selectOptions(screen.getByLabelText('Classe'), values.class);
   await userEvent.selectOptions(screen.getByLabelText('Provedor'), values.provider);
+  // The symbol is suggested from the ticker (025); typed over, it is the person's.
+  await userEvent.clear(screen.getByLabelText('Símbolo no provedor'));
   await userEvent.type(screen.getByLabelText('Símbolo no provedor'), values.symbol);
   await userEvent.selectOptions(screen.getByLabelText('Moeda'), values.currency);
   await userEvent.click(screen.getByRole('button', { name: 'Cadastrar ativo' }));
@@ -111,6 +114,7 @@ describe('AssetCatalogue', () => {
     await screen.findByTestId('market-asset-a-petr4');
 
     expect(within(screen.getByLabelText('Provedor')).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Yahoo Finance (B3, EUA, índices, cripto em US$, câmbio — sem chave)',
       'brapi (B3: ações, FIIs, ETFs)',
       'CoinGecko (cripto)',
       'Twelve Data (ações dos EUA)',

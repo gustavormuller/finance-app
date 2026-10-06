@@ -63,6 +63,32 @@ public sealed class FakeMarketDataProvidersTests
         Assert.Equal(await Closes(ProviderKind.Brapi, To.AddDays(-40), To), await Closes(ProviderKind.Brapi, To.AddDays(-40), To));
     }
 
+    /// <summary>
+    /// 025 test 14: the Yahoo fake loads a whole history like Yahoo, ends at 12.50, and has a
+    /// 2:1 split on <c>to - 100</c> and dividends on <c>to - 30</c>, <c>- 60</c> and <c>- 90</c>.
+    /// </summary>
+    [Fact]
+    public async Task The_yahoo_fake_has_a_split_and_dividends_and_ends_at_12_50()
+    {
+        var yahoo = FakeMarketDataProviders.Registry.For(ProviderKind.Yahoo);
+
+        var closes = (await yahoo.GetDailyClosesAsync("ANY", new(1900, 1, 1), To, CancellationToken.None))
+            .ToDictionary(close => close.Date);
+
+        Assert.Equal((new DateOnly(1900, 1, 1), true), (yahoo.HistoryStart, yahoo.RevisesHistory));
+        Assert.Equal(1001, closes.Count);
+        Assert.Equal(To.AddDays(-1000), closes.Keys.Min());
+        Assert.Equal(new DailyClose(To, 12.50m, 12.50m), closes[To]);
+
+        // The day before the split traded at twice its split-adjusted price; three dividends lie ahead of it.
+        Assert.Equal(new DailyClose(To.AddDays(-101), 22.98m, 11.14873551m), closes[To.AddDays(-101)]);
+        Assert.Equal(new DailyClose(To.AddDays(-100), 11.50m, 11.1584385m), closes[To.AddDays(-100)]);
+
+        // A dividend takes 1 % off the adjusted close of every day before it, and nothing after.
+        Assert.Equal(new DailyClose(To.AddDays(-31), 12.19m, 12.0681m), closes[To.AddDays(-31)]);
+        Assert.Equal(new DailyClose(To.AddDays(-30), 12.20m, 12.20m), closes[To.AddDays(-30)]);
+    }
+
     private static async Task<IReadOnlyList<DailyClose>> Closes(ProviderKind kind, DateOnly from, DateOnly to) =>
         await FakeMarketDataProviders.Registry.For(kind).GetDailyClosesAsync("ANY", from, to, CancellationToken.None);
 }
