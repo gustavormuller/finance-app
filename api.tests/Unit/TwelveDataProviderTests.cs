@@ -68,6 +68,33 @@ public sealed class TwelveDataProviderTests
         Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
     }
 
+    /// <summary>019 test 13: Twelve Data refuses everything without a key, as HTTP 401 or inside a 200.</summary>
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.OK)]
+    public async Task A_refusal_with_no_key_configured_is_a_missing_key_naming_the_setting(HttpStatusCode status)
+    {
+        var handler = new FakeHttpHandler(status, Fixture("twelvedata-missing-apikey.json"));
+
+        var error = await Assert.ThrowsAsync<ProviderKeyMissingException>(() =>
+            new TwelveDataProvider(handler.Client(), Microsoft.Extensions.Options.Options.Create(Keyless()))
+                .GetDailyClosesAsync("AAPL", From, To, CancellationToken.None));
+
+        Assert.Equal(("TwelveData", "AAPL", "MarketData:TwelveData:Key"), (error.Provider, error.Symbol, error.Setting));
+    }
+
+    /// <summary>019 test 14: with a key set, an HTTP 401 is about that key, as before.</summary>
+    [Fact]
+    public async Task A_refusal_with_a_key_configured_is_the_key_refused()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.Unauthorized, Fixture("twelvedata-missing-apikey.json"));
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(
+            () => Provider(handler).GetDailyClosesAsync("AAPL", From, To, CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("{\"values\":[{\"datetime\":")]
