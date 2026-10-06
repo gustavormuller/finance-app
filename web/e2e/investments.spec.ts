@@ -203,6 +203,7 @@ test('a sell, a JCP, a split and an edit move the position; a delete that uncove
   const form = page.getByRole('form', { name: 'Movimentação' });
   await expect(form.getByLabel('Quantidade')).toHaveValue('40');
   await form.getByLabel('Quantidade').fill('50');
+  await expect(form.getByTestId('movement-total')).toHaveText(/Valor líquido da venda:\s*R\$\s*500,00/);
   await form.getByRole('button', { name: 'Salvar movimentação' }).click();
   await expect(form).toBeHidden();
   await expect(summaryFigure(page, 'Quantidade')).toHaveText('50');
@@ -296,6 +297,7 @@ test('an asset found in the catalogue is added once, and removed once nothing is
   await result.getByRole('button', { name: 'Adicionar' }).click();
   await expect(page.getByRole('heading', { name: ticker })).toBeVisible();
   await expect(page.getByText('Nenhuma movimentação registrada.')).toBeVisible();
+  await expect(page.getByText('Sem histórico de valor ainda.')).toBeVisible();
   const asset = page.url();
 
   await page.goto('/investments');

@@ -98,6 +98,11 @@ test('a CSV is mapped with a live preview, reviewed and committed', async ({ pag
 
   await uploadTable(page, 'Nubank', 'nubank.csv');
   await expect(page.getByLabel('Delimitador')).toHaveValue(',');
+  // Until the columns are chosen, the live preview says what it is missing.
+  await expect(page.getByTestId('mapping-preview').getByRole('row').first()).toContainText(
+    'Escolha a coluna de data · Escolha a coluna de valor',
+  );
+  await expect(page.getByRole('button', { name: 'Continuar' })).toBeDisabled();
 
   await page.getByLabel('Formato dos números').selectOption('en-US');
   await page.getByLabel('Coluna de data').selectOption('Data');
@@ -190,9 +195,13 @@ test('the account shows the import in its card, and a review in progress is foun
 
   await uploadOfx(page, 'Nubank');
 
-  // Another account's tab says where the review is, instead of offering a drop zone.
+  // Another account's tab says where the review is, instead of offering a drop zone,
+  // and the card of the account in review says so too.
   await openImportTab(page, 'Inter');
   await expect(page.getByText(/Há um extrato em revisão na conta Nubank\./)).toBeVisible();
+  await expect(
+    page.getByRole('listitem').filter({ has: page.getByRole('link', { name: 'Nubank', exact: true }) }),
+  ).toContainText('Conta corrente · Extrato em revisão');
   await expect(page.getByTestId('drop-zone')).toHaveCount(0);
   await page.getByRole('link', { name: 'Abrir a importação da conta Nubank' }).click();
   await expect(page.getByRole('heading', { name: 'Nubank', exact: true })).toBeVisible();
