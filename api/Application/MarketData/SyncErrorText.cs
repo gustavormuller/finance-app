@@ -20,6 +20,11 @@ public static class SyncErrorText
     {
         ProviderRateLimitedException => "O provedor recusou por excesso de requisições; tente mais tarde.",
         ProviderKeyMissingException missing => KeyMissing(missing),
+        ProviderSymbolUnknownException unknown =>
+            $"{Subject(unknown.Provider)} não encontrou o símbolo {unknown.Symbol}. Confira o símbolo do ativo no catálogo.",
+        ProviderBlockedException blocked =>
+            $"{Subject(blocked.Provider)} recusou o acesso. Tente de novo mais tarde; "
+            + "se persistir, ele passou a exigir cookie e o adaptador precisa mudar.",
         ProviderResponseInvalidException => "O provedor respondeu em um formato inesperado.",
         HttpRequestException { StatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden } =>
             "O provedor recusou a chave de acesso.",
@@ -42,4 +47,11 @@ public static class SyncErrorText
         };
         return $"{provider} exige {key} para {missing.Symbol}. Configure {missing.Setting}.";
     }
+
+    /// <summary>A provider as the subject of a sentence: "O Yahoo Finance", "O provedor Acme".</summary>
+    private static string Subject(string provider) => provider switch
+    {
+        nameof(ProviderKind.Yahoo) => "O Yahoo Finance",
+        _ => $"O provedor {provider}",
+    };
 }
