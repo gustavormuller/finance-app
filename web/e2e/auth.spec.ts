@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-import { devLogin, uniqueEmail } from './support';
+import { createAccount, devLogin, uniqueEmail } from './support';
 
 /** Every page behind the sign-in, the ones outside the navigation included. */
 const PROTECTED = ['/', '/transactions', '/accounts', '/import', '/categories', '/investments', '/investments/returns', '/market-data', '/settings'];
@@ -46,6 +46,12 @@ test('a signed-in visitor sees their display name on /', async ({ page }) => {
 
   await expect(page.getByTestId('current-user')).toHaveText('Ada Lovelace');
   await expect(page.getByRole('link', { name: 'Entrar com o Google' })).toBeHidden();
+
+  // 024: an account Google gave no name is shown by its e-mail.
+  const nameless = uniqueEmail('signed-in-nameless');
+  await devLogin(page, nameless, '');
+  await page.goto('/');
+  await expect(page.getByTestId('current-user')).toHaveText(nameless);
 });
 
 test('logging out returns to the login page and leaves / protected', async ({ page }) => {
@@ -60,5 +66,48 @@ test('logging out returns to the login page and leaves / protected', async ({ pa
 
   // The cookie is gone, not just the client-side state.
   await page.goto('/');
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+/** Signs the browser out from a second tab, so the page under test still believes it is signed in. */
+async function signOutElsewhere(page: Page) {
+  const other = await page.context().newPage();
+  await other.goto('/');
+  await other.getByRole('button', { name: 'Sair' }).click();
+  await expect(other).toHaveURL(/\/login$/);
+  await other.close();
+}
+
+/** 024: a write from a tab whose session ended in another one. */
+test('a write after the session ended in another tab is explained in Portuguese', async ({ page }) => {
+  test.fixme(true, 'Bug: a 401 has no problem body, so the page shows the client\'s English fallback "Request failed (401)".');
+
+  await devLogin(page, uniqueEmail('e2e-ended-write'), 'Ada Lovelace');
+  await createAccount(page, 'Nubank');
+  await page.goto('/transactions');
+  await signOutElsewhere(page);
+
+  await page.getByRole('button', { name: 'Novo lançamento' }).click();
+  await page.getByLabel('Conta', { exact: true }).selectOption({ label: 'Nubank' });
+  await page.getByLabel('Categoria', { exact: true }).selectOption({ label: 'Lazer' });
+  await page.getByLabel('Valor').fill('10');
+  await page.getByLabel('Data').fill('2026-09-10');
+  await page.getByLabel('Descrição').fill('Depois de sair');
+  await page.getByRole('button', { name: 'Criar lançamento' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('sessão');
+  await expect(page.getByRole('alert')).not.toContainText('Request failed');
+});
+
+/** 024: Sair from a tab whose session already ended. */
+test('Sair from a tab whose session already ended lands on the login page', async ({ page }) => {
+  test.fixme(true, 'Bug: the logout answers 401 and the sidebar shows "Não foi possível sair." instead of leaving.');
+
+  await devLogin(page, uniqueEmail('e2e-ended-logout'), 'Grace Hopper');
+  await page.goto('/');
+  await signOutElsewhere(page);
+
+  await page.getByRole('button', { name: 'Sair' }).click();
+
   await expect(page).toHaveURL(/\/login$/);
 });

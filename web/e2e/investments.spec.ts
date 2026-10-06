@@ -268,6 +268,9 @@ test('an empty portfolio says so, with no returns to show', async ({ page }) => 
   await expect(page.getByText('Nenhum ativo na carteira ainda.')).toBeVisible();
   await expect(page.getByTestId('returns-hero')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Adicionar ativo' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Posições' }).click();
+  await expect(page).toHaveURL(/\/investments#posicoes$/);
 });
 
 /**
