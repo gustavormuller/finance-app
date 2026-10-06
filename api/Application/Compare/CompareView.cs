@@ -27,8 +27,11 @@ public enum CompareCurrency
 public sealed record CompareRequest(
     IReadOnlyList<SeriesKey> Series, ComparePeriodKind Period, DateOnly? From, DateOnly? To, CompareCurrency Currency);
 
-/// <summary><c>From</c> is the start, where every series is 100.</summary>
-public sealed record ComparePeriodView(DateOnly From, DateOnly To, int Days);
+/// <summary>
+/// <c>From</c> is the start, where every series is 100. <c>StartMoved</c> says the start is a
+/// series' first day, later than the period's own start; always under Máx, which has none.
+/// </summary>
+public sealed record ComparePeriodView(DateOnly From, DateOnly To, int Days, bool StartMoved);
 
 /// <summary>
 /// One series. <c>Currency</c> is its own; <c>FirstDate</c> is where its data begins in the

@@ -34,7 +34,7 @@ public sealed class CompareFiguresTests(PostgresFixture postgres)
         var body = await CompareAsync(user.Client, $"asset:{itub.Id},asset:{btc.Id},benchmark:CDI,benchmark:IPCA,benchmark:USDBRL", Week, ct);
 
         Assert.Equal("original", body.Currency);
-        Assert.Equal(new ComparePeriodBody(May31, June(7), 7), body.Period);
+        Assert.Equal(new ComparePeriodBody(May31, June(7), 7, false), body.Period);
         Assert.Equal(
             new CompareSeriesBody($"asset:{itub.Id}", "asset", "ITUB4", "ITUB4 name", "StockBr", null, "BRL", May29, June(5), true, 0.2m, 13449.4371985553m),
             body.Series[0]);
@@ -95,7 +95,7 @@ public sealed class CompareFiguresTests(PostgresFixture postgres)
         var nothing = await CompareAsync(user.Client, $"asset:{old.Id},asset:{itub.Id}", "&from=2024-01-01&to=2024-12-31", ct);
 
         // ITUB4 alone is drawn, to its last close; OLD3 has no values and no change.
-        Assert.Equal(new ComparePeriodBody(May31, June(5), 5), leftOut.Period);
+        Assert.Equal(new ComparePeriodBody(May31, June(5), 5, false), leftOut.Period);
         Assert.Equal([true, false], leftOut.Series.Select(series => series.HasData));
         Assert.Equal((null, null), (leftOut.Series[1].Change, leftOut.Series[1].Annualised));
         Assert.Equal((new DateOnly(2025, 1, 2), new DateOnly(2025, 3, 31)), (leftOut.Series[1].FirstDate, leftOut.Series[1].LastDate));
@@ -129,13 +129,14 @@ public sealed class CompareFiguresTests(PostgresFixture postgres)
         var fallback = await CompareAsync(user.Client, series, "", ct);
 
         // YTD's start is 31 December: REAL3 carries the 30th's 12.
-        Assert.Equal(new ComparePeriodBody(new DateOnly(2025, 12, 31), June(5), 156), ytd.Period);
+        Assert.Equal(new ComparePeriodBody(new DateOnly(2025, 12, 31), June(5), 156, false), ytd.Period);
         Assert.Equal([0.25m, 0.25m], ytd.Series.Select(one => one.Change));
         Assert.Equal(0.6855614175m, ytd.Series[0].Annualised);
-        Assert.Equal(new ComparePeriodBody(new DateOnly(2026, 5, 8), June(5), 28), month.Period);
+        Assert.Equal(new ComparePeriodBody(new DateOnly(2026, 5, 8), June(5), 28, false), month.Period);
 
-        // Máx, and the default 5A, start on DOLL's first day, where REAL3 is still at 10.
-        Assert.Equal(new ComparePeriodBody(new DateOnly(2025, 9, 1), June(5), 277), max.Period);
+        // Máx, and the default 5A, start on DOLL's first day, where REAL3 is still at 10: the
+        // start moved, which the page says.
+        Assert.Equal(new ComparePeriodBody(new DateOnly(2025, 9, 1), June(5), 277, true), max.Period);
         Assert.Equal(max.Series[1].FirstDate, max.Period!.From);
         Assert.Equal([0.5m, 0.25m], max.Series.Select(one => one.Change));
         Assert.Equal(max.Period, fallback.Period);
@@ -162,7 +163,7 @@ public sealed class CompareFiguresTests(PostgresFixture postgres)
 
     private sealed record CompareBody(string Currency, ComparePeriodBody? Period, List<CompareSeriesBody> Series, List<ComparePointBody> Points);
 
-    private sealed record ComparePeriodBody(DateOnly From, DateOnly To, int Days);
+    private sealed record ComparePeriodBody(DateOnly From, DateOnly To, int Days, bool StartMoved);
 
     private sealed record CompareSeriesBody(
         string Key,

@@ -49,7 +49,8 @@ public sealed class CompareQueries(AppDbContext db, TimeProvider clock, IOptions
             .Select((series, position) => converted[position] ? Within(series.Coverage, ptax) : series.Coverage)
             .ToList();
 
-        var plan = ComparePeriods.Plan(ComparePeriods.Window(request.Period, request.From, request.To, Today), coverage);
+        var window = ComparePeriods.Window(request.Period, request.From, request.To, Today);
+        var plan = ComparePeriods.Plan(window, coverage);
         Comparison? comparison = null;
         if (plan.Outcome == CompareOutcome.Compared)
         {
@@ -71,7 +72,7 @@ public sealed class CompareQueries(AppDbContext db, TimeProvider clock, IOptions
             comparison = SeriesComparison.Compare(drawn, plan.Start, plan.End);
         }
 
-        return new CompareResult(View(request.Currency, described, coverage, plan, comparison), []);
+        return new CompareResult(View(request.Currency, described, coverage, window, plan, comparison), []);
     }
 
     /// <summary>Each series' name, currency and own data, in the order asked; or why one cannot be compared.</summary>
@@ -218,7 +219,12 @@ public sealed class CompareQueries(AppDbContext db, TimeProvider clock, IOptions
     }
 
     private static CompareView View(
-        CompareCurrency currency, List<Described> described, List<SeriesCoverage> coverage, ComparePlan plan, Comparison? comparison)
+        CompareCurrency currency,
+        List<Described> described,
+        List<SeriesCoverage> coverage,
+        CompareWindow window,
+        ComparePlan plan,
+        Comparison? comparison)
     {
         var drawn = 0;
         var positions = plan.HasData.Select(hasData => comparison is not null && hasData ? drawn++ : (int?)null).ToList();
@@ -251,7 +257,9 @@ public sealed class CompareQueries(AppDbContext db, TimeProvider clock, IOptions
                 comparison.Dates[date],
                 [.. positions.Select(index => index is { } drawnAt ? Round(comparison.Indices[drawnAt][date], IndexPlaces) : (decimal?)null)]))
             .ToList();
-        return new CompareView(text, new ComparePeriodView(plan.Start, plan.End, plan.End.DayNumber - plan.Start.DayNumber), series, points);
+        var period = new ComparePeriodView(
+            plan.Start, plan.End, plan.End.DayNumber - plan.Start.DayNumber, window.From is not { } from || plan.Start > from);
+        return new CompareView(text, period, series, points);
     }
 
     private static decimal Round(decimal value, int places) => Math.Round(value, places, MidpointRounding.ToEven);

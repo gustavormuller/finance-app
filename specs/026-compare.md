@@ -18,7 +18,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 3 | How a series becomes a line | A **price** row contributes the value of `ComparisonPrice.ValueOf` (decision 4). A **level** benchmark (`Level`: USDBRL, IVVB11) contributes its value. A **rate** benchmark (`PercentPerDay`: CDI, SELIC; `PercentPerMonth`: IPCA) is accumulated into an index by 008's `BenchmarkAccumulator`, with its convention: a rate compounds on its own date, so IPCA's month compounds on the 1st, and a day without a row holds the index. A rate series can start on the day before its first row. A non-positive price or level is not an observation. |
 | 4 | Price source | One function, `Application/Compare/ComparisonPrice.ValueOf(Price)`, decides what a price row contributes. Today it is `price.Close`. Once 025 adds `Price.AdjustedClose`, the lead flips that one line to `price.AdjustedClose ?? price.Close`: the total return, dividends reinvested. Nothing else changes. The coalesce is per row, so a series whose rows mix adjusted and unadjusted closes would jump where they meet. |
 | 5 | Periods | **1M, 6M, YTD, 1A, 5A, 10A, Máx**, and a custom from/to (`period=1m\|6m\|ytd\|1y\|5y\|10y\|max\|custom`). A preset's start is counted back from today (UTC, as 008): one month, six months, one, five or ten years by the calendar (the 31st goes to a shorter month's last day); YTD starts on 31 December of the previous year, so the year's first close counts. **Máx** has no start of its own. Custom: `from` optional (missing, it is Máx's), `to` optional (missing, today), `from` before `to`. Dates alone mean custom; dates beside a preset are refused, as in 008. The default, with no period and no dates, is **5A**. **(review)** |
-| 6 | The common period | A series *has data in the window* when its own data covers part of it: `max(first, from) < min(last, to)`. The others are left out of the chart and named (decision 9). Of the rest, the **start** is the latest of the window's start and every series' first day, so every series has a value there; the **end** is the latest observation of any of them, not after `to`. Máx is therefore where the latest-starting series begins. When the start is a series' first day, the page says so: "Começa em 17/09/2014, primeiro dia com dados de BTC." |
+| 6 | The common period | A series *has data in the window* when its own data covers part of it: `max(first, from) < min(last, to)`. The others are left out of the chart and named (decision 9). Of the rest, the **start** is the latest of the window's start and every series' first day, so every series has a value there; the **end** is the latest observation of any of them, not after `to`. Máx is therefore where the latest-starting series begins. When that moves the start later than the period's own (always under Máx), the page names the series that begins there: "Começa em 17/09/2014, primeiro dia com dados de BTC." A preset whose start merely coincides with a first day (5A over a 5-year backfill) says nothing. |
 | 7 | Calendars | B3, NYSE, crypto every day, BCB business days: the points are the **union** of the dates on which any drawn series has an observation, plus the start and the end, and PTAX's dates when a series is converted. Each series is carried forward from its last observation. No interpolation. A series whose data ends before the end is drawn flat from there, and its row reads "dados até 01/08/2026" when that is more than 7 days before the end (IPCA is a month or two behind; a weekend is not worth a note). **(review)** |
 | 8 | Rebasing and figures | Every series is 100 on the start: `100 × v(d) / v(start)`. Its change over the period is `v(end) / v(start) − 1`, its annualised rate `(1 + change)^(365 / days) − 1` through 008's `TimeWeightedReturn.Annualise` (`null` past `decimal`'s range), with `days` = end − start. Everything in `decimal`; on the wire, rates to 10 places and index points to 6, half to even, as 008. |
 | 9 | Empty and error states | Fewer than 2 series chosen: the page asks for more and sends nothing (the API answers 400). A series without data in the window: left out of the chart, its row reads "Sem dados no período" and a note names it. No series with data: "Nenhuma das séries tem dados no período escolhido." **No common period**, when a series' data ends on or before the start (or the start is not before the end): nothing is drawn, the page says "As séries escolhidas não têm um período em comum." and lists where each series' data begins and ends. |
@@ -55,8 +55,9 @@ GET /api/compare?series=asset:{id},benchmark:{code}[,…]
     authenticated
     200 {
       currency: "original" | "BRL" | "USD",
-      period: { from: "2021-10-06", to: "2026-10-05", days: 1825 } | null,
-              from is the start, at 100; null when nothing is drawn (decision 9)
+      period: { from: "2021-10-06", to: "2026-10-05", days: 1825, startMoved: false } | null,
+              from is the start, at 100; startMoved when that is a series' first day, later than
+              the period's own start (always under Máx); null when nothing is drawn (decision 9)
       series: [{                                  in the order requested
         key: "asset:3f2c…" | "benchmark:CDI",     normalised: lower-case id, upper-case code
         kind: "asset" | "benchmark",
@@ -100,7 +101,8 @@ Everything is `decimal` until it is serialised.
    (decision 6), the note naming series without data, the chart (`data-testid="compare-chart"`, a line per
    drawn series, hover lists every series on the date, a screen-reader table at each month's last point),
    and the table (`data-testid="compare-table"`): Série (colour, ticker or name, the catalogue name under
-   it, and its currency: "R$", "US$", or "convertido para R$"), No período, Ao ano (decision 11).
+   it, and its currency: "R$", "US$", or "convertido para R$"), No período, Ao ano (decision 11; on a
+   phone it goes under No período, so no column scrolls out of sight).
 
 ## Test plan
 
