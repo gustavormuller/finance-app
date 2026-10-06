@@ -106,12 +106,14 @@ test('two catalogue assets and CDI side by side, over ten days and then a year',
   await expect(page.getByTestId('compare-chart').locator('.recharts-line path')).toHaveCount(3);
   await expect(page).toHaveURL(new RegExp(`period=custom&from=${utcDaysAgo(11)}&to=${utcDaysAgo(1)}`));
 
-  // A preset refetches, and goes into the URL.
+  // A preset refetches, and goes into the URL. Where 1A starts depends on CDI's history,
+  // which earlier runs wrote, so only the change of period is asserted.
+  const tenDays = (await page.getByTestId('compare-period').textContent()) ?? '';
   const periods = page.getByRole('group', { name: 'Período' });
   await periods.getByRole('button', { name: '1A' }).click();
   await expect(periods.getByRole('button', { name: '1A' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page).toHaveURL(/period=1y/);
-  await expect(page.getByTestId('compare-period')).not.toContainText('10 dias');
+  await expect(page.getByTestId('compare-period')).not.toHaveText(tenDays);
   await expect(page.getByTestId('compare-chart').locator('.recharts-line path')).toHaveCount(3);
 
   // The log scale is a setting of the URL as well.
