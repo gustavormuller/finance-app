@@ -64,7 +64,7 @@ function fromTemplate(template: CsvTemplate): MappingDraft {
  * live rendering of those rows as they would be interpreted. Choosing `dd/MM/yyyy`
  * against `MM/dd/yyyy` is invisible until `03/04` shows as 3 abr rather than 4 mar.
  *
- * A spreadsheet (011) comes with `delimiter` null and `onFormatChange`: its typed
+ * A spreadsheet comes with `delimiter` null and `onFormatChange`: its typed
  * cells are written by the API in the chosen culture and date format, so a change
  * asks for the preview again instead of only re-rendering it.
  */

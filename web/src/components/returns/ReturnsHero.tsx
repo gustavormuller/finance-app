@@ -23,7 +23,7 @@ const CODES = ['CDI', 'IPCA6', 'IVVB11'];
 /**
  * The portfolio's returns, first thing on `/investments` (016, design P1): the period's
  * TWR large, the annual rate beside it past a year, the XIRR line, three benchmarks and
- * 008's chart. Every figure is the API's; in dollars the TWR and the benchmarks are
+ * the comparison chart. Every figure is the API's; in dollars the TWR and the benchmarks are
  * derived from the series (decision 13) and the XIRR stays in reais (decision 14).
  */
 export default function ReturnsHero({ currency }: { currency: Currency }) {

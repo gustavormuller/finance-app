@@ -6,9 +6,9 @@ import { benchmarkLabel } from '@/lib/labels';
 import { NO_DATA, formatPoints, formatRate } from '@/lib/rates';
 
 /**
- * Spec 008 "Benchmarks table": each benchmark's return beside the portfolio's, and the
- * difference, portfolio minus benchmark, in percentage points of the period's return.
- * The only figure made here, and it is made exactly (`pointsDifference`).
+ * Each benchmark's return beside the portfolio's, and the difference, portfolio minus
+ * benchmark, in percentage points of the period's return. The only figure made here,
+ * and it is made exactly (`pointsDifference`).
  */
 export default function BenchmarksTable({
   twr,

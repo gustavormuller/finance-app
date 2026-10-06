@@ -67,7 +67,6 @@ internal sealed class FakeHttpHandler(HttpStatusCode status, string body) : Http
     }
 }
 
-/// <summary>A clock stopped at one instant.</summary>
 internal sealed class FixedClock(DateTimeOffset now) : TimeProvider
 {
     public override DateTimeOffset GetUtcNow() => now;

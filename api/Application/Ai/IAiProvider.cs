@@ -30,7 +30,7 @@ public class AiProviderException(string message, int? inputTokens = null, int ou
 
 /// <summary>
 /// The call ran past its purpose's <c>TimeoutSeconds</c> (<see cref="AiGateway"/>). Its tokens
-/// are unknown, so the gateway records an estimate. The suggest endpoint answers <c>504</c> (CP4).
+/// are unknown, so the gateway records an estimate. The suggest endpoint answers <c>504</c>.
 /// </summary>
 public sealed class AiProviderTimeoutException(string message, Exception? innerException = null)
     : AiProviderException(message, inputTokens: null, outputTokens: 0, innerException);

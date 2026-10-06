@@ -1,4 +1,5 @@
 ﻿using Finance.Api.Application.Dashboard;
+using Finance.Api.Application.MarketData;
 using Finance.Api.Domain.Investments;
 using Finance.Api.Domain.MarketData;
 using Finance.Api.Domain.Transactions;
@@ -46,10 +47,10 @@ public sealed record PortfolioSummary(decimal TotalBrl, decimal TotalCostBrl, de
     public UsdBrlView? UsdBrl { get; init; }
 }
 
-/// <summary>One asset class's part of the summary's total (016).</summary>
+/// <summary>One asset class's part of the summary's total.</summary>
 public sealed record AllocationView(MarketAssetClass Class, decimal ValueBrl, decimal Share);
 
-/// <summary>BRL per US dollar, and the day of that rate (016).</summary>
+/// <summary>BRL per US dollar, and the day of that rate.</summary>
 public sealed record UsdBrlView(decimal Rate, DateOnly Date);
 
 /// <summary>The current user's positions: movements through the calculator, valued by the latest daily row.</summary>
@@ -103,7 +104,7 @@ public sealed class PositionQueries(AppDbContext db)
     /// <summary>
     /// Sums the latest <see cref="PortfolioDaily"/> row of each asset (spec test 26). An
     /// asset with no row yet adds nothing, and so does a position sold down to zero. The
-    /// same rows, by class, are the allocation (016).
+    /// same rows, by class, are the allocation.
     /// </summary>
     public async Task<PortfolioSummary> SummaryAsync(CancellationToken cancellationToken)
     {
@@ -126,7 +127,7 @@ public sealed class PositionQueries(AppDbContext db)
         var shares = Shares.Of([.. classes.Select(item => item.Value)]);
 
         var usdBrl = await db.Benchmarks.AsNoTracking()
-            .Where(rate => rate.Code == SnapshotRebuild.UsdBrl)
+            .Where(rate => rate.Code == Benchmark.UsdBrl)
             .OrderByDescending(rate => rate.Date)
             .Select(rate => new UsdBrlView(rate.Value, rate.Date))
             .FirstOrDefaultAsync(cancellationToken);
@@ -176,15 +177,7 @@ public sealed class PositionQueries(AppDbContext db)
     private async Task<List<Benchmark>> RatesAsync(IEnumerable<Movement> movements, CancellationToken cancellationToken)
     {
         var first = movements.Select(movement => (DateOnly?)movement.Date).Min();
-        if (first is null)
-        {
-            return [];
-        }
-
-        var rates = db.Benchmarks.AsNoTracking().Where(rate => rate.Code == SnapshotRebuild.UsdBrl);
-        var anchor = await rates.Where(rate => rate.Date <= first).MaxAsync(rate => (DateOnly?)rate.Date, cancellationToken);
-        return await (anchor is { } start ? rates.Where(rate => rate.Date >= start) : rates)
-            .OrderBy(rate => rate.Date).ToListAsync(cancellationToken);
+        return first is { } date ? await db.UsdBrlRatesAsync(date, last: null, cancellationToken) : [];
     }
 
     private static decimal Brl(decimal amount) => new Money(amount, SnapshotBuilder.BaseCurrency).Amount;

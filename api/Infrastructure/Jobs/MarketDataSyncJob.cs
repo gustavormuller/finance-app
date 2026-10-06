@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Finance.Api.Infrastructure.Jobs;
 
 /// <summary>
-/// Hosts the nightly market-data sync (006; ADR-003 as amended). Cronos computes the next
+/// Hosts the nightly market-data sync (ADR-003 as amended). Cronos computes the next
 /// occurrence of <c>MarketData:Schedule</c> in the server's local time zone, the job waits
 /// until then, runs <see cref="MarketDataSync"/> in a scope of its own, and loops. At
 /// startup, if the latest <see cref="SyncRun"/> started more than 26 hours ago, or there is
@@ -125,7 +125,7 @@ public sealed class MarketDataSyncJob(
 
     /// <summary>
     /// Behind the gate the manual trigger uses: waits out a manual run in progress, then
-    /// runs, then rebuilds the portfolio snapshots from the new closes (007).
+    /// runs, then rebuilds the portfolio snapshots from the new closes.
     /// </summary>
     private async Task RunOnceAsync(CancellationToken stoppingToken)
     {

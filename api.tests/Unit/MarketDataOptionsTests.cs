@@ -4,8 +4,8 @@ using Microsoft.Extensions.Configuration;
 namespace Finance.Api.Tests.Unit;
 
 /// <summary>
-/// 006 configuration: the SGS codes and their units are in <c>appsettings.json</c>, beside
-/// each other, and bind. The codes themselves still need checking on the SGS portal.
+/// The SGS codes and their units are in <c>appsettings.json</c>, beside each other, and
+/// bind. The codes themselves still need checking on the SGS portal.
 /// </summary>
 public sealed class MarketDataOptionsTests
 {
@@ -24,7 +24,7 @@ public sealed class MarketDataOptionsTests
                 .Select(pair => (pair.Key, pair.Value.Code, pair.Value.Unit)));
     }
 
-    /// <summary>CP3: the job is on in production; IVVB11 is a brapi price stored as a benchmark level.</summary>
+    /// <summary>The job is on in production; IVVB11 is a brapi price stored as a benchmark level.</summary>
     [Fact]
     public void Appsettings_turns_on_the_nightly_job_and_serves_IVVB11_from_brapi()
     {
@@ -58,23 +58,10 @@ public sealed class MarketDataOptionsTests
     private static MarketDataOptions Bind()
     {
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(RepositoryRoot(), "api", "appsettings.json"), optional: false, reloadOnChange: false)
+            .AddJsonFile(Path.Combine(TestPaths.RepositoryRoot(), "api", "appsettings.json"), optional: false, reloadOnChange: false)
             .Build();
 
         return configuration.GetSection(MarketDataOptions.Section).Get<MarketDataOptions>()
             ?? throw new InvalidOperationException("No MarketData section in appsettings.json.");
-    }
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "FinanceApp.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("FinanceApp.slnx not found above the test binaries.");
     }
 }

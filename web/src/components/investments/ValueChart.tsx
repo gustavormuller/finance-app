@@ -2,16 +2,12 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 
 import type { DailyRow } from '@/api/finance';
 import SectionHeading from '@/components/dashboard/SectionHeading';
-import { axisTick, tooltipProps, wholeMoney } from '@/lib/chart';
+import { axisTick, shortDay, tooltipProps, wholeMoney } from '@/lib/chart';
 import { formatDate } from '@/lib/labels';
 import { formatMoney } from '@/lib/money';
 
-/** `2026-09-24` as `24/09`, for the axis. */
-const shortDay = (isoDay: string) => formatDate(isoDay).slice(0, 5);
-
 /**
- * The asset's `ValueBrl` per day (spec 007 UI: a simple line, not 008's comparison;
- * 012 draws it over a fill that fades to the ground).
+ * The asset's `ValueBrl` per day: a simple line over a fill that fades to the ground.
  * One series, so no legend: the heading names it. Hovering gives the day's value; the
  * visually hidden table gives the value at each month's last row, since a row per
  * calendar day would be thousands of cells to a screen reader.

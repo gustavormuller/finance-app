@@ -146,7 +146,7 @@ public sealed partial class SpreadsheetReaderTests
     [Fact]
     public void The_reader_holds_no_double_or_float()
     {
-        var file = Path.Combine(RepositoryRoot(), "api", "Domain", "Import", "SpreadsheetStatementReader.cs");
+        var file = Path.Combine(TestPaths.RepositoryRoot(), "api", "Domain", "Import", "SpreadsheetStatementReader.cs");
 
         var offenders = File.ReadLines(file)
             .Select((line, number) => (number, code: Comment().Replace(line, "")))
@@ -178,17 +178,4 @@ public sealed partial class SpreadsheetReaderTests
 
     [GeneratedRegex(@"\b(double|float|Half|Single|Double)\b|\d(d|f|D|F)\b")]
     private static partial Regex FloatingPoint();
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "FinanceApp.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("FinanceApp.slnx not found above the test binaries.");
-    }
 }

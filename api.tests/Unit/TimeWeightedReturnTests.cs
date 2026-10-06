@@ -105,7 +105,7 @@ public sealed class TimeWeightedReturnTests
 
     /// <summary>
     /// Spec silent: annualised is computed for a year or less too, so the timing effect
-    /// compares like with like (DEFERRED, 008 CP1). 10% over 365 days is 10% a year.
+    /// compares like with like. 10% over 365 days is 10% a year.
     /// </summary>
     [Fact]
     public void A_year_or_less_is_annualised_too()

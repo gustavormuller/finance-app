@@ -2,7 +2,7 @@ import type { Category, CategoryKind, CategoryUsage } from '@/api/finance';
 
 /** A category's transactions in the range: how many, and their signed sum. */
 export type Use = { count: number; total: number };
-export type Leaf = { category: Category; use: Use };
+type Leaf = { category: Category; use: Use };
 /** A main category; its rollup is its own use plus its subcategories'. */
 export type Main = { category: Category; rollup: Use; children: Leaf[] };
 
@@ -16,7 +16,6 @@ const size = (entry: Leaf | Main) => Math.abs('rollup' in entry ? entry.rollup.t
 /** Largest use first, then by name: the categories that matter float up. */
 const bySize = (a: Leaf | Main, b: Leaf | Main) => size(b) - size(a) || a.category.name.localeCompare(b.category.name);
 
-/** Main categories of a kind with their subcategories, each with its use (spec 013). */
 export function categoryTree(categories: Category[], usage: CategoryUsage[], kind: CategoryKind): Main[] {
   const used = new Map(usage.map((entry) => [entry.categoryId, { count: entry.count, total: entry.total }]));
   const use = (id: string) => used.get(id) ?? NONE;

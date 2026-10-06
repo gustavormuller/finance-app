@@ -10,9 +10,9 @@ import ReturnsReport from '@/components/returns/ReturnsReport';
 import { returnsInUsd, useCurrencyChoice } from '@/lib/currency';
 
 /**
- * `/investments/returns` (008): how the money did, and against what. Every figure is the
- * API's; the page formats, it does not compute. 016 keeps it as the detailed report
- * behind `/investments`' hero, in R$ or US$.
+ * `/investments/returns`: how the money did, and against what. Every figure is the
+ * API's; the page formats, it does not compute. It is the detailed report behind
+ * `/investments`' hero, in R$ or US$.
  */
 export default function ReturnsPage() {
   const [query, setQuery] = useState<ReturnsQuery>({ period: 'inception' });

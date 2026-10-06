@@ -97,11 +97,7 @@ public static class MarketDataEndpoints
             var asset = NewAsset(request, clock);
             database.Add(asset);
 
-            try
-            {
-                await database.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException exception) when (exception.IsDuplicate())
+            if (!await database.TrySaveAsync(cancellationToken))
             {
                 return DuplicateSymbol(asset);
             }
