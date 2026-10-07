@@ -26,6 +26,13 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 11 | When a failure's sentence goes | When the next write starts (categories, transactions, movements, accounts), no longer when the form closes: a late save that leaves another form open must not clear that form's sentence. |
 | 12 | Tests | E2E, each defect reproduced in the test's own page with `page.route`: a write answered with a bare 500 or 403, or aborted; a save held back until another form is open (`support.ts` gains `holdBack`). A bare 404 is real: the row is deleted in a second tab (024, decision 10). Unit, only where E2E cannot reach: a 400's message is its field messages, never the title, which no page shows on its own. |
 
+## Found on the way, not fixed
+
+- A refusal that lands late lands on whatever form is open: on `/accounts` and an asset's
+  movements its field messages show under the fields of the form opened since, and on
+  `/categories` and `/transactions` its sentence shows above the list while another form is
+  open. Proposal: the same rule as a success, a late refusal shown only on its own form.
+
 ## Out of scope
 
 - A 2xx answer whose body is not JSON: the proxies send `/api` only to the API, which always
@@ -65,7 +72,8 @@ None.
 | `market-data.spec.ts` | "a source saved late leaves another entry's editor open" | one entry's save held back while another's Editar is opened |
 | `accounts.spec.ts` | "an account created after its form was cancelled leaves the next form open" | decision 9 |
 
-Each failed first for the reason in its row. The PWA suite's test 10 reads "com falha".
+Each failed first for the reason in its row. The suite runs 105 tests in 18 files (98 before), none
+skipped. The PWA suite's test 10 reads "com falha".
 
 ### Unit — `web`
 
