@@ -4,6 +4,7 @@ import {
   createAccount,
   createTransaction,
   devLogin,
+  holdBack,
   importStep,
   showTransactionsBetween,
   uniqueEmail,
@@ -71,6 +72,32 @@ test('an account created before the list has loaded is the one selected', async 
   await page.getByRole('button', { name: 'Criar conta' }).click();
 
   await expect(page.getByRole('heading', { name: 'Zeta', exact: true })).toBeVisible();
+});
+
+/** 028: a create still in flight when its form is cancelled and another one is opened. */
+test('an account created after its form was cancelled leaves the next form open', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-accounts-late'), 'Ada Lovelace');
+  await createAccount(page, 'Banco A');
+  const selected = page.url();
+
+  const release = await holdBack(page, 'POST', '/api/accounts');
+  const form = page.getByRole('region', { name: 'Nova conta' });
+  await page.getByRole('button', { name: 'Nova conta' }).click();
+  await form.getByLabel('Nome').fill('Zeta');
+  await form.getByRole('button', { name: 'Criar conta' }).click();
+  await form.getByRole('button', { name: 'Cancelar' }).click();
+  await page.getByRole('button', { name: 'Nova conta' }).click();
+  await form.getByLabel('Nome').fill('Ômega');
+  release();
+
+  // Zeta lands in the list, unselected, and its save is over once Criar conta is enabled again:
+  // the form opened since still holds what was typed in it.
+  await expect(card(page, 'Zeta')).toBeVisible();
+  await expect(form.getByRole('button', { name: 'Criar conta' })).toBeEnabled();
+  await expect(form.getByLabel('Nome')).toHaveValue('Ômega');
+  expect(page.url()).toBe(selected);
+  await form.getByRole('button', { name: 'Criar conta' }).click();
+  await expect(page.getByRole('heading', { name: 'Ômega', exact: true })).toBeVisible();
 });
 
 test('an account the form or the API refuses says why, under the field', async ({ page }) => {
