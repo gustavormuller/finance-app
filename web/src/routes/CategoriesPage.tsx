@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { categoryTree, fold, type Main, type Use } from '@/lib/categoryTree';
 import { categoryKindPlurals, categoryKinds } from '@/lib/labels';
+import { refusalMessage } from '@/lib/refusal';
 import { cn } from '@/lib/utils';
 
 type KindFilter = 'All' | CategoryKind;
@@ -64,7 +65,7 @@ export default function CategoriesPage() {
       }
       close();
     },
-    onError: (error: Error) => setFailure(error.message),
+    onError: (error: Error) => setFailure(refusalMessage(error)),
   });
 
   const remove = useMutation({
@@ -73,7 +74,7 @@ export default function CategoriesPage() {
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
       close();
     },
-    onError: (error: Error) => setFailure(error.message),
+    onError: (error: Error) => setFailure(refusalMessage(error)),
   });
 
   const all = categories.data ?? [];

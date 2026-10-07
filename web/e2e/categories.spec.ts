@@ -181,8 +181,6 @@ test("each category's use over the last 12 months, its share, and the unused one
 });
 
 test('a refusal the API sends as a 400 is explained in Portuguese', async ({ page }) => {
-  test.fixme(true, 'Bug: CategoriesPage shows the 400\'s English title ("One or more validation errors occurred.") instead of its field message.');
-
   await devLogin(page, uniqueEmail('e2e-categories-400'), 'Ada Lovelace');
   await page.goto('/categories');
 
