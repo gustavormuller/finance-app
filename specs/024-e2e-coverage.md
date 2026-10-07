@@ -285,7 +285,7 @@ Each was kept as a `test.fixme` with its reason, and none was fixed here. Spec 0
 | The AI budget spent (402), the provider timing out (504) or failing (502), an analysis that fails, a 409 from another tab's generation | The fake provider always answers at once, and a call costs cents against R$ 15. |
 | An analysis for a month that has not begun | The month selector stops at the current month. |
 | A page failing to load ("Não foi possível carregar…", the comparison's included) and the in-flight states ("Carregando…", "Verificando…", "Gerando…") | Needs the API to fail or hang mid-suite; it is shared by every test, and an in-flight state lasts milliseconds. |
-| The footer's `degraded` / `unreachable` on the dev server | Same; the PWA suite covers the unreachable API (HEALTH-3). |
+| The footer's `unreachable` on the dev server | Same; the PWA suite covers the unreachable API (HEALTH-3). Since 028, `health` reaches the `degraded` footer ("com falha") by answering `/api/health` in its own page. |
 | Storage that cannot be read (theme, currency choice) | A private window's blocked storage is not something a test context offers. |
 | A password-protected spreadsheet | Needs an encrypted workbook fixture; the API's integration tests cover it. |
 | Dropping a file on the zone | Playwright's synthetic drop is not an operating-system drag; it reaches the same handler as Escolher arquivo, which E2E drives. |

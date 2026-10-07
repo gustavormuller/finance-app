@@ -3,7 +3,7 @@ import { Navigate, Outlet, useNavigate, useParams, useSearch } from '@tanstack/r
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
-import { api } from '@/api/finance';
+import { api, type AccountInput } from '@/api/finance';
 import AccountForm from '@/components/accounts/AccountForm';
 import AccountList from '@/components/accounts/AccountList';
 import { useAccounts, useBalances, useImports } from '@/components/accounts/queries';
@@ -12,6 +12,7 @@ import Card from '@/components/Card';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { accountRefusal } from '@/lib/accounts';
+import { useOpenForm, type Opening } from '@/lib/openForm';
 import type { Refusal } from '@/lib/refusal';
 
 /**
@@ -24,7 +25,9 @@ export default function AccountsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const { accountId } = useParams({ strict: false });
   const { tab } = useSearch({ from: '/protected/accounts' });
-  const [creating, setCreating] = useState(false);
+  // The new-account form, which edits no account: only its openings tell two apart.
+  const forms = useOpenForm<null>();
+  const opening = forms.open;
   const [refused, setRefused] = useState<Refusal | null>(null);
 
   const accounts = useAccounts();
@@ -32,18 +35,23 @@ export default function AccountsPage(): React.JSX.Element {
   const imports = useImports();
 
   const close = () => {
-    setCreating(false);
+    forms.close();
     setRefused(null);
   };
 
   const create = useMutation({
-    mutationFn: api.createAccount,
+    mutationFn: ({ input }: { input: AccountInput; from: Opening<null> }) => api.createAccount(input),
     onMutate: () => setRefused(null),
-    onSuccess: async (created) => {
+    onSuccess: async (created, { from }) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['accounts'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       ]);
+      // Its form cancelled, or another opened since: the new account is in the list, and the
+      // page stays as the person left it.
+      if (forms.current() !== from) {
+        return;
+      }
       // Selected before the form closes: closing brings the outlet back, and on `/accounts`
       // alone that is FirstAccount, whose redirect to the first account would win.
       await navigate({ to: '/accounts/$accountId', params: { accountId: created.id } });
@@ -58,8 +66,8 @@ export default function AccountsPage(): React.JSX.Element {
         title="Contas"
         subtitle="O extrato entra pela conta a que ele pertence: sem escolher conta de novo, com o histórico dela ao lado."
         actions={
-          !creating && (
-            <Button onClick={() => setCreating(true)}>
+          !opening && (
+            <Button onClick={() => forms.show(null)}>
               <Plus aria-hidden="true" />
               Nova conta
             </Button>
@@ -67,7 +75,7 @@ export default function AccountsPage(): React.JSX.Element {
         }
       />
 
-      {creating && (
+      {opening && (
         <Card aria-labelledby="new-account-heading" className="grid gap-4">
           <h3 id="new-account-heading" className="text-lg font-semibold">
             Nova conta
@@ -77,7 +85,7 @@ export default function AccountsPage(): React.JSX.Element {
             submitLabel="Criar conta"
             busy={create.isPending}
             errors={refused?.fields ?? {}}
-            onSubmit={(input) => create.mutate(input)}
+            onSubmit={(input) => create.mutate({ input, from: opening })}
           >
             <Button type="button" variant="outline" onClick={close}>
               Cancelar
@@ -88,13 +96,13 @@ export default function AccountsPage(): React.JSX.Element {
 
       {accounts.isError && <Alert>Não foi possível carregar as contas. Recarregue a página para tentar de novo.</Alert>}
 
-      {accounts.data?.length === 0 && !creating && (
+      {accounts.data?.length === 0 && !opening && (
         <Card as="div" className="text-muted-foreground py-16 text-center">
           <p className="text-foreground text-sm font-medium">Nenhuma conta ainda</p>
           <p className="mt-1 text-sm">
             Cadastre a primeira para começar a registrar lançamentos e importar extratos.
           </p>
-          <Button className="mt-4" onClick={() => setCreating(true)}>
+          <Button className="mt-4" onClick={() => forms.show(null)}>
             Criar a primeira conta
           </Button>
         </Card>
@@ -114,7 +122,7 @@ export default function AccountsPage(): React.JSX.Element {
             />
           </div>
           {/* Hidden while creating, so the page never shows two account forms at once. */}
-          {!creating && <Outlet />}
+          {!opening && <Outlet />}
         </div>
       )}
     </section>

@@ -102,7 +102,7 @@ test('10: with the server down, an app route still opens on the app', async () =
   expect(response?.fromServiceWorker()).toBe(true);
   await expect(page.getByRole('heading', { name: 'Finanças Pessoais' })).toBeVisible();
   // The app's own answer to an unreachable API.
-  await expect(page.getByTestId('health-status')).toHaveText('degraded');
+  await expect(page.getByTestId('health-status')).toHaveText('com falha');
 
   server = await startPreview();
 });

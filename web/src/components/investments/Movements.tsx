@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDate, movementKindLabels } from '@/lib/labels';
 import { formatMoney, formatQuantity, formatUnitPrice, localToday } from '@/lib/money';
+import { useOpenForm, type Opening } from '@/lib/openForm';
 
 import MovementForm from './MovementForm';
 import { INVESTMENTS, useMovements } from './queries';
@@ -20,28 +21,35 @@ import { INVESTMENTS, useMovements } from './queries';
 export default function Movements({ assetId, currency }: { assetId: string; currency: string }) {
   const queryClient = useQueryClient();
   const movements = useMovements(assetId);
-  const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<Movement | null>(null);
+  // The open form's movement, or null for a new one.
+  const forms = useOpenForm<Movement | null>();
+  const opening = forms.open;
+  const editing = opening?.of ?? null;
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [failure, setFailure] = useState<string | null>(null);
 
   const open = (movement: Movement | null) => {
-    setCreating(movement === null);
-    setEditing(movement);
+    forms.show(movement);
     setErrors({});
     setFailure(null);
   };
   const close = () => {
-    setCreating(false);
-    setEditing(null);
+    forms.close();
     setErrors({});
   };
 
   const save = useMutation({
-    mutationFn: (input: MovementInput) => (editing ? api.updateMovement(editing.id, input) : api.createMovement(assetId, input)),
-    onSuccess: async () => {
+    mutationFn: ({ input, from }: { input: MovementInput; from: Opening<Movement | null> }) =>
+      from.of ? api.updateMovement(from.of.id, input) : api.createMovement(assetId, input),
+    onMutate: () => {
+      setErrors({});
+      setFailure(null);
+    },
+    onSuccess: async (_, { from }) => {
       await queryClient.invalidateQueries({ queryKey: INVESTMENTS });
-      close();
+      if (forms.current() === from) {
+        close();
+      }
     },
     onError: (error: Error) => {
       const fields = error instanceof ApiError ? error.fields : {};
@@ -63,12 +71,12 @@ export default function Movements({ assetId, currency }: { assetId: string; curr
     <section aria-labelledby="movements-heading" className="grid gap-4">
       <div className="flex items-center justify-between gap-4">
         <SectionHeading id="movements-heading">Movimentações</SectionHeading>
-        {!creating && !editing && <Button onClick={() => open(null)}>Nova movimentação</Button>}
+        {!opening && <Button onClick={() => open(null)}>Nova movimentação</Button>}
       </div>
 
       {failure && <Alert>{failure}</Alert>}
 
-      {(creating || editing) && (
+      {opening && (
         <div className="glass rounded-2xl p-5 sm:p-6">
           <MovementForm
             key={editing?.id ?? 'new'}
@@ -78,7 +86,7 @@ export default function Movements({ assetId, currency }: { assetId: string; curr
             errors={errors}
             pending={save.isPending}
             submitLabel={editing ? 'Salvar movimentação' : 'Registrar movimentação'}
-            onSubmit={(input) => save.mutate(input)}
+            onSubmit={(input) => save.mutate({ input, from: opening })}
             onCancel={close}
           />
         </div>

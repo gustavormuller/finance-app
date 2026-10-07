@@ -1,10 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
 
 import {
   commitImport,
   createAccount,
   createTransaction,
   devLogin,
+  holdBack,
   importStep,
   showTransactionsBetween,
   uniqueEmail,
@@ -293,6 +294,88 @@ test('a date the API refuses is explained in Portuguese', async ({ page }) => {
 
   await expect(page.getByRole('alert')).toContainText('A data deve estar entre 01/01/1900 e');
   await expect(page.getByRole('alert')).not.toContainText('One or more validation errors occurred.');
+});
+
+/**
+ * 028: refusals that bring no sentence of their own, and requests that never reach the API.
+ * The 404 is real, for a row deleted in a second tab; the rest are answered in this page only.
+ */
+test('a refusal that comes without a sentence still reads in Portuguese', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-bare-refusals'), 'Grace Hopper');
+  await createAccount(page, 'Nubank');
+  await createTransaction(page, { account: 'Nubank', category: 'Lazer', amount: '20', date: '2026-09-08', description: 'Teatro' });
+  await createTransaction(page, { account: 'Nubank', category: 'Alimentação', amount: '35', date: '2026-09-09', description: 'Mercado' });
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
+  const alert = page.getByRole('alert');
+
+  await page.getByRole('row', { name: /Teatro/ }).getByRole('button', { name: 'Editar' }).click();
+  const other = await page.context().newPage();
+  await other.goto('/transactions');
+  await showTransactionsBetween(other, '2026-09-01', '2026-09-30');
+  await other.getByRole('row', { name: /Teatro/ }).getByRole('button', { name: 'Excluir' }).click();
+  await expect(other.getByRole('row', { name: /Teatro/ })).toHaveCount(0);
+  await other.close();
+  await page.getByLabel('Descrição').fill('Teatro municipal');
+  await page.getByRole('button', { name: 'Salvar lançamento' }).click();
+  await expect(alert).toHaveText('Este item não existe mais; talvez tenha sido excluído em outra aba. Recarregue a página.');
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(alert).toHaveCount(0);
+
+  const network = 'Não foi possível falar com o servidor. Confira a conexão e tente de novo.';
+  const exports = (url: URL) => url.pathname === '/api/transactions/export';
+  await page.route(exports, (route) => route.abort('failed'));
+  await page.getByRole('button', { name: 'Exportar CSV' }).click();
+  await expect(alert).toHaveText(network);
+  await page.unroute(exports);
+
+  await page.getByRole('button', { name: 'Novo lançamento' }).click();
+  await page.getByLabel('Conta', { exact: true }).selectOption({ label: 'Nubank' });
+  await page.getByLabel('Categoria', { exact: true }).selectOption({ label: 'Lazer' });
+  await page.getByLabel('Valor').fill('15');
+  await page.getByLabel('Data').fill('2026-09-10');
+  await page.getByLabel('Descrição').fill('Cinema');
+  const creates = (url: URL) => url.pathname === '/api/transactions';
+  const answered = async (answer: (route: Route) => Promise<void>, sentence: string) => {
+    await page.route(creates, (route) => (route.request().method() === 'POST' ? answer(route) : route.fallback()));
+    await page.getByRole('button', { name: 'Criar lançamento' }).click();
+    await expect(alert).toHaveText(sentence);
+    await page.unroute(creates);
+  };
+  await answered((route) => route.fulfill({ status: 500 }), 'O servidor não conseguiu concluir a operação. Tente de novo em instantes.');
+  await answered((route) => route.fulfill({ status: 403 }), 'Não foi possível concluir a operação (erro 403).');
+  await answered((route) => route.abort('failed'), network);
+});
+
+/** 028: Editar on a row while a new transaction is still being saved. */
+test('Editar while a new transaction is saving opens that row, and the save leaves it open', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-transactions-late'), 'Katherine Johnson');
+  await createAccount(page, 'Nubank');
+  await createTransaction(page, { account: 'Nubank', category: 'Alimentação', amount: '42', date: '2026-09-10', description: 'Mercado' });
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
+
+  const release = await holdBack(page, 'POST', '/api/transactions');
+  await page.getByRole('button', { name: 'Novo lançamento' }).click();
+  await page.getByLabel('Conta', { exact: true }).selectOption({ label: 'Nubank' });
+  await page.getByLabel('Categoria', { exact: true }).selectOption({ label: 'Lazer' });
+  await page.getByLabel('Valor').fill('30');
+  await page.getByLabel('Data').fill('2026-09-12');
+  await page.getByLabel('Descrição').fill('Cinema');
+  await page.getByRole('button', { name: 'Criar lançamento' }).click();
+
+  // The row's own values, not the ones typed for the new transaction.
+  await page.getByRole('row', { name: /Mercado/ }).getByRole('button', { name: 'Editar' }).click();
+  const description = page.getByLabel('Descrição');
+  await expect(description).toHaveValue('Mercado');
+  await expect(page.getByLabel('Valor')).toHaveValue('42.00');
+  release();
+
+  // Cinema lands; Mercado's form is still open, and saves Mercado.
+  await expect(page.getByRole('row', { name: /Cinema/ })).toBeVisible();
+  await description.fill('Mercado do bairro');
+  await page.getByRole('button', { name: 'Salvar lançamento' }).click();
+  await expect(page.getByRole('row', { name: /Mercado do bairro/ })).toBeVisible();
+  await expect(page.getByRole('row', { name: /Cinema/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Salvar lançamento' })).toBeHidden();
 });
 
 /**

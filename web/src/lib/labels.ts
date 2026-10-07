@@ -166,6 +166,17 @@ export const syncRunStatusLabels: Record<SyncRunStatus, string> = {
   Failed: 'Falhou',
 };
 
+const healthWords: Record<string, string> = {
+  ok: 'ok',
+  degraded: 'com falha',
+  unreachable: 'inacessível',
+};
+
+/** A word of `/api/health` (001): `ok`, `degraded` or `unreachable`. An unknown word is shown as sent. */
+export function healthLabel(word: string): string {
+  return healthWords[word] ?? word;
+}
+
 export const movementKindLabels: Record<MovementKind, string> = {
   Buy: 'Compra',
   Sell: 'Venda',

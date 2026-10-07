@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { marketAssetClassLabels, providerKindLabels } from '@/lib/labels';
+import { useOpenForm } from '@/lib/openForm';
 import { refusal } from '@/lib/refusal';
 
 import EditSource from './EditSource';
@@ -27,7 +28,8 @@ export default function AssetCatalogue() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   // A new key remounts the registration fields blank, suggestions and all.
   const [registration, setRegistration] = useState(0);
-  const [editing, setEditing] = useState<MarketAsset | null>(null);
+  const editors = useOpenForm<MarketAsset>();
+  const editing = editors.open;
 
   const assets = useQuery({ queryKey: ['market-assets', q], queryFn: () => api.searchMarketAssets(q) });
 
@@ -86,7 +88,18 @@ export default function AssetCatalogue() {
         </Button>
       </form>
 
-      {editing && <EditSource key={editing.id} asset={editing} onDone={() => setEditing(null)} />}
+      {editing && (
+        <EditSource
+          key={editing.of.id}
+          asset={editing.of}
+          // Also called by a save landing after another entry's Editar, whose editor stays.
+          onDone={() => {
+            if (editors.current() === editing) {
+              editors.close();
+            }
+          }}
+        />
+      )}
 
       {assets.isError && <Alert>Não foi possível carregar os ativos.</Alert>}
 
@@ -124,7 +137,7 @@ export default function AssetCatalogue() {
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">{asset.currency}</TableCell>
                 <TableCell className="text-right">
-                  <Button size="sm" variant="outline" aria-label={`Editar ${asset.ticker}`} onClick={() => setEditing(asset)}>
+                  <Button size="sm" variant="outline" aria-label={`Editar ${asset.ticker}`} onClick={() => editors.show(asset)}>
                     Editar
                   </Button>
                 </TableCell>

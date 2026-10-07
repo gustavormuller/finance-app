@@ -642,7 +642,7 @@ export class ApiError extends Error {
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   // A FormData body sets its own multipart boundary; only a JSON string needs the
   // header, and forcing it onto multipart would break the upload.
-  const response = await fetch(url, {
+  const response = await send(url, {
     ...init,
     credentials: 'same-origin',
     headers: typeof init?.body === 'string' ? { 'Content-Type': 'application/json' } : {},
@@ -660,7 +660,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
  * gives. A refusal is an `ApiError`, as for any other request.
  */
 async function download(url: string, fallbackName: string): Promise<DownloadedFile> {
-  const response = await fetch(url, { credentials: 'same-origin' });
+  const response = await send(url, { credentials: 'same-origin' });
 
   if (!response.ok) {
     throw await refusal(response);
@@ -672,20 +672,47 @@ async function download(url: string, fallbackName: string): Promise<DownloadedFi
   };
 }
 
+/**
+ * The fetch every call makes. A request that gets no answer at all is not an `ApiError`, so
+ * nothing takes it for a refusal, but its message is a sentence: the browser's own is English
+ * and differs from one browser to the next.
+ */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    throw new Error('Não foi possível falar com o servidor. Confira a conexão e tente de novo.', { cause: error });
+  }
+}
+
 async function refusal(response: Response): Promise<ApiError> {
-  // The API answers every refusal as problem details but a 401, which has no body: the
-  // session ended, in another tab or by expiring. `errors` is present on a 400 naming
-  // fields; `detail` carries the readable sentence a 409 exists to give.
+  // Every refusal the API writes is problem details with a pt-BR `detail`, but a 400, whose
+  // `errors` hold pt-BR messages under ASP.NET's English `title`. The rest come with no body:
+  // a 401, a 404 for a row that is gone, the Origin check's 403, a server that failed.
   const problem = await response.json().catch(() => ({}) as Record<string, unknown>);
+  const fields = (problem.errors as Record<string, string[]> | undefined) ?? {};
 
   return new ApiError(
     response.status,
-    (problem.detail as string) ??
-      (problem.title as string) ??
-      (response.status === 401 ? 'Sua sessão terminou. Entre de novo para continuar.' : `Request failed (${response.status})`),
-    (problem.errors as Record<string, string[]>) ?? {},
+    (problem.detail as string | undefined) ?? (Object.values(fields).flat().join(' ') || statusSentence(response.status)),
+    fields,
     typeof problem.openBatchId === 'string' ? problem.openBatchId : null,
   );
+}
+
+/** What a refusal says when it brings no sentence of its own. */
+function statusSentence(status: number): string {
+  if (status === 401) {
+    return 'Sua sessão terminou. Entre de novo para continuar.';
+  }
+
+  if (status === 404) {
+    return 'Este item não existe mais; talvez tenha sido excluído em outra aba. Recarregue a página.';
+  }
+
+  return status >= 500
+    ? 'O servidor não conseguiu concluir a operação. Tente de novo em instantes.'
+    : `Não foi possível concluir a operação (erro ${status}).`;
 }
 
 function searchParams(query: object): string {

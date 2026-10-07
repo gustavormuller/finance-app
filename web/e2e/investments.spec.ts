@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { devLogin, localToday, syncMarketData, uniqueEmail, uniqueTicker } from './support';
+import { devLogin, holdBack, localToday, syncMarketData, uniqueEmail, uniqueTicker } from './support';
 
 /**
  * Spec 007 E2E (tests 31–33) and 024's investments flows, against the real API process
@@ -396,4 +396,31 @@ test('a new ticker shows "Sem cotação" until a sync prices it', async ({ page 
     await expect(row).toContainText('R$ 100,00', { timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
   await expect(row).not.toContainText('Sem cotação');
+});
+
+/** 028: Editar on a movement while a new one is still being saved. No sync: nothing is valued. */
+test('a movement saved late leaves the form opened since', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-invest-late'), 'Katherine Johnson');
+  const assetId = await addNewAsset(page, uniqueTicker('TARDE'));
+  await recordMovement(page, { kind: 'Buy', quantity: '10', unitPrice: '8' });
+
+  const release = await holdBack(page, 'POST', `/api/investments/assets/${assetId}/movements`);
+  await page.getByRole('button', { name: 'Nova movimentação' }).click();
+  const form = page.getByRole('form', { name: 'Movimentação' });
+  await form.getByLabel('Tipo').selectOption('Dividend');
+  await form.getByLabel('Valor recebido').fill('5');
+  await form.getByRole('button', { name: 'Registrar movimentação' }).click();
+  const movement = (kind: string) => page.locator('[data-testid^="movement-"]').filter({ hasText: kind });
+  await movement('Compra').getByRole('button', { name: 'Editar' }).click();
+  await expect(form.getByLabel('Quantidade')).toHaveValue('10');
+  release();
+
+  // The dividend lands, and its save is over once the button is enabled again: the buy's
+  // form is still open.
+  await expect(movement('Dividendo')).toBeVisible();
+  await expect(form.getByRole('button', { name: 'Salvar movimentação' })).toBeEnabled();
+  await form.getByLabel('Quantidade').fill('12');
+  await form.getByRole('button', { name: 'Salvar movimentação' }).click();
+  await expect(form).toBeHidden();
+  await expect(summaryFigure(page, 'Quantidade')).toHaveText('12');
 });

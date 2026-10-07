@@ -50,7 +50,7 @@ describe('HealthRoute', () => {
 
     renderRoute();
 
-    expect(await screen.findByTestId('health-status')).toHaveTextContent('degraded');
-    expect(screen.getByTestId('health-database')).toHaveTextContent('unreachable');
+    expect(await screen.findByTestId('health-status')).toHaveTextContent('com falha');
+    expect(screen.getByTestId('health-database')).toHaveTextContent('inacessível');
   });
 });
