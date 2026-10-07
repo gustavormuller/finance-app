@@ -20,7 +20,7 @@ Marked **(review)** where the spec picked a default a person should confirm.
 | 5 | After a write refused with a 401, go to `/login`? | No. The sentence stays on the page, beside what the person typed, as the E2E expects; the next read of the session (a refocus, a reload) sends them to `/login` through the guard. **(review)** |
 | 6 | Sair when the session already ended | A 401 from `POST /api/auth/logout` means the person is already signed out: the page lands on `/login`, as a normal Sair does. Any other failure (a 403 from the Origin check, a 5xx, the network) still reads "Não foi possível sair." The route stays behind the sign-in. **(review)** |
 | 7 | An account created while `/accounts` is still opening its first account | The new account is selected before the form closes. Closing the form brings the outlet back, and on `/accounts` alone that is the index route, whose redirect to the first account won. `navigate` resolves once the new route is committed and rendered, so the outlet comes back on the new account. |
-| 8 | The refused fixmes' assertions | Kept as 024 wrote them; none was wrong. |
+| 8 | The fixmes' assertions | Kept as 024 wrote them; none was wrong. Two tests change beyond their fixme line. The categories one raced its own setup: it clicked "Editar Lazer" while the subcategory's save was in flight, and on a busy run that save landed after the click and closed the edit form (found on the way, below). It now waits for what a person sees first, the form closed and Cinema listed, which adds two assertions. The import test that accepted "2,1" or "2.1" now accepts only the comma. |
 | 9 | Unit tests | None added: each bug has its E2E test (024, phase 2: E2E owns the flows). The refusal of an index or a rate is an endpoint's status and field, which E2E does not see (024, decision 13), so it gets an integration test. |
 
 ## The bugs
@@ -42,6 +42,11 @@ Marked **(review)** where the spec picked a default a person should confirm.
   `Request failed (N)`: a bare 404 for a row another tab deleted (Editar on a deleted transaction),
   a 5xx with no body. Proposal: a pt-BR sentence in the same fallback. Outside the seven bugs, and
   no test reaches it yet.
+- A save that lands late closes whatever form is open by then: on `/categories`, Editar on another
+  row while a create is in flight opens that form, and the create's success closes it; on
+  `/transactions`, Editar on a row while a new transaction is saving does the same. Proposal: close
+  only the form the save came from. Outside the seven bugs; the categories test now waits for the
+  save, as a person does (decision 8).
 
 ## Out of scope
 
@@ -76,7 +81,8 @@ No route, status or shape changes. One message: the 413 of `POST /api/imports` a
 ### E2E — `web/e2e`
 
 The seven `test.fixme` lines are removed. Each test failed first for the reason its fixme gave,
-and passes after its fix, unchanged otherwise. The suite then runs 98 tests in 18 files, none
+and passes after its fix; the categories one also waits for its setup's save, and the general
+import refusal test pins the comma (decision 8). The suite then runs 98 tests in 18 files, none
 skipped.
 
 ### Integration — `api.tests/Integration`
