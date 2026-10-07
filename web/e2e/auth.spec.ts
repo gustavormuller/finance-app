@@ -114,8 +114,6 @@ test('a write after the session ended in another tab is explained in Portuguese'
 
 /** 024: Sair from a tab whose session already ended. */
 test('Sair from a tab whose session already ended lands on the login page', async ({ page }) => {
-  test.fixme(true, 'Bug: the logout answers 401 and the sidebar shows "Não foi possível sair." instead of leaving.');
-
   await devLogin(page, uniqueEmail('e2e-ended-logout'), 'Grace Hopper');
   await page.goto('/');
   await signOutElsewhere(page);

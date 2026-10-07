@@ -71,9 +71,10 @@ function SignedIn() {
     mutationFn: async () => {
       const response = await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
 
-      // A 403 here means the Origin check refused the request, which is a bug in the
-      // configured origin rather than something to report as a signed-out state.
-      if (!response.ok) {
+      // A 401 means the session already ended (Sair in another tab, or it expired): signed
+      // out either way. A 403 here means the Origin check refused the request, which is a
+      // bug in the configured origin rather than something to report as a signed-out state.
+      if (!response.ok && response.status !== 401) {
         throw new Error(`/api/auth/logout answered ${response.status}`);
       }
     },
