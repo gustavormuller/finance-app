@@ -46,6 +46,7 @@ Each spec contains:
 | 024 | e2e-coverage | every flow on the site driven by an E2E test, or listed as not reachable |
 | 025 | yahoo-full-history | Yahoo Finance first and keyless, raw and adjusted closes, full history back to 1994 |
 | 026 | compare | any catalogue asset or benchmark side by side, base 100, in its own currency or at PTAX |
+| 027 | e2e-bugs | the seven bugs 024's E2E suite found, fixed; its `test.fixme`s pass |
 
 One number per session set. If a feature needs more than three sessions, it was scoped
 too large — split it.
