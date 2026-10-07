@@ -491,7 +491,9 @@ public static class ImportEndpoints
         {
             return new Upload(fileName, [], Results.Problem(
                 title: "Arquivo muito grande",
-                detail: $"O arquivo tem {file.Length / 1024.0m / 1024.0m:0.0} MB; o limite é {MaxFileBytes / 1024 / 1024} MB.",
+                detail: string.Create(
+                    AmountParser.NumberFormat("pt-BR"),
+                    $"O arquivo tem {file.Length / 1024.0m / 1024.0m:0.0} MB; o limite é {MaxFileBytes / 1024 / 1024} MB."),
                 statusCode: StatusCodes.Status413PayloadTooLarge));
         }
 
