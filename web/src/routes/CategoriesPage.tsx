@@ -78,9 +78,9 @@ export default function CategoriesPage() {
     onMutate: () => setFailure(null),
     onSuccess: async (_, id) => {
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
-      // Only the deleted category's own form goes with it.
+      // Only the deleted category's own forms go with it: its edit, or a subcategory under it.
       const now = forms.current()?.of;
-      if (now?.mode === 'edit' && now.category.id === id) {
+      if ((now?.mode === 'edit' && now.category.id === id) || (now?.mode === 'create' && now.parent?.id === id)) {
         forms.close();
       }
     },
