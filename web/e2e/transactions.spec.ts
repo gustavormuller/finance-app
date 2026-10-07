@@ -5,6 +5,7 @@ import {
   createAccount,
   createTransaction,
   devLogin,
+  holdBack,
   importStep,
   showTransactionsBetween,
   uniqueEmail,
@@ -343,6 +344,38 @@ test('a refusal that comes without a sentence still reads in Portuguese', async 
   await answered((route) => route.fulfill({ status: 500 }), 'O servidor não conseguiu concluir a operação. Tente de novo em instantes.');
   await answered((route) => route.fulfill({ status: 403 }), 'Não foi possível concluir a operação (erro 403).');
   await answered((route) => route.abort('failed'), network);
+});
+
+/** 028: Editar on a row while a new transaction is still being saved. */
+test('Editar while a new transaction is saving opens that row, and the save leaves it open', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-transactions-late'), 'Katherine Johnson');
+  await createAccount(page, 'Nubank');
+  await createTransaction(page, { account: 'Nubank', category: 'Alimentação', amount: '42', date: '2026-09-10', description: 'Mercado' });
+  await showTransactionsBetween(page, '2026-09-01', '2026-09-30');
+
+  const release = await holdBack(page, 'POST', '/api/transactions');
+  await page.getByRole('button', { name: 'Novo lançamento' }).click();
+  await page.getByLabel('Conta', { exact: true }).selectOption({ label: 'Nubank' });
+  await page.getByLabel('Categoria', { exact: true }).selectOption({ label: 'Lazer' });
+  await page.getByLabel('Valor').fill('30');
+  await page.getByLabel('Data').fill('2026-09-12');
+  await page.getByLabel('Descrição').fill('Cinema');
+  await page.getByRole('button', { name: 'Criar lançamento' }).click();
+
+  // The row's own values, not the ones typed for the new transaction.
+  await page.getByRole('row', { name: /Mercado/ }).getByRole('button', { name: 'Editar' }).click();
+  const description = page.getByLabel('Descrição');
+  await expect(description).toHaveValue('Mercado');
+  await expect(page.getByLabel('Valor')).toHaveValue('42.00');
+  release();
+
+  // Cinema lands; Mercado's form is still open, and saves Mercado.
+  await expect(page.getByRole('row', { name: /Cinema/ })).toBeVisible();
+  await description.fill('Mercado do bairro');
+  await page.getByRole('button', { name: 'Salvar lançamento' }).click();
+  await expect(page.getByRole('row', { name: /Mercado do bairro/ })).toBeVisible();
+  await expect(page.getByRole('row', { name: /Cinema/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Salvar lançamento' })).toBeHidden();
 });
 
 /**

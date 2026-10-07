@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { api, type Transaction } from '@/api/finance';
+import { api, type Transaction, type TransactionInput } from '@/api/finance';
 import { useAccounts } from '@/components/accounts/queries';
 import Amount from '@/components/Amount';
 import Alert from '@/components/Alert';
@@ -11,6 +11,7 @@ import EmptyState from '@/components/EmptyState';
 import { saveFile } from '@/lib/download';
 import { formatDate } from '@/lib/labels';
 import { currentMonth, monthDays } from '@/lib/months';
+import { useOpenForm, type Opening } from '@/lib/openForm';
 import { refusalMessage } from '@/lib/refusal';
 import TransactionForm from '@/components/TransactionForm';
 import { selectClasses } from '@/components/FormField';
@@ -41,8 +42,10 @@ export default function TransactionsPage() {
       : { ...monthDays(currentMonth()), accountId: '', categoryId: '', importBatchId: '' },
   );
   const [page, setPage] = useState(1);
-  const [editing, setEditing] = useState<Transaction | null>(null);
-  const [creating, setCreating] = useState(false);
+  // The open form's transaction, or null for a new one.
+  const forms = useOpenForm<Transaction | null>();
+  const opening = forms.open;
+  const editing = opening?.of ?? null;
   const [failure, setFailure] = useState<string | null>(null);
 
   const accounts = useAccounts();
@@ -55,17 +58,19 @@ export default function TransactionsPage() {
   });
 
   const close = () => {
-    setCreating(false);
-    setEditing(null);
+    forms.close();
     setFailure(null);
   };
 
   const save = useMutation({
-    mutationFn: (input: Parameters<typeof api.createTransaction>[0]) =>
-      editing ? api.updateTransaction(editing.id, input) : api.createTransaction(input),
-    onSuccess: async () => {
+    mutationFn: ({ input, from }: { input: TransactionInput; from: Opening<Transaction | null> }) =>
+      from.of ? api.updateTransaction(from.of.id, input) : api.createTransaction(input),
+    onMutate: () => setFailure(null),
+    onSuccess: async (_, { from }) => {
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      close();
+      if (forms.current() === from) {
+        forms.close();
+      }
     },
     onError: (error: Error) => setFailure(refusalMessage(error)),
   });
@@ -114,21 +119,21 @@ export default function TransactionsPage() {
             {exporting.isPending ? 'Exportando…' : 'Exportar CSV'}
           </Button>
 
-          {!creating && !editing && (
-            <Button onClick={() => setCreating(true)}>Novo lançamento</Button>
-          )}
+          {!opening && <Button onClick={() => forms.show(null)}>Novo lançamento</Button>}
         </div>
       </div>
 
-      {(creating || editing) && (
+      {opening && (
         <div className="glass rounded-2xl p-5 sm:p-6">
           <TransactionForm
+            // react-hook-form reads its defaults once: another row needs a form of its own.
+            key={editing?.id ?? 'new'}
             accounts={accounts.data ?? []}
             categories={categories.data ?? []}
             submitLabel={editing ? 'Salvar lançamento' : 'Criar lançamento'}
             onCancel={close}
             onSubmit={async (input) => {
-              await save.mutateAsync(input);
+              await save.mutateAsync({ input, from: opening });
             }}
             {...(editing
               ? {
@@ -237,7 +242,7 @@ export default function TransactionsPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(transaction)}>
+                    <Button variant="ghost" size="sm" onClick={() => forms.show(transaction)}>
                       Editar
                     </Button>
                     <Button
