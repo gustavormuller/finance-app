@@ -1,0 +1,11 @@
+Data;Valor;Descrição
+01/08/2026;-10,00;Linha boa
+31/12/2026;-20,00;Boa também, mas impossível sob MM/dd/yyyy
+2026-08-05;-30,00;Data em outro formato
+06/08/2026;1,234.56;Valor escrito no formato americano
+07/08/2026;0,001;Arredonda para zero
+08/08/2026;-40,00;12/08/2026
+09/08/2026;abc;Valor em texto
+10/08/2026;-50,00
+11/08/1899;-60,00;Fora do intervalo permitido
+12/08/2026;-70,00;Última linha boa
