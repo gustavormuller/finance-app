@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { healthLabel } from '@/lib/labels';
+
 type Health = {
   status: string;
   database: string;
@@ -34,14 +36,8 @@ export default function HealthRoute() {
       <div className="flex items-center gap-1.5">
         <Dot ok={health.status === 'ok'} />
         <dt>API</dt>
-        {/*
-          The value is printed exactly as the API reports it — 'ok', 'degraded',
-          'unreachable'. It is a status word from the wire rather than a label, the
-          e2e spec asserts on it, and translating it would make the page disagree
-          with what the API actually said.
-        */}
         <dd data-testid="health-status" className="font-medium">
-          {health.status}
+          {healthLabel(health.status)}
         </dd>
       </div>
 
@@ -49,7 +45,7 @@ export default function HealthRoute() {
         <Dot ok={health.database === 'ok'} />
         <dt>Banco</dt>
         <dd data-testid="health-database" className="font-medium">
-          {health.database}
+          {healthLabel(health.database)}
         </dd>
       </div>
     </dl>
