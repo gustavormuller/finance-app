@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { categoryTree, fold, type Main, type Use } from '@/lib/categoryTree';
 import { categoryKindPlurals, categoryKinds } from '@/lib/labels';
+import { useOpenForm, type Opening } from '@/lib/openForm';
 import { refusalMessage } from '@/lib/refusal';
 import { cn } from '@/lib/utils';
 
@@ -39,40 +40,49 @@ export default function CategoriesPage() {
   const [search, setSearch] = useState('');
   const [unusedOnly, setUnusedOnly] = useState(false);
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
-  const [form, setForm] = useState<Form | null>(null);
+  const forms = useOpenForm<Form>();
+  const form = forms.open?.of ?? null;
   const [failure, setFailure] = useState<string | null>(null);
 
   const categories = useCategories();
   const usage = useCategoryUsage();
 
   const close = () => {
-    setForm(null);
+    forms.close();
     setFailure(null);
   };
   const open = (next: Form) => {
     setFailure(null);
-    setForm(next);
+    forms.show(next);
   };
 
   const save = useMutation({
-    mutationFn: (input: CategoryInput) =>
-      form?.mode === 'edit' ? api.updateCategory(form.category.id, input) : api.createCategory(input),
-    onSuccess: async (_, input) => {
+    mutationFn: ({ input, from }: { input: CategoryInput; from: Opening<Form> }) =>
+      from.of.mode === 'edit' ? api.updateCategory(from.of.category.id, input) : api.createCategory(input),
+    onMutate: () => setFailure(null),
+    onSuccess: async (_, { input, from }) => {
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
       if (input.parentId) {
         const parentId = input.parentId;
         setOpened((current) => new Set(current).add(parentId));
       }
-      close();
+      if (forms.current() === from) {
+        forms.close();
+      }
     },
     onError: (error: Error) => setFailure(refusalMessage(error)),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteCategory(id),
-    onSuccess: async () => {
+    onMutate: () => setFailure(null),
+    onSuccess: async (_, id) => {
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
-      close();
+      // Only the deleted category's own form goes with it.
+      const now = forms.current()?.of;
+      if (now?.mode === 'edit' && now.category.id === id) {
+        forms.close();
+      }
     },
     onError: (error: Error) => setFailure(refusalMessage(error)),
   });
@@ -92,7 +102,11 @@ export default function CategoriesPage() {
   const formProps = {
     mains,
     pending: save.isPending,
-    onSubmit: (input: CategoryInput) => save.mutate(input),
+    onSubmit: (input: CategoryInput) => {
+      if (forms.open) {
+        save.mutate({ input, from: forms.open });
+      }
+    },
     onCancel: close,
   };
 

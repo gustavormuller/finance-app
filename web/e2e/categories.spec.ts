@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { createAccount, createTransaction, devLogin, uniqueEmail, utcDaysAgo } from './support';
+import { createAccount, createTransaction, devLogin, holdBack, uniqueEmail, utcDaysAgo } from './support';
 
 /**
  * Spec 024: `/categories`, against the real API and a real PostgreSQL. Every test signs in
@@ -195,12 +195,43 @@ test('a refusal the API sends as a 400 is explained in Portuguese', async ({ pag
   await page.getByRole('button', { name: 'Nova subcategoria em Lazer' }).click();
   await page.getByLabel('Nome').fill('Cinema');
   await page.getByRole('button', { name: 'Criar categoria' }).click();
-  // Saved, as a person sees it, before Lazer is edited: a save that lands later closes
-  // whatever form is open by then (spec 027, found on the way).
+  // Saved, as a person sees it, before Lazer is edited.
   await expect(page.getByRole('button', { name: 'Criar categoria' })).toBeHidden();
   await expect(page.getByRole('cell', { name: 'Cinema', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Editar Lazer' }).click();
   await page.getByLabel('Fica dentro de').selectOption({ label: 'Alimentação (Despesa)' });
   await page.getByRole('button', { name: 'Salvar', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('Essa categoria tem subcategorias, então não pode virar subcategoria.');
+});
+
+/** 028: a write closes only the form it came from, however late it lands. */
+test('a write that lands late closes only its own form', async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-categories-late'), 'Grace Hopper');
+  await page.goto('/categories');
+  const name = page.getByLabel('Nome');
+  const salvar = page.getByRole('button', { name: 'Salvar', exact: true });
+
+  // Lazer is opened for editing while Viagens is still being created.
+  const release = await holdBack(page, 'POST', '/api/categories');
+  await page.getByRole('button', { name: 'Nova categoria' }).click();
+  await name.fill('Viagens');
+  await page.getByRole('button', { name: 'Criar categoria' }).click();
+  await page.getByRole('button', { name: 'Editar Lazer' }).click();
+  await expect(name).toHaveValue('Lazer');
+  release();
+
+  // Viagens lands, and its save is over once Salvar is enabled again: Lazer's form is still open.
+  await expect(row(page, 'Viagens')).toBeVisible();
+  await expect(salvar).toBeEnabled();
+  await expect(name).toHaveValue('Lazer');
+  await name.fill('Lazer e cultura');
+  await salvar.click();
+  await expect(row(page, 'Lazer e cultura')).toBeVisible();
+
+  // Deleting a row leaves another category's open form, and what was typed in it, alone.
+  await page.getByRole('button', { name: 'Editar Moradia' }).click();
+  await name.fill('Casa');
+  await page.getByRole('button', { name: 'Excluir Viagens' }).click();
+  await expect(row(page, 'Viagens')).toHaveCount(0);
+  await expect(name).toHaveValue('Casa');
 });

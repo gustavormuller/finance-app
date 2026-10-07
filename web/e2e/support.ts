@@ -262,6 +262,33 @@ export function localMonthDay(monthsBack: number, day = 15) {
 }
 
 /**
+ * Holds back the next `method` request whose path is `path`, as a slow network would, until the
+ * returned function is called; the request reaches the API only then. Every other request
+ * passes. Spec 028 lands a save late this way, after the person has opened another form.
+ */
+export async function holdBack(page: Page, method: string, path: string | RegExp): Promise<() => void> {
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let holding = true;
+
+  await page.route(
+    (url) => (typeof path === 'string' ? url.pathname === path : path.test(url.pathname)),
+    async (route) => {
+      if (holding && route.request().method() === method) {
+        holding = false;
+        await held;
+        await route.continue();
+        return;
+      }
+
+      await route.fallback();
+    },
+  );
+
+  return release;
+}
+
+/**
  * Pages the dashboard's month selector back to `month` (`YYYY-MM`), labelled `label` as
  * the selector writes it, so a test on fixed dates holds whatever the current month is.
  * The selector opens on the browser's month, so that is the clock read here.
