@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { devLogin, uniqueEmail, uniqueTicker as uniqueTickerWith } from './support';
+import { devLogin, holdBack, uniqueEmail, uniqueTicker as uniqueTickerWith } from './support';
 
 /**
  * Spec 006 E2E, against the real API process and a real PostgreSQL.
@@ -205,6 +205,38 @@ test('a search with no match says so', async ({ page }) => {
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   await expect(page.getByText('Nenhum ativo corresponde a esta busca.')).toBeVisible();
+});
+
+/** 028: another entry's Editar opened while one entry's new source is still being saved. */
+test("a source saved late leaves another entry's editor open", async ({ page }) => {
+  await devLogin(page, uniqueEmail('e2e-market-late'), 'Katherine Johnson');
+  await page.goto('/market-data');
+  const tag = uniqueTicker();
+  const [first, second] = [uniqueTicker(), uniqueTicker()];
+  for (const ticker of [first, second]) {
+    await registerAsset(page, ticker, `Fila ${tag}`);
+    await expect(page.getByLabel('Ticker')).toHaveValue('');
+  }
+  await page.getByLabel('Buscar ativo').fill(tag);
+  await page.getByRole('button', { name: 'Buscar' }).click();
+  const row = (ticker: string) => page.locator('[data-testid^="market-asset-"]').filter({ hasText: ticker });
+  await expect(page.locator('[data-testid^="market-asset-"]')).toHaveCount(2);
+
+  const release = await holdBack(page, 'PATCH', /^\/api\/market-data\/assets\//);
+  const edit = page.getByRole('form', { name: 'Editar fonte do ativo' });
+  await page.getByRole('button', { name: `Editar ${first}` }).click();
+  await edit.getByLabel('Símbolo no provedor').fill(`${first}X`);
+  await edit.getByRole('button', { name: 'Salvar' }).click();
+  await page.getByRole('button', { name: `Editar ${second}` }).click();
+  await expect(edit).toContainText(`Editar fonte de ${second}`);
+  release();
+
+  // The first source lands; the second entry's editor is still open, and saves.
+  await expect(row(first)).toContainText(`brapi (${first}X)`);
+  await edit.getByLabel('Símbolo no provedor').fill(`${second}X`);
+  await edit.getByRole('button', { name: 'Salvar' }).click();
+  await expect(edit).toBeHidden();
+  await expect(row(second)).toContainText(`brapi (${second}X)`);
 });
 
 /** Spec E2E test 26. */
