@@ -561,7 +561,7 @@ test('a file the import cannot take is refused with the reason', async ({ page }
   await expect(alert).toHaveText('O arquivo tem 5001 lançamentos; o limite é 5000. Exporte um período menor.');
 
   await choose({ name: 'grande.ofx', mimeType: 'application/x-ofx', buffer: Buffer.alloc(2_200_000, ' ') });
-  await expect(alert).toHaveText(/^O arquivo tem 2[,.]1 MB; o limite é 2 MB\.$/);
+  await expect(alert).toHaveText('O arquivo tem 2,1 MB; o limite é 2 MB.');
 
   await expect(page.getByTestId('drop-zone')).toBeVisible();
   await expect(page.getByText('Nenhuma importação nesta conta ainda.')).toBeVisible();
@@ -569,8 +569,6 @@ test('a file the import cannot take is refused with the reason', async ({ page }
 
 /** 024: a pt-BR sentence writes a decimal comma. */
 test('a file over 2 MB is refused with its size written in Portuguese', async ({ page }) => {
-  test.fixme(true, 'Bug: the API formats the size under InvariantGlobalization, so the pt-BR sentence reads "2.1 MB".');
-
   await devLogin(page, uniqueEmail('e2e-import-size'), 'Alan Turing');
   await createAccount(page, 'Nubank');
   await uploadStatement(page, 'Nubank', { name: 'grande.ofx', mimeType: 'application/x-ofx', buffer: Buffer.alloc(2_200_000, ' ') });

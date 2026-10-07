@@ -95,8 +95,6 @@ async function signOutElsewhere(page: Page) {
 
 /** 024: a write from a tab whose session ended in another one. */
 test('a write after the session ended in another tab is explained in Portuguese', async ({ page }) => {
-  test.fixme(true, 'Bug: a 401 has no problem body, so the page shows the client\'s English fallback "Request failed (401)".');
-
   await devLogin(page, uniqueEmail('e2e-ended-write'), 'Ada Lovelace');
   await createAccount(page, 'Nubank');
   await page.goto('/transactions');
@@ -116,8 +114,6 @@ test('a write after the session ended in another tab is explained in Portuguese'
 
 /** 024: Sair from a tab whose session already ended. */
 test('Sair from a tab whose session already ended lands on the login page', async ({ page }) => {
-  test.fixme(true, 'Bug: the logout answers 401 and the sidebar shows "Não foi possível sair." instead of leaving.');
-
   await devLogin(page, uniqueEmail('e2e-ended-logout'), 'Grace Hopper');
   await page.goto('/');
   await signOutElsewhere(page);

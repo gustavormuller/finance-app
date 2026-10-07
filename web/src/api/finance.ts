@@ -673,13 +673,16 @@ async function download(url: string, fallbackName: string): Promise<DownloadedFi
 }
 
 async function refusal(response: Response): Promise<ApiError> {
-  // The API answers every refusal as problem details. `errors` is present on a 400
-  // naming fields; `detail` carries the readable sentence a 409 exists to give.
+  // The API answers every refusal as problem details but a 401, which has no body: the
+  // session ended, in another tab or by expiring. `errors` is present on a 400 naming
+  // fields; `detail` carries the readable sentence a 409 exists to give.
   const problem = await response.json().catch(() => ({}) as Record<string, unknown>);
 
   return new ApiError(
     response.status,
-    (problem.detail as string) ?? (problem.title as string) ?? `Request failed (${response.status})`,
+    (problem.detail as string) ??
+      (problem.title as string) ??
+      (response.status === 401 ? 'Sua sessão terminou. Entre de novo para continuar.' : `Request failed (${response.status})`),
     (problem.errors as Record<string, string[]>) ?? {},
     typeof problem.openBatchId === 'string' ? problem.openBatchId : null,
   );

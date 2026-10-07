@@ -52,8 +52,6 @@ test('a new user creates the first account from the empty state', async ({ page 
  * back, so Nova conta is clicked while /accounts is still about to open its first account.
  */
 test('an account created before the list has loaded is the one selected', async ({ page }) => {
-  test.fixme(true, 'Bug: created while /accounts is still opening its first account, the new account is not selected; that redirect wins.');
-
   await devLogin(page, uniqueEmail('e2e-accounts-race'), 'Grace Hopper');
   await createAccount(page, 'Banco A');
 

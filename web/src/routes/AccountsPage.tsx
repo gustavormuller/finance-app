@@ -44,8 +44,10 @@ export default function AccountsPage(): React.JSX.Element {
         queryClient.invalidateQueries({ queryKey: ['accounts'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       ]);
-      close();
+      // Selected before the form closes: closing brings the outlet back, and on `/accounts`
+      // alone that is FirstAccount, whose redirect to the first account would win.
       await navigate({ to: '/accounts/$accountId', params: { accountId: created.id } });
+      close();
     },
     onError: (error: Error) => setRefused(accountRefusal(error)),
   });

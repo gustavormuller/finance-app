@@ -95,6 +95,50 @@ public sealed class InvestmentAssetEndpointTests(PostgresFixture postgres)
         Assert.Equal(["marketAssetId"], await ProblemFieldsAsync(unknown, ct));
     }
 
+    /// <summary>
+    /// 025, decision 15: an index or an exchange rate is in the catalogue to be compared with,
+    /// so the portfolio refuses it, picked from the catalogue or registered in the same call.
+    /// </summary>
+    [Fact]
+    public async Task An_index_or_an_exchange_rate_is_refused_and_nothing_is_held()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var api = await StartAsync(postgres, ct);
+        var user = await api.SignInAsync("assets-compare-only", ct);
+        var ibovespa = new MarketAsset
+        {
+            Id = Guid.NewGuid(),
+            Ticker = "IBOV",
+            Name = "Ibovespa",
+            Class = MarketAssetClass.Index,
+            Currency = "BRL",
+            Provider = ProviderKind.Yahoo,
+            ProviderSymbol = "^BVSP",
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        await using (var context = api.Context(null))
+        {
+            context.Add(ibovespa);
+            await context.SaveChangesAsync(ct);
+        }
+
+        using var picked = await user.Client.SendAsync(Post("/api/investments/assets", new { marketAssetId = ibovespa.Id }), ct);
+        using var registered = await user.Client.SendAsync(Post("/api/investments/assets",
+            new { ticker = "USDBRL", @class = "Currency", provider = "Yahoo", providerSymbol = "BRL=X", currency = "BRL" }), ct);
+
+        const string compareOnly = "Índices e câmbio servem para comparação e não entram na carteira.";
+        Assert.Equal(HttpStatusCode.BadRequest, picked.StatusCode);
+        Assert.Equal(["marketAssetId"], await ProblemFieldsAsync(picked, ct));
+        Assert.Equal([compareOnly], await ProblemMessagesAsync(picked, "marketAssetId", ct));
+        Assert.Equal(HttpStatusCode.BadRequest, registered.StatusCode);
+        Assert.Equal(["class"], await ProblemFieldsAsync(registered, ct));
+        Assert.Equal([compareOnly], await ProblemMessagesAsync(registered, "class", ct));
+        Assert.Empty((await user.Client.GetFromJsonAsync<List<PositionItem>>("/api/investments/assets", ct))!);
+        await using var catalogue = api.Context(null);
+        Assert.False(await catalogue.Set<MarketAsset>().AnyAsync(asset => asset.ProviderSymbol == "BRL=X", ct));
+    }
+
     /// <summary>Spec integration test 24, over HTTP, and the assets part of 16.</summary>
     [Fact]
     public async Task An_asset_with_movements_is_a_409_on_delete_and_another_users_asset_is_a_404()

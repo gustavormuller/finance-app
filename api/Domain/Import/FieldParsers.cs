@@ -49,10 +49,7 @@ public static class AmountParser
     /// </exception>
     public static bool TryParse(string? text, string culture, out decimal amount)
     {
-        if (!Formats.TryGetValue(culture, out var format))
-        {
-            throw new ArgumentException($"'{culture}' is not a supported culture.", nameof(culture));
-        }
+        var format = NumberFormat(culture);
 
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -76,15 +73,18 @@ public static class AmountParser
     /// the culture's decimal separator and no grouping, so it parses back to exactly
     /// the same value. How a spreadsheet's number cell enters the CSV path.
     /// </summary>
-    public static string Format(decimal amount, string culture)
-    {
-        if (!Formats.TryGetValue(culture, out var format))
-        {
-            throw new ArgumentException($"'{culture}' is not a supported culture.", nameof(culture));
-        }
+    public static string Format(decimal amount, string culture) =>
+        amount.ToString("0.############################", NumberFormat(culture));
 
-        return amount.ToString("0.############################", format);
-    }
+    /// <summary>
+    /// The culture's separators, also for a number written into a sentence the way its
+    /// readers write it: under <c>InvariantGlobalization</c> the culture cannot be asked.
+    /// </summary>
+    /// <exception cref="ArgumentException">The culture is not one of <see cref="SupportedCultures"/>.</exception>
+    public static NumberFormatInfo NumberFormat(string culture) =>
+        Formats.TryGetValue(culture, out var format)
+            ? format
+            : throw new ArgumentException($"'{culture}' is not a supported culture.", nameof(culture));
 
     /// <summary>
     /// <see cref="decimal.TryParse(string, NumberStyles, IFormatProvider, out decimal)"/>

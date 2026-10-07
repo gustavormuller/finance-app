@@ -67,13 +67,13 @@ export default function TransactionsPage() {
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       close();
     },
-    onError: (error: Error) => setFailure(error.message),
+    onError: (error: Error) => setFailure(refusalMessage(error)),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteTransaction(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
-    onError: (error: Error) => setFailure(error.message),
+    onError: (error: Error) => setFailure(refusalMessage(error)),
   });
 
   // 021: every row the filter selects, not only this page, as the file the API names.

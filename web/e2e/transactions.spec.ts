@@ -280,8 +280,6 @@ test('the form checks what it can before sending, and Cancelar writes nothing', 
 
 /** 024: a rule only the API knows, refused with the API's own sentence. */
 test('a date the API refuses is explained in Portuguese', async ({ page }) => {
-  test.fixme(true, 'Bug: TransactionsPage shows the 400\'s English title ("One or more validation errors occurred.") instead of its field message.');
-
   await devLogin(page, uniqueEmail('e2e-refused-date'), 'Alan Turing');
   await createAccount(page, 'Nubank');
   await page.goto('/transactions');

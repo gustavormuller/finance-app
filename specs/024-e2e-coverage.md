@@ -71,11 +71,11 @@ test that covers it now, by file and title.
 | AUTH-2 | Signed in, the sidebar shows the display name, or the e-mail when Google gave none | partial | `auth` "a signed-in visitor sees their display name on /" |
 | AUTH-3 | Sair returns to `/login`, and the cookie is gone | `auth` | `auth` "logging out returns to the login page and leaves / protected" |
 | AUTH-4 | `/login?error=unverified\|cancelled\|auth_failed` explains itself; `/login`, an unknown code or notice show nothing | GAP | `auth` "the login page explains each way a sign-in can come back, and nothing else" |
-| AUTH-5 | A write, and Sair, from a tab whose session ended in another tab | GAP | **bugs 5 and 6**: `auth` "a write after the session ended in another tab is explained in Portuguese", "Sair from a tab whose session already ended lands on the login page" (`fixme`) |
+| AUTH-5 | A write, and Sair, from a tab whose session ended in another tab | GAP | **bugs 5 and 6**: `auth` "a write after the session ended in another tab is explained in Portuguese", "Sair from a tab whose session already ended lands on the login page" (a `fixme` here; passing since 027) |
 | NAV-1 | The sidebar's eight pages (Comparar since 026, Dados de mercado since 025), no Importar, the current one marked | GAP | `navigation` "the sidebar opens every page and marks the one shown" |
 | NAV-2 | `/investments/returns` opens by address (`/market-data` did too, until 025 put it in the sidebar) | partial | `navigation` "the returns page, outside the sidebar, opens by its address" |
 | NAV-3 | An account or asset id that does not exist says so (`/accounts/$id`, `/investments/$id`, `/investments/$id/returns`) | GAP | `navigation` "an account or an asset that does not exist says so" |
-| NAV-4 | An address that matches no page | GAP | **bug 1**: `navigation` "an address that matches no page answers in Portuguese" (`fixme`) |
+| NAV-4 | An address that matches no page | GAP | **bug 1**: `navigation` "an address that matches no page answers in Portuguese" (a `fixme` here; passing since 027) |
 | THEME-1 | Claro and Escuro survive a reload, the toolbar colour follows | `theme` | `theme` "the theme chosen is kept across a reload" |
 | THEME-2 | Sistema follows the operating system while the page is open, toolbar colour included | GAP | `theme` "Sistema follows the operating system, live" |
 | THEME-3 | The selected account card has the primary outline | `theme` | `theme` "the selected account card has the primary outline" |
@@ -115,7 +115,7 @@ test that covers it now, by file and title.
 | TX-7 | The list opens on the current month; with nothing ever recorded it says so differently | GAP | `transactions` "the list opens on the current month, and an empty ledger says so" |
 | TX-8 | More than 50 rows page 50 at a time | GAP | `transactions` "a list longer than a page pages 50 at a time" |
 | TX-9 | The form's own checks, categories grouped by kind, a typed minus ignored, Cancelar | GAP | `transactions` "the form checks what it can before sending, and Cancelar writes nothing" |
-| TX-10 | A transaction the API refuses (a date out of range) shows the API's sentence | GAP | **bug 2**: `transactions` "a date the API refuses is explained in Portuguese" (`fixme`) |
+| TX-10 | A transaction the API refuses (a date out of range) shows the API's sentence | GAP | **bug 2**: `transactions` "a date the API refuses is explained in Portuguese" (a `fixme` here; passing since 027) |
 | TX-11 | Opened from an import: only its rows, and Mostrar todos | partial | `import` "an OFX is uploaded, reviewed, committed and its rows appear in the list" |
 | TX-12 | Opened from an account: only its rows, whatever the dates | GAP | `accounts` "the Lançamentos tab lists the account's own rows and leads to all of them" |
 | TX-13 | A subcategory is offered as "Principal / Sub" | GAP | `categories` "a category and a subcategory are created, renamed and deleted" |
@@ -128,7 +128,7 @@ test that covers it now, by file and title.
 | # | Flow | Before | After |
 |---|---|---|---|
 | ACC-1 | No accounts: the empty state creates the first, Cancelar writes nothing | GAP | `accounts` "a new user creates the first account from the empty state" |
-| ACC-2 | Creating an account, with or without an opening balance | `support.createAccount` | unchanged; `accounts` "the tab is in the address…" (empty balance is zero); **bug 7**: `accounts` "an account created before the list has loaded is the one selected" (`fixme`) |
+| ACC-2 | Creating an account, with or without an opening balance | `support.createAccount` | unchanged; `accounts` "the tab is in the address…" (empty balance is zero); **bug 7**: `accounts` "an account created before the list has loaded is the one selected" (a `fixme` here; passing since 027) |
 | ACC-3 | Creating refused: a name in use, a blank name, a currency that is not ISO, a balance that is not a number | GAP | `accounts` "an account the form or the API refuses says why, under the field" |
 | ACC-4 | The cards: balance, type, last import (none, in review, its day), total | partial | `accounts` "a new user creates…", "Detalhes da conta…"; `import` "the account shows the import in its card…" |
 | ACC-5 | The Lançamentos tab: latest rows, empty message, link to all of the account's | GAP | `accounts` "the Lançamentos tab…", "a new user creates…" |
@@ -155,7 +155,7 @@ test that covers it now, by file and title.
 | IMP-13 | A file without a header row; another delimiter | GAP | `import` "a file without a header row, and a delimiter typed by hand" |
 | IMP-14 | The next month's OFX: the overlap is duplicate, a foreign-currency row is invalid, a merchant seen before keeps its category | GAP | `import` "next month's statement: the overlap is duplicate, a dollar row is invalid, a merchant keeps its category" |
 | IMP-15 | More than 100 staged rows page in the review | GAP | `transactions` "a list longer than a page pages 50 at a time" |
-| IMP-16 | Refused files: not an OFX, no transactions, not a spreadsheet, over 5 000 rows, over 2 MB | GAP | `import` "a file the import cannot take is refused with the reason"; **bug 4**: "a file over 2 MB is refused with its size written in Portuguese" (`fixme`) |
+| IMP-16 | Refused files: not an OFX, no transactions, not a spreadsheet, over 5 000 rows, over 2 MB | GAP | `import` "a file the import cannot take is refused with the reason"; **bug 4**: "a file over 2 MB is refused with its size written in Portuguese" (a `fixme` here; passing since 027) |
 | IMP-17 | The history: undo (and cancel it), continue and discard a statement in review; Nova importação, Recomeçar, Voltar | GAP | `import` "the history undoes a batch, and resumes or discards a statement in review" |
 | IMP-18 | A second tab's upload while a statement is in review elsewhere | GAP | `import` "an upload from a tab that missed a review started elsewhere is sent to that review" |
 
@@ -167,7 +167,7 @@ test that covers it now, by file and title.
 | CAT-2 | A category and a subcategory created, renamed in place and deleted; the kind follows the parent; a search keeps a matching subcategory's parent | GAP | `categories` "a category and a subcategory are created, renamed and deleted" |
 | CAT-3 | Refused: a name in use, a category with subcategories or transactions; a kind left empty and filled again | GAP | `categories` "a name in use and a category with transactions are refused with the reason" |
 | CAT-4 | Use over the last 12 months: count, total, share, rollup; Só as sem uso | GAP | `categories` "each category's use over the last 12 months, its share, and the unused ones" |
-| CAT-5 | A refusal the API answers with a 400 (a blank name, a parent made a child) | GAP | **bug 3**: `categories` "a refusal the API sends as a 400 is explained in Portuguese" (`fixme`) |
+| CAT-5 | A refusal the API answers with a 400 (a blank name, a parent made a child) | GAP | **bug 3**: `categories` "a refusal the API sends as a 400 is explained in Portuguese" (a `fixme` here; passing since 027) |
 
 ### AI and settings (`/settings`, the import, the dashboard card)
 
@@ -255,7 +255,7 @@ before 026 it moved the start ("1 dia" for "10 dias").
 
 ### Bugs the new tests found
 
-Each is kept as a `test.fixme` with its reason, and none is fixed here.
+Each was kept as a `test.fixme` with its reason, and none was fixed here. Spec 027 fixed all seven; their tests now run and pass.
 
 | # | Bug | Where | Test |
 |---|---|---|---|

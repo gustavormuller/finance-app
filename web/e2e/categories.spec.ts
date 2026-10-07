@@ -181,8 +181,6 @@ test("each category's use over the last 12 months, its share, and the unused one
 });
 
 test('a refusal the API sends as a 400 is explained in Portuguese', async ({ page }) => {
-  test.fixme(true, 'Bug: CategoriesPage shows the 400\'s English title ("One or more validation errors occurred.") instead of its field message.');
-
   await devLogin(page, uniqueEmail('e2e-categories-400'), 'Ada Lovelace');
   await page.goto('/categories');
 
@@ -197,6 +195,10 @@ test('a refusal the API sends as a 400 is explained in Portuguese', async ({ pag
   await page.getByRole('button', { name: 'Nova subcategoria em Lazer' }).click();
   await page.getByLabel('Nome').fill('Cinema');
   await page.getByRole('button', { name: 'Criar categoria' }).click();
+  // Saved, as a person sees it, before Lazer is edited: a save that lands later closes
+  // whatever form is open by then (spec 027, found on the way).
+  await expect(page.getByRole('button', { name: 'Criar categoria' })).toBeHidden();
+  await expect(page.getByRole('cell', { name: 'Cinema', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Editar Lazer' }).click();
   await page.getByLabel('Fica dentro de').selectOption({ label: 'Alimentação (Despesa)' });
   await page.getByRole('button', { name: 'Salvar', exact: true }).click();

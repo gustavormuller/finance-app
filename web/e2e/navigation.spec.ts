@@ -73,8 +73,6 @@ test('an account or an asset that does not exist says so', async ({ page }) => {
 });
 
 test('an address that matches no page answers in Portuguese', async ({ page }) => {
-  test.fixme(true, 'Bug: the router has no notFoundComponent, so TanStack Router renders its English "Not Found".');
-
   await devLogin(page, uniqueEmail('e2e-nav-unknown'), 'Katherine Johnson');
   await page.goto('/nao-existe');
 
